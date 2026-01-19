@@ -405,9 +405,9 @@ class ApiHandlers {
     try {
       final bytes = await blobs.getArchive(versionInfo.archiveKey);
       return Response.ok(
-        bytes,
+        Stream.value(bytes),
         headers: {
-          'content-type': 'application/gzip',
+          'content-type': 'application/octet-stream',
           'content-length': bytes.length.toString(),
         },
       );
