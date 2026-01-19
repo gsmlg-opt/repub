@@ -22,6 +22,9 @@ Router createRouter({
   // Package info endpoint
   router.get('/api/packages/<name>', handlers.getPackage);
 
+  // Version info endpoint
+  router.get('/api/packages/<name>/versions/<version>', handlers.getVersion);
+
   // Publish flow
   router.get('/api/packages/versions/new', handlers.initiateUpload);
   router.post(
@@ -106,6 +109,44 @@ class ApiHandlers {
 
     return Response.ok(
       jsonEncode(response),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/api/packages/<name>/versions/<version>`
+  Future<Response> getVersion(
+      Request request, String name, String version) async {
+    // Check auth if required for downloads
+    if (config.requireDownloadAuth) {
+      final authResult = await authenticate(
+        request,
+        lookupToken: metadata.getTokenByHash,
+        touchToken: metadata.touchToken,
+        requiredScope: 'read:all',
+      );
+      if (authResult is! AuthSuccess) {
+        return _authErrorResponse(authResult);
+      }
+    }
+
+    final versionInfo = await metadata.getPackageVersion(name, version);
+    if (versionInfo == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {
+            'code': 'not_found',
+            'message': 'Version $version of package $name not found',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final archiveUrl =
+        '${config.baseUrl}/packages/${versionInfo.packageName}/versions/${versionInfo.version}.tar.gz';
+
+    return Response.ok(
+      jsonEncode(versionInfo.toJson(archiveUrl)),
       headers: {'content-type': 'application/json'},
     );
   }

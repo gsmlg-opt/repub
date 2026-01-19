@@ -163,6 +163,12 @@ jobs:
           MIT License
           EOF
 
+          # Remove leading spaces from files (heredoc preserves them)
+          sed -i 's/^          //' /tmp/test_pkg/pubspec.yaml
+          sed -i 's/^          //' /tmp/test_pkg/lib/integration_test_pkg.dart
+          sed -i 's/^          //' /tmp/test_pkg/CHANGELOG.md
+          sed -i 's/^          //' /tmp/test_pkg/LICENSE
+
       - name: Publish test package
         run: |
           # Add token to dart pub
@@ -216,6 +222,10 @@ jobs:
             print(testMessage());
           }
           EOF
+
+          # Remove leading spaces from files (heredoc preserves them)
+          sed -i 's/^          //' /tmp/consumer_app/pubspec.yaml
+          sed -i 's/^          //' /tmp/consumer_app/bin/main.dart
 
           cd /tmp/consumer_app
           dart pub get
