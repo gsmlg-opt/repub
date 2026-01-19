@@ -1,0 +1,66 @@
+name: repub
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dev_dependencies:
+  melos: ^7.0.0
+
+workspace:
+  - packages/repub_model
+  - packages/repub_auth
+  - packages/repub_storage
+  - packages/repub_migrate
+  - packages/repub_server
+  - packages/repub_cli
+
+melos:
+  command:
+    bootstrap:
+      runPubGetInParallel: true
+
+  scripts:
+    analyze:
+      description: Run dart analyze in all packages
+      run: dart analyze --fatal-infos
+      exec:
+        concurrency: 5
+
+    test:
+      description: Run tests in all packages
+      run: dart test
+      exec:
+        concurrency: 1
+      packageFilters:
+        dirExists: test
+
+    format:
+      description: Format all Dart files
+      run: dart format .
+      exec:
+        concurrency: 5
+
+    format:check:
+      description: Check formatting of all Dart files
+      run: dart format --set-exit-if-changed .
+      exec:
+        concurrency: 5
+
+    migrate:
+      description: Run database migrations
+      run: dart run repub_cli migrate
+      packageFilters:
+        scope: repub_cli
+
+    serve:
+      description: Start the repub server
+      run: dart run repub_server
+      packageFilters:
+        scope: repub_server
+
+    build:
+      description: Build production binary
+      run: dart compile exe bin/repub_server.dart -o bin/repub
+      packageFilters:
+        scope: repub_server

@@ -1,0 +1,20 @@
+name: repub_storage
+description: Storage abstractions (PostgreSQL + S3) for repub package registry
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  repub_model:
+    path: ../repub_model
+  postgres: ^3.5.1
+  minio: ^3.5.8
+  crypto: ^3.0.6
+  uuid: ^4.5.1
+
+dev_dependencies:
+  lints: ^5.1.1
+  test: ^1.25.8
