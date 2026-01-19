@@ -432,32 +432,63 @@ class ApiHandlers {
     }
 
     final boundary = boundaryMatch.group(1)!;
+    final boundaryBytes = utf8.encode('--$boundary');
     final bytes = await request.read().expand((x) => x).toList();
     final body = Uint8List.fromList(bytes);
 
-    final bodyStr = utf8.decode(body, allowMalformed: true);
-    final parts = bodyStr.split('--$boundary');
+    // Find boundary positions in raw bytes
+    final headerEndMarker = utf8.encode('\r\n\r\n');
+    final endMarker = utf8.encode('\r\n--');
 
-    for (final part in parts) {
-      if (part.contains('filename=') || part.contains('name="file"')) {
-        final headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd == -1) continue;
+    int pos = 0;
+    while (pos < body.length) {
+      // Find next boundary
+      final boundaryPos = _indexOf(body, boundaryBytes, pos);
+      if (boundaryPos == -1) break;
 
-        final contentStart = headerEnd + 4;
-        final contentEnd = part.lastIndexOf('\r\n');
-        if (contentEnd <= contentStart) continue;
+      // Find header end
+      final headerEndPos =
+          _indexOf(body, headerEndMarker, boundaryPos + boundaryBytes.length);
+      if (headerEndPos == -1) {
+        pos = boundaryPos + boundaryBytes.length;
+        continue;
+      }
 
-        final partStartInBody = bodyStr.indexOf(part);
-        final start = partStartInBody + contentStart;
-        final end = partStartInBody + contentEnd;
+      // Check if this part contains file data by looking at headers
+      final headerBytes = body.sublist(boundaryPos + boundaryBytes.length,
+          headerEndPos + headerEndMarker.length);
+      final headerStr = utf8.decode(headerBytes, allowMalformed: true);
 
-        if (start >= 0 && end <= body.length && start < end) {
-          return Uint8List.sublistView(body, start, end);
+      if (headerStr.contains('filename=') ||
+          headerStr.contains('name="file"')) {
+        final contentStart = headerEndPos + headerEndMarker.length;
+
+        // Find the next boundary or end
+        final nextBoundaryPos = _indexOf(body, endMarker, contentStart);
+        final contentEnd =
+            nextBoundaryPos != -1 ? nextBoundaryPos : body.length;
+
+        if (contentEnd > contentStart) {
+          return Uint8List.sublistView(body, contentStart, contentEnd);
         }
       }
+
+      pos = headerEndPos + headerEndMarker.length;
     }
 
     return Uint8List(0);
+  }
+
+  /// Find the index of a pattern in a byte list.
+  int _indexOf(Uint8List haystack, List<int> needle, int start) {
+    outer:
+    for (var i = start; i <= haystack.length - needle.length; i++) {
+      for (var j = 0; j < needle.length; j++) {
+        if (haystack[i + j] != needle[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
   }
 
   Response _authErrorResponse(AuthResult result) {
