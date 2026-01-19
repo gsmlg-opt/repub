@@ -100,7 +100,7 @@ jobs:
 
       - name: Setup MinIO bucket
         run: |
-          docker run --rm --network host minio/mc:latest sh -c "
+          docker run --rm --network host --entrypoint /bin/sh minio/mc:latest -c "
             mc alias set repub http://localhost:9000 minioadmin minioadmin &&
             mc mb repub/repub --ignore-existing
           "
