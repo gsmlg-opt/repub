@@ -106,11 +106,12 @@ jobs:
           "
 
       - name: Run migrations
-        run: dart run -C packages/repub_cli repub_cli migrate
+        run: cd packages/repub_cli && dart run repub_cli migrate
 
       - name: Start server
         run: |
-          dart run -C packages/repub_server repub_server &
+          cd packages/repub_server
+          dart run repub_server &
           echo $! > /tmp/server.pid
 
           # Wait for server to be ready
@@ -127,7 +128,8 @@ jobs:
       - name: Create auth token
         id: token
         run: |
-          TOKEN=$(dart run -C packages/repub_cli repub_cli token create ci-test publish:all 2>&1 | grep "^Created token:" | cut -d: -f2 | tr -d ' ')
+          cd packages/repub_cli
+          TOKEN=$(dart run repub_cli token create ci-test publish:all 2>&1 | grep "^Created token:" | cut -d: -f2 | tr -d ' ')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           echo "Token created successfully"
 
