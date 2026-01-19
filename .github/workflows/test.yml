@@ -1,10 +1,9 @@
 name: Test
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -71,6 +70,17 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      REPUB_URL: http://localhost:8080
+      REPUB_LISTEN_ADDR: "0.0.0.0:8080"
+      REPUB_BASE_URL: "http://localhost:8080"
+      REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
+      REPUB_S3_ENDPOINT: "http://localhost:9000"
+      REPUB_S3_REGION: "us-east-1"
+      REPUB_S3_ACCESS_KEY: "minioadmin"
+      REPUB_S3_SECRET_KEY: "minioadmin"
+      REPUB_S3_BUCKET: "repub"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -92,32 +102,147 @@ jobs:
           "
 
       - name: Run migrations
-        env:
-          REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
         run: dart run -C packages/repub_cli repub_cli migrate
 
       - name: Start server
-        env:
-          REPUB_LISTEN_ADDR: "0.0.0.0:8080"
-          REPUB_BASE_URL: "http://localhost:8080"
-          REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
-          REPUB_S3_ENDPOINT: "http://localhost:9000"
-          REPUB_S3_REGION: "us-east-1"
-          REPUB_S3_ACCESS_KEY: "minioadmin"
-          REPUB_S3_SECRET_KEY: "minioadmin"
-          REPUB_S3_BUCKET: "repub"
         run: |
           dart run -C packages/repub_server repub_server &
-          sleep 5
+          echo $! > /tmp/server.pid
+
+          # Wait for server to be ready
+          for i in {1..30}; do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Server is ready"
+              break
+            fi
+            sleep 1
+          done
+
           curl -sf http://localhost:8080/health || exit 1
-          echo "Server is running"
 
-      - name: Test API endpoints
+      - name: Create auth token
+        id: token
         run: |
-          # Test health endpoint
-          curl -sf http://localhost:8080/health
+          TOKEN=$(dart run -C packages/repub_cli repub_cli token create ci-test publish:all 2>&1 | grep "^Created token:" | cut -d: -f2 | tr -d ' ')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "Token created successfully"
 
-          # Test packages endpoint (should return empty list or 404)
-          curl -sf http://localhost:8080/api/packages/nonexistent || true
+      - name: Create test package
+        run: |
+          mkdir -p /tmp/test_pkg/lib
 
-          echo "API endpoints responding correctly"
+          cat > /tmp/test_pkg/pubspec.yaml << 'EOF'
+          name: integration_test_pkg
+          version: 1.0.0
+          description: Integration test package for CI
+          environment:
+            sdk: ^3.0.0
+          publish_to: http://localhost:8080
+          EOF
+
+          cat > /tmp/test_pkg/lib/integration_test_pkg.dart << 'EOF'
+          /// Integration test package.
+          library;
+
+          /// Returns a test message.
+          String testMessage() => 'Integration test successful!';
+          EOF
+
+          cat > /tmp/test_pkg/CHANGELOG.md << 'EOF'
+          ## 1.0.0
+          - Initial release
+          EOF
+
+          cat > /tmp/test_pkg/LICENSE << 'EOF'
+          MIT License
+          EOF
+
+      - name: Publish test package
+        run: |
+          # Add token to dart pub
+          echo "${{ steps.token.outputs.token }}" | dart pub token add http://localhost:8080
+
+          cd /tmp/test_pkg
+          dart pub publish --force
+
+          echo "Package published successfully"
+
+      - name: Verify package in registry
+        run: |
+          # Check package exists via API
+          response=$(curl -sf http://localhost:8080/api/packages/integration_test_pkg)
+
+          if echo "$response" | grep -q '"name":"integration_test_pkg"'; then
+            echo "Package found in registry"
+          else
+            echo "Package not found!"
+            echo "Response: $response"
+            exit 1
+          fi
+
+          if echo "$response" | grep -q '"version":"1.0.0"'; then
+            echo "Version 1.0.0 verified"
+          else
+            echo "Version not found!"
+            exit 1
+          fi
+
+      - name: Download and use published package
+        run: |
+          mkdir -p /tmp/consumer_app/bin
+
+          cat > /tmp/consumer_app/pubspec.yaml << 'EOF'
+          name: consumer_app
+          version: 1.0.0
+          environment:
+            sdk: ^3.0.0
+          dependencies:
+            integration_test_pkg:
+              hosted:
+                url: http://localhost:8080
+              version: ^1.0.0
+          EOF
+
+          cat > /tmp/consumer_app/bin/main.dart << 'EOF'
+          import 'package:integration_test_pkg/integration_test_pkg.dart';
+
+          void main() {
+            print(testMessage());
+          }
+          EOF
+
+          cd /tmp/consumer_app
+          dart pub get
+
+          output=$(dart run bin/main.dart)
+
+          if echo "$output" | grep -q "Integration test successful!"; then
+            echo "Consumer app executed successfully!"
+            echo "Output: $output"
+          else
+            echo "Unexpected output: $output"
+            exit 1
+          fi
+
+      - name: Test package versions endpoint
+        run: |
+          response=$(curl -sf http://localhost:8080/api/packages/integration_test_pkg/versions/1.0.0)
+
+          if echo "$response" | grep -q '"version":"1.0.0"'; then
+            echo "Version endpoint working correctly"
+          else
+            echo "Version endpoint failed"
+            echo "Response: $response"
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Remove token
+          dart pub token remove http://localhost:8080 || true
+
+          # Stop server
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) 2>/dev/null || true
+          fi
