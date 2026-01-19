@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: gsmlg-dev/repub
+  IMAGE_NAME: gsmlg-opt/repub
 
 jobs:
   build:
