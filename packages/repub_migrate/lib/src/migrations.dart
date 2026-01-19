@@ -58,8 +58,6 @@ const migrations = <String, String>{
 
 /// Get all migrations that haven't been applied yet.
 List<MapEntry<String, String>> getPendingMigrations(Set<String> applied) {
-  return migrations.entries
-      .where((e) => !applied.contains(e.key))
-      .toList()
+  return migrations.entries.where((e) => !applied.contains(e.key)).toList()
     ..sort((a, b) => a.key.compareTo(b.key));
 }

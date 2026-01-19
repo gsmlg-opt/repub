@@ -23,6 +23,9 @@ RUN dart pub global run melos bootstrap
 # Copy all source code
 COPY packages/ packages/
 
+# Create output directory and compile executables
+RUN mkdir -p bin
+
 # Compile repub_server to native executable
 RUN dart compile exe packages/repub_server/bin/repub_server.dart -o bin/repub_server
 

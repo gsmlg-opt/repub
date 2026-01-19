@@ -50,10 +50,9 @@ class MetadataStore {
 
     return result.map((row) {
       final pubspecJson = row[2];
-      final pubspec =
-          pubspecJson is Map<String, dynamic>
-              ? pubspecJson
-              : jsonDecode(pubspecJson as String) as Map<String, dynamic>;
+      final pubspec = pubspecJson is Map<String, dynamic>
+          ? pubspecJson
+          : jsonDecode(pubspecJson as String) as Map<String, dynamic>;
 
       return PackageVersion(
         packageName: row[0] as String,
@@ -93,10 +92,9 @@ class MetadataStore {
 
     final row = result.first;
     final pubspecJson = row[2];
-    final pubspec =
-        pubspecJson is Map<String, dynamic>
-            ? pubspecJson
-            : jsonDecode(pubspecJson as String) as Map<String, dynamic>;
+    final pubspec = pubspecJson is Map<String, dynamic>
+        ? pubspecJson
+        : jsonDecode(pubspecJson as String) as Map<String, dynamic>;
 
     return PackageVersion(
       packageName: row[0] as String,
@@ -173,10 +171,9 @@ class MetadataStore {
 
     final row = result.first;
     final scopes = row[2];
-    final scopesList =
-        scopes is List
-            ? scopes.cast<String>()
-            : (scopes as List<dynamic>).cast<String>();
+    final scopesList = scopes is List
+        ? scopes.cast<String>()
+        : (scopes as List<dynamic>).cast<String>();
 
     return AuthToken(
       tokenHash: row[0] as String,
@@ -229,10 +226,9 @@ class MetadataStore {
       final scopes = row[1];
       return {
         'label': row[0] as String,
-        'scopes':
-            scopes is List
-                ? scopes.cast<String>()
-                : (scopes as List<dynamic>).cast<String>(),
+        'scopes': scopes is List
+            ? scopes.cast<String>()
+            : (scopes as List<dynamic>).cast<String>(),
         'created_at': (row[2] as DateTime).toIso8601String(),
         'last_used_at': (row[3] as DateTime?)?.toIso8601String(),
       };

@@ -71,7 +71,8 @@ Future<void> runTokenCommand(List<String> args) async {
     print('  admin         - Full access');
     print('  publish:all   - Publish any package');
     print('  publish:pkg:NAME - Publish specific package');
-    print('  read:all      - Read/download packages (needed if REQUIRE_DOWNLOAD_AUTH=true)');
+    print(
+        '  read:all      - Read/download packages (needed if REQUIRE_DOWNLOAD_AUTH=true)');
     exit(1);
   }
 
@@ -84,7 +85,8 @@ Future<void> runTokenCommand(List<String> args) async {
       case 'create':
         if (args.length < 2) {
           print('Usage: dart run repub_cli token create <label> [scopes...]');
-          print('Example: dart run repub_cli token create ci-publish publish:all');
+          print(
+              'Example: dart run repub_cli token create ci-publish publish:all');
           exit(1);
         }
         final label = args[1];

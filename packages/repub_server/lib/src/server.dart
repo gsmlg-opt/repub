@@ -55,7 +55,8 @@ Future<void> startServer({Config? config}) async {
     cfg.listenPort,
   );
 
-  print('Repub server listening on http://${server.address.host}:${server.port}');
+  print(
+      'Repub server listening on http://${server.address.host}:${server.port}');
   print('Press Ctrl+C to stop');
 
   // Handle shutdown

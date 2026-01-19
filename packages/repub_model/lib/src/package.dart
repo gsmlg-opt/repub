@@ -15,10 +15,10 @@ class Package {
   });
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    if (isDiscontinued) 'isDiscontinued': true,
-    if (replacedBy != null) 'replacedBy': replacedBy,
-  };
+        'name': name,
+        if (isDiscontinued) 'isDiscontinued': true,
+        if (replacedBy != null) 'replacedBy': replacedBy,
+      };
 }
 
 /// A specific version of a package.
@@ -42,12 +42,12 @@ class PackageVersion {
   /// Convert to JSON for API response.
   /// [archiveUrl] is the full URL to download the archive.
   Map<String, dynamic> toJson(String archiveUrl) => {
-    'version': version,
-    'pubspec': pubspec,
-    'archive_url': archiveUrl,
-    'archive_sha256': archiveSha256,
-    'published': publishedAt.toUtc().toIso8601String(),
-  };
+        'version': version,
+        'pubspec': pubspec,
+        'archive_url': archiveUrl,
+        'archive_sha256': archiveSha256,
+        'published': publishedAt.toUtc().toIso8601String(),
+      };
 }
 
 /// Full package info including all versions.

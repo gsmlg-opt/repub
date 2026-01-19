@@ -43,8 +43,7 @@ Future<PublishResult> validateTarball(Uint8List tarballBytes) async {
     ArchiveFile? pubspecFile;
     for (final file in archive) {
       // pubspec.yaml can be at root or in a subdirectory
-      if (file.name == 'pubspec.yaml' ||
-          file.name.endsWith('/pubspec.yaml')) {
+      if (file.name == 'pubspec.yaml' || file.name.endsWith('/pubspec.yaml')) {
         // Prefer the one at root or shallowest level
         if (pubspecFile == null ||
             file.name.split('/').length < pubspecFile.name.split('/').length) {

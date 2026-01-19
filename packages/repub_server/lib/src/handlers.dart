@@ -16,18 +16,22 @@ Router createRouter({
   required BlobStore blobs,
 }) {
   final router = Router();
-  final handlers = ApiHandlers(config: config, metadata: metadata, blobs: blobs);
+  final handlers =
+      ApiHandlers(config: config, metadata: metadata, blobs: blobs);
 
   // Package info endpoint
   router.get('/api/packages/<name>', handlers.getPackage);
 
   // Publish flow
   router.get('/api/packages/versions/new', handlers.initiateUpload);
-  router.post('/api/packages/versions/upload/<sessionId>', handlers.uploadPackage);
-  router.get('/api/packages/versions/finalize/<sessionId>', handlers.finalizeUpload);
+  router.post(
+      '/api/packages/versions/upload/<sessionId>', handlers.uploadPackage);
+  router.get(
+      '/api/packages/versions/finalize/<sessionId>', handlers.finalizeUpload);
 
   // Download endpoint (legacy format)
-  router.get('/packages/<name>/versions/<version>.tar.gz', handlers.downloadPackage);
+  router.get(
+      '/packages/<name>/versions/<version>.tar.gz', handlers.downloadPackage);
 
   // Health check
   router.get('/health', (Request req) {
@@ -81,7 +85,8 @@ class ApiHandlers {
     // Build version list with archive URLs
     final versions = <Map<String, dynamic>>[];
     for (final v in info.versions) {
-      final archiveUrl = '${config.baseUrl}/packages/${v.packageName}/versions/${v.version}.tar.gz';
+      final archiveUrl =
+          '${config.baseUrl}/packages/${v.packageName}/versions/${v.version}.tar.gz';
       versions.add(v.toJson(archiveUrl));
     }
 
@@ -95,7 +100,8 @@ class ApiHandlers {
       if (latest != null) 'latest': latest.toJson(latestArchiveUrl!),
       'versions': versions,
       if (info.package.isDiscontinued) 'isDiscontinued': true,
-      if (info.package.replacedBy != null) 'replacedBy': info.package.replacedBy,
+      if (info.package.replacedBy != null)
+        'replacedBy': info.package.replacedBy,
     };
 
     return Response.ok(
@@ -119,7 +125,8 @@ class ApiHandlers {
     // Create upload session
     final session = await metadata.createUploadSession();
 
-    final uploadUrl = '${config.baseUrl}/api/packages/versions/upload/${session.id}';
+    final uploadUrl =
+        '${config.baseUrl}/api/packages/versions/upload/${session.id}';
 
     return Response.ok(
       jsonEncode({
@@ -148,7 +155,10 @@ class ApiHandlers {
       return Response(
         400,
         body: jsonEncode({
-          'error': {'code': 'invalid_session', 'message': 'Invalid or expired upload session'},
+          'error': {
+            'code': 'invalid_session',
+            'message': 'Invalid or expired upload session'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -158,7 +168,10 @@ class ApiHandlers {
       return Response(
         400,
         body: jsonEncode({
-          'error': {'code': 'expired_session', 'message': 'Upload session has expired'},
+          'error': {
+            'code': 'expired_session',
+            'message': 'Upload session has expired'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -189,7 +202,8 @@ class ApiHandlers {
     _uploadData[sessionId] = tarballBytes;
 
     // Respond with 204 and Location header for finalize
-    final finalizeUrl = '${config.baseUrl}/api/packages/versions/finalize/$sessionId';
+    final finalizeUrl =
+        '${config.baseUrl}/api/packages/versions/finalize/$sessionId';
     return Response(
       204,
       headers: {'location': finalizeUrl},
@@ -216,7 +230,10 @@ class ApiHandlers {
       return Response(
         400,
         body: jsonEncode({
-          'error': {'code': 'no_upload', 'message': 'No upload data found for session'},
+          'error': {
+            'code': 'no_upload',
+            'message': 'No upload data found for session'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -229,7 +246,10 @@ class ApiHandlers {
       return Response(
         400,
         body: jsonEncode({
-          'error': {'code': 'invalid_session', 'message': 'Invalid or expired upload session'},
+          'error': {
+            'code': 'invalid_session',
+            'message': 'Invalid or expired upload session'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -254,7 +274,8 @@ class ApiHandlers {
     // Check publish permission
     if (!token.canPublish(success.packageName)) {
       _uploadData.remove(sessionId);
-      return forbidden('Not authorized to publish package: ${success.packageName}');
+      return forbidden(
+          'Not authorized to publish package: ${success.packageName}');
     }
 
     // Check if version already exists
@@ -265,7 +286,8 @@ class ApiHandlers {
         body: jsonEncode({
           'error': {
             'code': 'version_exists',
-            'message': 'Version ${success.version} of ${success.packageName} already exists',
+            'message':
+                'Version ${success.version} of ${success.packageName} already exists',
           },
         }),
         headers: {'content-type': 'application/json'},
@@ -298,7 +320,8 @@ class ApiHandlers {
     return Response.ok(
       jsonEncode({
         'success': {
-          'message': 'Successfully published ${success.packageName} ${success.version}',
+          'message':
+              'Successfully published ${success.packageName} ${success.version}',
         },
       }),
       headers: {'content-type': 'application/json'},
@@ -350,7 +373,10 @@ class ApiHandlers {
     } catch (e) {
       return Response.internalServerError(
         body: jsonEncode({
-          'error': {'code': 'storage_error', 'message': 'Failed to retrieve archive'},
+          'error': {
+            'code': 'storage_error',
+            'message': 'Failed to retrieve archive'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );

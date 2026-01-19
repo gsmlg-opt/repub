@@ -13,9 +13,9 @@ class BlobStore {
     required Minio minio,
     required String bucket,
     required int signedUrlTtl,
-  }) : _minio = minio,
-       _bucket = bucket,
-       _signedUrlTtl = signedUrlTtl;
+  })  : _minio = minio,
+        _bucket = bucket,
+        _signedUrlTtl = signedUrlTtl;
 
   /// Create a blob store from config.
   factory BlobStore.fromConfig(Config config) {
@@ -23,7 +23,9 @@ class BlobStore {
 
     final minio = Minio(
       endPoint: endpoint.host,
-      port: endpoint.hasPort ? endpoint.port : (endpoint.scheme == 'https' ? 443 : 9000),
+      port: endpoint.hasPort
+          ? endpoint.port
+          : (endpoint.scheme == 'https' ? 443 : 9000),
       useSSL: endpoint.scheme == 'https',
       accessKey: config.s3AccessKey,
       secretKey: config.s3SecretKey,
