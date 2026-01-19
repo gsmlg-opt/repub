@@ -24,8 +24,13 @@ Future<int> runMigrations(Connection conn) async {
     print('Applying migration: ${migration.key}');
 
     await conn.runTx((session) async {
-      // Run the migration SQL
-      await session.execute(migration.value);
+      // Split migration into individual statements and execute each
+      final statements = _splitStatements(migration.value);
+      for (final statement in statements) {
+        if (statement.trim().isNotEmpty) {
+          await session.execute(statement);
+        }
+      }
 
       // Record it as applied
       await session.execute(
@@ -38,4 +43,80 @@ Future<int> runMigrations(Connection conn) async {
   }
 
   return count;
+}
+
+/// Split SQL into individual statements.
+/// Handles semicolons inside strings and comments.
+List<String> _splitStatements(String sql) {
+  final statements = <String>[];
+  final buffer = StringBuffer();
+  var inSingleQuote = false;
+  var inDoubleQuote = false;
+  var inLineComment = false;
+  var inBlockComment = false;
+
+  for (var i = 0; i < sql.length; i++) {
+    final char = sql[i];
+    final nextChar = i + 1 < sql.length ? sql[i + 1] : '';
+
+    // Handle comments
+    if (!inSingleQuote && !inDoubleQuote) {
+      if (inLineComment) {
+        buffer.write(char);
+        if (char == '\n') inLineComment = false;
+        continue;
+      }
+      if (inBlockComment) {
+        buffer.write(char);
+        if (char == '*' && nextChar == '/') {
+          buffer.write(nextChar);
+          i++;
+          inBlockComment = false;
+        }
+        continue;
+      }
+      if (char == '-' && nextChar == '-') {
+        inLineComment = true;
+        buffer.write(char);
+        continue;
+      }
+      if (char == '/' && nextChar == '*') {
+        inBlockComment = true;
+        buffer.write(char);
+        continue;
+      }
+    }
+
+    // Handle quotes
+    if (char == "'" && !inDoubleQuote && !inLineComment && !inBlockComment) {
+      inSingleQuote = !inSingleQuote;
+    }
+    if (char == '"' && !inSingleQuote && !inLineComment && !inBlockComment) {
+      inDoubleQuote = !inDoubleQuote;
+    }
+
+    // Handle semicolons
+    if (char == ';' &&
+        !inSingleQuote &&
+        !inDoubleQuote &&
+        !inLineComment &&
+        !inBlockComment) {
+      final stmt = buffer.toString().trim();
+      if (stmt.isNotEmpty) {
+        statements.add(stmt);
+      }
+      buffer.clear();
+      continue;
+    }
+
+    buffer.write(char);
+  }
+
+  // Add remaining statement if any
+  final remaining = buffer.toString().trim();
+  if (remaining.isNotEmpty) {
+    statements.add(remaining);
+  }
+
+  return statements;
 }
