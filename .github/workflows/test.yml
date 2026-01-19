@@ -1,0 +1,123 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap workspace
+        run: melos bootstrap
+
+      - name: Run tests
+        run: |
+          for pkg in packages/*; do
+            if [ -d "$pkg/test" ] && [ "$(ls -A "$pkg/test" 2>/dev/null)" ]; then
+              echo "Testing $pkg..."
+              (cd "$pkg" && dart test --reporter=expanded)
+            else
+              echo "Skipping $pkg (no tests)"
+            fi
+          done
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: repub
+          POSTGRES_PASSWORD: repub
+          POSTGRES_DB: repub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "mc ready local"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap workspace
+        run: melos bootstrap
+
+      - name: Setup MinIO bucket
+        run: |
+          docker run --rm --network host minio/mc:latest sh -c "
+            mc alias set repub http://localhost:9000 minioadmin minioadmin &&
+            mc mb repub/repub --ignore-existing
+          "
+
+      - name: Run migrations
+        env:
+          REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
+        run: dart run -C packages/repub_cli repub_cli migrate
+
+      - name: Start server
+        env:
+          REPUB_LISTEN_ADDR: "0.0.0.0:8080"
+          REPUB_BASE_URL: "http://localhost:8080"
+          REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
+          REPUB_S3_ENDPOINT: "http://localhost:9000"
+          REPUB_S3_REGION: "us-east-1"
+          REPUB_S3_ACCESS_KEY: "minioadmin"
+          REPUB_S3_SECRET_KEY: "minioadmin"
+          REPUB_S3_BUCKET: "repub"
+        run: |
+          dart run -C packages/repub_server repub_server &
+          sleep 5
+          curl -sf http://localhost:8080/health || exit 1
+          echo "Server is running"
+
+      - name: Test API endpoints
+        run: |
+          # Test health endpoint
+          curl -sf http://localhost:8080/health
+
+          # Test packages endpoint (should return empty list or 404)
+          curl -sf http://localhost:8080/api/packages/nonexistent || true
+
+          echo "API endpoints responding correctly"

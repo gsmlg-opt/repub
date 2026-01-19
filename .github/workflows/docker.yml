@@ -1,0 +1,113 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build and Push
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  test-image:
+    name: Test Docker Image
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build test image
+        run: docker build -t repub-test .
+
+      - name: Start services
+        run: |
+          docker compose up -d postgres minio minio-init
+          sleep 10
+
+      - name: Run container
+        run: |
+          docker run -d --name repub-server \
+            --network host \
+            -e REPUB_LISTEN_ADDR="0.0.0.0:8080" \
+            -e REPUB_BASE_URL="http://localhost:8080" \
+            -e REPUB_DATABASE_URL="postgres://repub:repub@localhost:5432/repub" \
+            -e REPUB_S3_ENDPOINT="http://localhost:9000" \
+            -e REPUB_S3_REGION="us-east-1" \
+            -e REPUB_S3_ACCESS_KEY="minioadmin" \
+            -e REPUB_S3_SECRET_KEY="minioadmin" \
+            -e REPUB_S3_BUCKET="repub" \
+            repub-test
+
+          sleep 5
+          docker logs repub-server
+
+      - name: Test health endpoint
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:8080/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Health check failed"
+          docker logs repub-server
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop repub-server || true
+          docker compose down || true
