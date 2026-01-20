@@ -91,15 +91,7 @@ jobs:
   build:
     name: Build Release Binaries
     needs: test
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: linux-x64
-          - os: macos-latest
-            target: macos-arm64
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -117,20 +109,20 @@ jobs:
       - name: Compile server binary
         run: |
           dart compile exe packages/repub_server/bin/repub_server.dart \
-            -o repub_server-${{ matrix.target }}
+            -o repub_server-linux-x64
 
       - name: Compile CLI binary
         run: |
           dart compile exe packages/repub_cli/bin/repub_cli.dart \
-            -o repub_cli-${{ matrix.target }}
+            -o repub_cli-linux-x64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.target }}
+          name: binaries-linux-x64
           path: |
-            repub_server-${{ matrix.target }}
-            repub_cli-${{ matrix.target }}
+            repub_server-linux-x64
+            repub_cli-linux-x64
 
   release:
     name: Create Release
