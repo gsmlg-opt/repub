@@ -78,3 +78,45 @@ int _compareSemver(String a, String b) {
   }
   return 0;
 }
+
+/// Result of listing packages with pagination.
+class PackageListResult {
+  final List<PackageInfo> packages;
+  final int total;
+  final int page;
+  final int limit;
+
+  const PackageListResult({
+    required this.packages,
+    required this.total,
+    required this.page,
+    required this.limit,
+  });
+
+  int get totalPages => (total / limit).ceil();
+  bool get hasNextPage => page < totalPages;
+  bool get hasPrevPage => page > 1;
+
+  Map<String, dynamic> toJson(String baseUrl) => {
+        'packages': packages.map((p) {
+          final latest = p.latest;
+          final latestArchiveUrl = latest != null
+              ? '$baseUrl/packages/${latest.packageName}/versions/${latest.version}.tar.gz'
+              : null;
+          return {
+            'name': p.package.name,
+            if (latest != null) 'latest': latest.toJson(latestArchiveUrl!),
+            'versions': p.versions.map((v) {
+              final archiveUrl =
+                  '$baseUrl/packages/${v.packageName}/versions/${v.version}.tar.gz';
+              return v.toJson(archiveUrl);
+            }).toList(),
+            if (p.package.isDiscontinued) 'isDiscontinued': true,
+            if (p.package.replacedBy != null) 'replacedBy': p.package.replacedBy,
+          };
+        }).toList(),
+        'total': total,
+        'page': page,
+        'limit': limit,
+      };
+}

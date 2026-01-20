@@ -1,0 +1,13 @@
+targets:
+  $default:
+    builders:
+      jaspr_builder:
+        enabled: true
+      build_web_compilers:web_entrypoint:
+        generate_for:
+          - web/main.dart
+        options:
+          compiler: dart2js
+          dart2js_args:
+            - --minify
+            - -O2

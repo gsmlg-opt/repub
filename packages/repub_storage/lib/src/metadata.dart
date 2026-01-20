@@ -83,6 +83,12 @@ abstract class MetadataStore {
   /// Check if a version already exists.
   Future<bool> versionExists(String packageName, String version);
 
+  /// List all packages with pagination.
+  Future<PackageListResult> listPackages({int page = 1, int limit = 20});
+
+  /// Search packages by name or description.
+  Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20});
+
   // ============ Auth Tokens ============
 
   /// Get a token by its hash.
@@ -308,6 +314,87 @@ class PostgresMetadataStore extends MetadataStore {
       parameters: {'name': packageName, 'version': version},
     );
     return result.isNotEmpty;
+  }
+
+  @override
+  Future<PackageListResult> listPackages({int page = 1, int limit = 20}) async {
+    // Get total count
+    final countResult = await _conn.execute('SELECT COUNT(*) FROM packages');
+    final total = countResult.first[0] as int;
+
+    // Get packages for this page
+    final offset = (page - 1) * limit;
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT name FROM packages
+        ORDER BY updated_at DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'limit': limit, 'offset': offset},
+    );
+
+    final packages = <PackageInfo>[];
+    for (final row in result) {
+      final name = row[0] as String;
+      final info = await getPackageInfo(name);
+      if (info != null) {
+        packages.add(info);
+      }
+    }
+
+    return PackageListResult(
+      packages: packages,
+      total: total,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20}) async {
+    final searchTerm = '%${query.toLowerCase()}%';
+
+    // Get total count
+    final countResult = await _conn.execute(
+      Sql.named('''
+        SELECT COUNT(DISTINCT p.name) FROM packages p
+        LEFT JOIN package_versions pv ON p.name = pv.package_name
+        WHERE LOWER(p.name) LIKE @search
+           OR LOWER(pv.pubspec_json::text) LIKE @search
+      '''),
+      parameters: {'search': searchTerm},
+    );
+    final total = countResult.first[0] as int;
+
+    // Get packages for this page
+    final offset = (page - 1) * limit;
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT DISTINCT p.name FROM packages p
+        LEFT JOIN package_versions pv ON p.name = pv.package_name
+        WHERE LOWER(p.name) LIKE @search
+           OR LOWER(pv.pubspec_json::text) LIKE @search
+        ORDER BY p.name
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'search': searchTerm, 'limit': limit, 'offset': offset},
+    );
+
+    final packages = <PackageInfo>[];
+    for (final row in result) {
+      final name = row[0] as String;
+      final info = await getPackageInfo(name);
+      if (info != null) {
+        packages.add(info);
+      }
+    }
+
+    return PackageListResult(
+      packages: packages,
+      total: total,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override
@@ -649,6 +736,78 @@ class SqliteMetadataStore extends MetadataStore {
       WHERE package_name = ? AND version = ?
     ''', [packageName, version]);
     return result.isNotEmpty;
+  }
+
+  @override
+  Future<PackageListResult> listPackages({int page = 1, int limit = 20}) async {
+    // Get total count
+    final countResult = _db.select('SELECT COUNT(*) FROM packages');
+    final total = countResult.first.values.first as int;
+
+    // Get packages for this page
+    final offset = (page - 1) * limit;
+    final result = _db.select('''
+      SELECT name FROM packages
+      ORDER BY updated_at DESC
+      LIMIT ? OFFSET ?
+    ''', [limit, offset]);
+
+    final packages = <PackageInfo>[];
+    for (final row in result) {
+      final name = row['name'] as String;
+      final info = await getPackageInfo(name);
+      if (info != null) {
+        packages.add(info);
+      }
+    }
+
+    return PackageListResult(
+      packages: packages,
+      total: total,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20}) async {
+    final searchTerm = '%${query.toLowerCase()}%';
+
+    // Get total count
+    final countResult = _db.select('''
+      SELECT COUNT(DISTINCT p.name) FROM packages p
+      LEFT JOIN package_versions pv ON p.name = pv.package_name
+      WHERE LOWER(p.name) LIKE ?
+         OR LOWER(pv.pubspec_json) LIKE ?
+    ''', [searchTerm, searchTerm]);
+    final total = countResult.first.values.first as int;
+
+    // Get packages for this page
+    final offset = (page - 1) * limit;
+    final result = _db.select('''
+      SELECT DISTINCT p.name FROM packages p
+      LEFT JOIN package_versions pv ON p.name = pv.package_name
+      WHERE LOWER(p.name) LIKE ?
+         OR LOWER(pv.pubspec_json) LIKE ?
+      ORDER BY p.name
+      LIMIT ? OFFSET ?
+    ''', [searchTerm, searchTerm, limit, offset]);
+
+    final packages = <PackageInfo>[];
+    for (final row in result) {
+      final name = row['name'] as String;
+      final info = await getPackageInfo(name);
+      if (info != null) {
+        packages.add(info);
+      }
+    }
+
+    return PackageListResult(
+      packages: packages,
+      total: total,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override

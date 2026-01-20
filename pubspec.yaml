@@ -14,6 +14,7 @@ workspace:
   - packages/repub_migrate
   - packages/repub_server
   - packages/repub_cli
+  - packages/repub_web
 
 melos:
   command:
@@ -53,9 +54,9 @@ melos:
       packageFilters:
         scope: repub_cli
 
-    serve:
-      description: Start the repub server
-      run: dart run repub_server
+    server:
+      description: Start the repub server with local data directory
+      run: REPUB_STORAGE_PATH=./data/packages REPUB_DATABASE_URL=sqlite:./data/metadata/repub.db dart run repub_server
       packageFilters:
         scope: repub_server
 
@@ -64,3 +65,15 @@ melos:
       run: dart compile exe bin/repub_server.dart -o bin/repub
       packageFilters:
         scope: repub_server
+
+    build:web:
+      description: Build web UI
+      run: dart run build_runner build --release --output build
+      packageFilters:
+        scope: repub_web
+
+    dev:web:
+      description: Run web UI in development mode
+      run: dart run build_runner serve
+      packageFilters:
+        scope: repub_web

@@ -1,0 +1,169 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:repub_model/repub_model_web.dart';
+
+/// API client for communicating with the Repub backend
+class ApiClient {
+  final String baseUrl;
+  final http.Client _client;
+
+  ApiClient({required this.baseUrl}) : _client = http.Client();
+
+  /// Get package info including all versions
+  Future<PackageInfo?> getPackage(String name) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/packages/$name'),
+    );
+
+    if (response.statusCode == 404) {
+      return null;
+    }
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch package: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return _parsePackageInfo(json);
+  }
+
+  /// Get a specific package version
+  Future<PackageVersion?> getPackageVersion(String name, String version) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/packages/$name/versions/$version'),
+    );
+
+    if (response.statusCode == 404) {
+      return null;
+    }
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch version: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return _parsePackageVersion(name, json);
+  }
+
+  /// List all packages (paginated)
+  Future<PackageListResponse> listPackages({int page = 1, int limit = 20}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/packages?page=$page&limit=$limit'),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to list packages: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final packages = (json['packages'] as List<dynamic>?)
+            ?.map((p) => _parsePackageInfo(p as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return PackageListResponse(
+      packages: packages,
+      total: json['total'] as int? ?? packages.length,
+      page: json['page'] as int? ?? page,
+      limit: json['limit'] as int? ?? limit,
+    );
+  }
+
+  /// Search packages by query
+  Future<PackageListResponse> searchPackages(String query, {int page = 1, int limit = 20}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/packages/search?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to search packages: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final packages = (json['packages'] as List<dynamic>?)
+            ?.map((p) => _parsePackageInfo(p as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return PackageListResponse(
+      packages: packages,
+      total: json['total'] as int? ?? packages.length,
+      page: json['page'] as int? ?? page,
+      limit: json['limit'] as int? ?? limit,
+    );
+  }
+
+  PackageInfo _parsePackageInfo(Map<String, dynamic> json) {
+    final package = Package(
+      name: json['name'] as String,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      isDiscontinued: json['isDiscontinued'] as bool? ?? false,
+      replacedBy: json['replacedBy'] as String?,
+    );
+
+    final versions = (json['versions'] as List<dynamic>?)
+            ?.map((v) => _parsePackageVersion(json['name'] as String, v as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return PackageInfo(package: package, versions: versions);
+  }
+
+  PackageVersion _parsePackageVersion(String packageName, Map<String, dynamic> json) {
+    return PackageVersion(
+      packageName: packageName,
+      version: json['version'] as String,
+      pubspec: json['pubspec'] as Map<String, dynamic>? ?? {},
+      archiveKey: json['archive_url'] as String? ?? '',
+      archiveSha256: json['archive_sha256'] as String? ?? '',
+      publishedAt: json['published'] != null
+          ? DateTime.parse(json['published'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  void dispose() {
+    _client.close();
+  }
+}
+
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  ApiException({required this.statusCode, required this.message});
+
+  @override
+  String toString() => 'ApiException($statusCode): $message';
+}
+
+class PackageListResponse {
+  final List<PackageInfo> packages;
+  final int total;
+  final int page;
+  final int limit;
+
+  PackageListResponse({
+    required this.packages,
+    required this.total,
+    required this.page,
+    required this.limit,
+  });
+
+  int get totalPages => (total / limit).ceil();
+  bool get hasNextPage => page < totalPages;
+  bool get hasPrevPage => page > 1;
+}

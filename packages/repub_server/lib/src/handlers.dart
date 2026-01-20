@@ -1,11 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:path/path.dart' as p;
 import 'package:repub_auth/repub_auth.dart';
 import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_static/shelf_static.dart';
 
 import 'publish.dart';
 
@@ -18,6 +21,12 @@ Router createRouter({
   final router = Router();
   final handlers =
       ApiHandlers(config: config, metadata: metadata, blobs: blobs);
+
+  // List all packages (for web UI)
+  router.get('/api/packages', handlers.listPackages);
+
+  // Search packages (for web UI)
+  router.get('/api/packages/search', handlers.searchPackages);
 
   // Package info endpoint
   router.get('/api/packages/<name>', handlers.getPackage);
@@ -42,7 +51,65 @@ Router createRouter({
         headers: {'content-type': 'application/json'});
   });
 
+  // Web UI static files - serve from web build directory
+  final webDir = _findWebDir();
+  if (webDir != null) {
+    final staticHandler = createStaticHandler(
+      webDir,
+      defaultDocument: 'index.html',
+    );
+
+    // Serve index.html for SPA routes
+    router.get('/', (Request req) => staticHandler(req));
+
+    // Serve static assets
+    router.all('/<path|.*>', (Request req, String path) async {
+      // Check if it's an API route first
+      if (path.startsWith('api/') || path.startsWith('packages/')) {
+        return Response.notFound('Not found');
+      }
+
+      // Try to serve static file
+      final response = await staticHandler(req);
+      if (response.statusCode != 404) {
+        return response;
+      }
+
+      // For SPA routes, serve index.html
+      final indexReq = Request('GET', Uri.parse('/index.html'),
+          context: req.context, headers: req.headers);
+      return staticHandler(indexReq);
+    });
+  }
+
   return router;
+}
+
+/// Find the web UI build directory.
+String? _findWebDir() {
+  // Check common locations for the web build
+  final candidates = [
+    // When running from workspace root
+    'packages/repub_web/build/web',
+    // When running from server package
+    '../repub_web/build/web',
+    // Docker/production location
+    '/app/web',
+    // Environment variable override
+    Platform.environment['REPUB_WEB_DIR'],
+  ];
+
+  for (final path in candidates) {
+    if (path == null) continue;
+    final dir = Directory(path);
+    if (dir.existsSync() && File(p.join(path, 'index.html')).existsSync()) {
+      print('Serving web UI from: ${dir.absolute.path}');
+      return path;
+    }
+  }
+
+  print('Web UI not found - run "melos run build:web" to build it');
+  return null;
 }
 
 /// API handler implementations.
@@ -59,6 +126,69 @@ class ApiHandlers {
     required this.metadata,
     required this.blobs,
   });
+
+  /// GET `/api/packages`
+  Future<Response> listPackages(Request request) async {
+    // Check auth if required for downloads
+    if (config.requireDownloadAuth) {
+      final authResult = await authenticate(
+        request,
+        lookupToken: metadata.getTokenByHash,
+        touchToken: metadata.touchToken,
+        requiredScope: 'read:all',
+      );
+      if (authResult is! AuthSuccess) {
+        return _authErrorResponse(authResult);
+      }
+    }
+
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    final result = await metadata.listPackages(page: page, limit: limit.clamp(1, 100));
+
+    return Response.ok(
+      jsonEncode(result.toJson(config.baseUrl)),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/api/packages/search`
+  Future<Response> searchPackages(Request request) async {
+    // Check auth if required for downloads
+    if (config.requireDownloadAuth) {
+      final authResult = await authenticate(
+        request,
+        lookupToken: metadata.getTokenByHash,
+        touchToken: metadata.touchToken,
+        requiredScope: 'read:all',
+      );
+      if (authResult is! AuthSuccess) {
+        return _authErrorResponse(authResult);
+      }
+    }
+
+    final query = request.url.queryParameters['q'] ?? '';
+    if (query.isEmpty) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {'code': 'missing_query', 'message': 'Search query is required'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    final result = await metadata.searchPackages(query, page: page, limit: limit.clamp(1, 100));
+
+    return Response.ok(
+      jsonEncode(result.toJson(config.baseUrl)),
+      headers: {'content-type': 'application/json'},
+    );
+  }
 
   /// GET `/api/packages/<name>`
   Future<Response> getPackage(Request request, String name) async {
