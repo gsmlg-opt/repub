@@ -16,6 +16,7 @@ COPY packages/repub_storage/pubspec.yaml packages/repub_storage/
 COPY packages/repub_migrate/pubspec.yaml packages/repub_migrate/
 COPY packages/repub_server/pubspec.yaml packages/repub_server/
 COPY packages/repub_cli/pubspec.yaml packages/repub_cli/
+COPY packages/repub_web/pubspec.yaml packages/repub_web/
 
 # Bootstrap melos workspace
 RUN dart pub global run melos bootstrap
