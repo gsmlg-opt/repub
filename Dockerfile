@@ -24,6 +24,9 @@ RUN dart pub global run melos bootstrap
 # Copy all source code
 COPY packages/ packages/
 
+# Build web UI
+RUN cd packages/repub_web && dart run build_runner build --release --output build
+
 # Create output directory and compile executables
 RUN mkdir -p bin
 
@@ -38,7 +41,7 @@ FROM debian:bookworm-slim
 
 # Install CA certificates for HTTPS and SQLite
 RUN apt-get update && \
-    apt-get install -y ca-certificates libsqlite3-0 && \
+    apt-get install -y ca-certificates libsqlite3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -46,6 +49,9 @@ WORKDIR /app
 # Copy the compiled binaries
 COPY --from=build /app/bin/repub_server /app/bin/repub_server
 COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
+
+# Copy web UI build output
+COPY --from=build /app/packages/repub_web/build/web /app/web
 
 # Create data directories for SQLite and local storage
 RUN mkdir -p /data/metadata /data/packages
