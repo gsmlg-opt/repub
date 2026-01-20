@@ -31,9 +31,9 @@ Future<void> startServer({Config? config}) async {
   final metadata = MetadataStore(conn);
   final blobs = BlobStore.fromConfig(cfg);
 
-  // Ensure bucket exists
-  print('Checking S3 bucket...');
-  await blobs.ensureBucket();
+  // Ensure storage is ready
+  print('Checking storage...');
+  await blobs.ensureReady();
 
   // Create router
   final router = createRouter(
