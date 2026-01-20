@@ -7,7 +7,7 @@ A self-hosted Dart/Flutter package registry implementing the [Hosted Pub Reposit
 - **Publish packages**: Full support for `dart pub publish`
 - **Install packages**: Works with `dart pub get` using hosted URLs
 - **Bearer token auth**: Secure publish with scoped tokens
-- **S3 storage**: Package archives stored in S3-compatible storage (MinIO)
+- **Flexible storage**: Package archives stored locally or in S3-compatible storage (MinIO, AWS S3)
 - **PostgreSQL metadata**: Package metadata stored in PostgreSQL
 - **Melos monorepo**: Modular architecture with clear package boundaries
 
@@ -137,18 +137,48 @@ melos run format:check
 
 All configuration is via environment variables:
 
+### Core Settings
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REPUB_LISTEN_ADDR` | `0.0.0.0:8080` | Listen address |
 | `REPUB_BASE_URL` | `http://localhost:8080` | Public URL of the registry |
 | `REPUB_DATABASE_URL` | `postgres://repub:repub@localhost:5432/repub` | PostgreSQL connection URL |
-| `REPUB_S3_ENDPOINT` | `http://localhost:9000` | S3/MinIO endpoint |
-| `REPUB_S3_REGION` | `us-east-1` | S3 region |
-| `REPUB_S3_ACCESS_KEY` | `minioadmin` | S3 access key |
-| `REPUB_S3_SECRET_KEY` | `minioadmin` | S3 secret key |
-| `REPUB_S3_BUCKET` | `repub` | S3 bucket name |
 | `REPUB_REQUIRE_DOWNLOAD_AUTH` | `false` | Require auth for downloads |
-| `REPUB_SIGNED_URL_TTL_SECONDS` | `3600` | TTL for signed URLs |
+
+### Storage Options
+
+You can use either local file storage or S3-compatible storage. Set **one** of the following:
+
+#### Option 1: Local File Storage
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPUB_STORAGE_PATH` | *(none)* | Local directory for package archives |
+
+Example:
+```bash
+export REPUB_STORAGE_PATH=/var/lib/repub/packages
+```
+
+#### Option 2: S3-Compatible Storage (MinIO, AWS S3, etc.)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPUB_S3_ENDPOINT` | *(none)* | S3/MinIO endpoint URL |
+| `REPUB_S3_REGION` | `us-east-1` | S3 region |
+| `REPUB_S3_ACCESS_KEY` | *(none)* | S3 access key |
+| `REPUB_S3_SECRET_KEY` | *(none)* | S3 secret key |
+| `REPUB_S3_BUCKET` | *(none)* | S3 bucket name |
+| `REPUB_SIGNED_URL_TTL_SECONDS` | `3600` | TTL for signed download URLs |
+
+Example:
+```bash
+export REPUB_S3_ENDPOINT=http://localhost:9000
+export REPUB_S3_ACCESS_KEY=minioadmin
+export REPUB_S3_SECRET_KEY=minioadmin
+export REPUB_S3_BUCKET=repub
+```
 
 ## API Endpoints
 
@@ -242,9 +272,17 @@ dart pub global activate melos
 # Bootstrap workspace
 melos bootstrap
 
-# Run locally (requires postgres and minio)
+# Run locally with local file storage (requires postgres only)
+export REPUB_DATABASE_URL="postgres://repub:repub@localhost:5432/repub"
+export REPUB_STORAGE_PATH="./data/packages"
+dart run -C packages/repub_server repub_server
+
+# Or run locally with S3/MinIO (requires postgres and minio)
 export REPUB_DATABASE_URL="postgres://repub:repub@localhost:5432/repub"
 export REPUB_S3_ENDPOINT="http://localhost:9000"
+export REPUB_S3_ACCESS_KEY="minioadmin"
+export REPUB_S3_SECRET_KEY="minioadmin"
+export REPUB_S3_BUCKET="repub"
 dart run -C packages/repub_server repub_server
 ```
 
