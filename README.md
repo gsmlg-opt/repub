@@ -42,6 +42,29 @@ repub/
 
 ## Quickstart
 
+### Option A: Docker Standalone (Zero Dependencies)
+
+The Docker image uses SQLite + local file storage by default, requiring no external services:
+
+```bash
+# Run with persistent volume
+docker run -d \
+  -p 8080:8080 \
+  -v repub_data:/data \
+  ghcr.io/gsmlg-dev/repub:latest
+
+# Create an auth token
+docker exec <container_id> /app/bin/repub_cli token create my-token publish:all
+```
+
+Data is stored in `/data`:
+- SQLite database: `/data/metadata/repub.db`
+- Package archives: `/data/packages/`
+
+### Option B: Docker Compose (PostgreSQL + MinIO)
+
+For production with external database and S3-compatible storage:
+
 ### 1. Install Melos
 
 ```bash

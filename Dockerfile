@@ -46,18 +46,21 @@ WORKDIR /app
 COPY --from=build /app/bin/repub_server /app/bin/repub_server
 COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
 
-# Create data directory for SQLite and local storage
-RUN mkdir -p /app/data
+# Create data directories for SQLite and local storage
+RUN mkdir -p /data/metadata /data/packages
 
 # Create non-root user and set permissions
 RUN useradd -r -s /bin/false repub && \
-    chown -R repub:repub /app/data
+    chown -R repub:repub /data
+
+# Volume mount point for persistent data
+VOLUME /data
 
 USER repub
 
 # Default environment: SQLite database and local file storage
-ENV REPUB_DATABASE_URL=sqlite:/app/data/repub.db
-ENV REPUB_STORAGE_PATH=/app/data/packages
+ENV REPUB_DATABASE_URL=sqlite:/data/metadata/repub.db
+ENV REPUB_STORAGE_PATH=/data/packages
 
 EXPOSE 8080
 
