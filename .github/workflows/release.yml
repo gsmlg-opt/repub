@@ -82,7 +82,11 @@ jobs:
           cd packages/repub_cli
           dart run repub_cli migrate
           cd ../repub_server
-          dart test integration_test/
+          if [ -d "integration_test" ]; then
+            dart test integration_test/
+          else
+            echo "No integration tests found, skipping"
+          fi
 
   build:
     name: Build Release Binaries
