@@ -1,16 +1,92 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: repub
+          POSTGRES_PASSWORD: repub
+          POSTGRES_DB: repub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U repub"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap workspace
+        run: melos bootstrap
+
+      - name: Analyze
+        run: melos run analyze
+
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+
+          sleep 5
+
+          docker run --rm --network host \
+            --entrypoint /bin/sh minio/mc:latest -c "
+              mc alias set local http://localhost:9000 minioadmin minioadmin &&
+              mc mb local/repub
+            "
+
+      - name: Run unit tests
+        run: melos run test
+
+      - name: Run integration tests
+        env:
+          REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
+          REPUB_S3_ENDPOINT: http://localhost:9000
+          REPUB_S3_ACCESS_KEY: minioadmin
+          REPUB_S3_SECRET_KEY: minioadmin
+          REPUB_S3_BUCKET: repub
+          REPUB_S3_REGION: us-east-1
+        run: |
+          cd packages/repub_cli
+          dart run repub_cli migrate
+          cd ../repub_server
+          dart test integration_test/
+
   build:
     name: Build Release Binaries
+    needs: test
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -18,13 +94,10 @@ jobs:
         include:
           - os: ubuntu-latest
             target: linux-x64
-            extension: ""
           - os: macos-latest
             target: macos-arm64
-            extension: ""
           - os: macos-13
             target: macos-x64
-            extension: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -42,20 +115,20 @@ jobs:
       - name: Compile server binary
         run: |
           dart compile exe packages/repub_server/bin/repub_server.dart \
-            -o repub_server-${{ matrix.target }}${{ matrix.extension }}
+            -o repub_server-${{ matrix.target }}
 
       - name: Compile CLI binary
         run: |
           dart compile exe packages/repub_cli/bin/repub_cli.dart \
-            -o repub_cli-${{ matrix.target }}${{ matrix.extension }}
+            -o repub_cli-${{ matrix.target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.target }}
           path: |
-            repub_server-${{ matrix.target }}${{ matrix.extension }}
-            repub_cli-${{ matrix.target }}${{ matrix.extension }}
+            repub_server-${{ matrix.target }}
+            repub_cli-${{ matrix.target }}
 
   release:
     name: Create Release
@@ -64,6 +137,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -82,9 +162,44 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
           files: release/*
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          prerelease: ${{ inputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Trigger Docker Build
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Docker workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker.yml',
+              ref: 'main',
+              inputs: {
+                tag: '${{ inputs.version }}',
+                test: 'false'
+              }
+            });
+
+            // Also build latest tag
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker.yml',
+              ref: 'main',
+              inputs: {
+                tag: 'latest',
+                test: 'false'
+              }
+            });
