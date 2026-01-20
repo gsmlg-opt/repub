@@ -187,19 +187,9 @@ jobs:
               workflow_id: 'docker.yml',
               ref: 'main',
               inputs: {
-                tag: '${{ inputs.version }}',
+                tag: 'v${{ inputs.version }}',
+                'git-ref': 'v${{ inputs.version }}',
                 test: 'false'
               }
             });
-
-            // Also build latest tag
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'docker.yml',
-              ref: 'main',
-              inputs: {
-                tag: 'latest',
-                test: 'false'
-              }
-            });
+            // Docker workflow auto-tags latest when tag is not 'latest'
