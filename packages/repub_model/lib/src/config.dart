@@ -1,5 +1,8 @@
 import 'dart:io';
 
+/// Database type enum.
+enum DatabaseType { sqlite, postgresql }
+
 /// Application configuration loaded from environment variables.
 class Config {
   final String listenAddr;
@@ -35,6 +38,27 @@ class Config {
     required this.signedUrlTtlSeconds,
   });
 
+  /// Get the database type based on the URL scheme.
+  DatabaseType get databaseType {
+    if (databaseUrl.startsWith('postgres://') ||
+        databaseUrl.startsWith('postgresql://')) {
+      return DatabaseType.postgresql;
+    }
+    // Default to SQLite (file path or sqlite:// scheme)
+    return DatabaseType.sqlite;
+  }
+
+  /// Get the SQLite database path (strips sqlite:// prefix if present).
+  String get sqlitePath {
+    if (databaseUrl.startsWith('sqlite://')) {
+      return databaseUrl.substring(9);
+    }
+    if (databaseUrl.startsWith('sqlite:')) {
+      return databaseUrl.substring(7);
+    }
+    return databaseUrl;
+  }
+
   /// Whether to use local file storage instead of S3.
   bool get useLocalStorage => storagePath != null && storagePath!.isNotEmpty;
 
@@ -58,7 +82,7 @@ class Config {
       baseUrl: _env('REPUB_BASE_URL', 'http://localhost:8080'),
       databaseUrl: _env(
         'REPUB_DATABASE_URL',
-        'postgres://repub:repub@localhost:5432/repub',
+        'sqlite:./data/repub.db',
       ),
       storagePath: _envOptional('REPUB_STORAGE_PATH'),
       s3Endpoint: _envOptional('REPUB_S3_ENDPOINT'),

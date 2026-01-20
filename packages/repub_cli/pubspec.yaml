@@ -12,12 +12,9 @@ dependencies:
     path: ../repub_model
   repub_storage:
     path: ../repub_storage
-  repub_migrate:
-    path: ../repub_migrate
   repub_server:
     path: ../repub_server
   args: ^2.6.0
-  postgres: ^3.5.1
 
 dev_dependencies:
   lints: ^5.1.1

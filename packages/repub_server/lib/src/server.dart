@@ -1,7 +1,5 @@
 import 'dart:io';
 
-import 'package:postgres/postgres.dart';
-import 'package:repub_migrate/repub_migrate.dart';
 import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:shelf/shelf.dart';
@@ -15,20 +13,20 @@ Future<void> startServer({Config? config}) async {
 
   print('Starting Repub server...');
   print('Base URL: ${cfg.baseUrl}');
+  print('Database: ${cfg.databaseType.name}');
 
-  // Connect to database
+  // Create metadata store (handles connection and migrations)
   print('Connecting to database...');
-  final conn = await connectDb(cfg);
+  final metadata = await MetadataStore.create(cfg);
 
   // Run migrations
   print('Running migrations...');
-  final migrated = await runMigrations(conn);
+  final migrated = await metadata.runMigrations();
   if (migrated > 0) {
     print('Applied $migrated migration(s)');
   }
 
-  // Create storage
-  final metadata = MetadataStore(conn);
+  // Create blob storage
   final blobs = BlobStore.fromConfig(cfg);
 
   // Ensure storage is ready
@@ -63,39 +61,9 @@ Future<void> startServer({Config? config}) async {
   ProcessSignal.sigint.watch().listen((_) async {
     print('\nShutting down...');
     await server.close();
-    await conn.close();
+    await metadata.close();
     exit(0);
   });
-}
-
-/// Connect to the database with retries.
-Future<Connection> connectDb(Config config) async {
-  final uri = Uri.parse(config.databaseUrl);
-  final userInfo = uri.userInfo.split(':');
-
-  final endpoint = Endpoint(
-    host: uri.host,
-    port: uri.hasPort ? uri.port : 5432,
-    database: uri.pathSegments.isNotEmpty ? uri.pathSegments.first : 'repub',
-    username: userInfo.isNotEmpty ? userInfo[0] : 'repub',
-    password: userInfo.length > 1 ? userInfo[1] : 'repub',
-  );
-
-  // Keep trying to connect for up to 30 seconds
-  for (var i = 0; i < 30; i++) {
-    try {
-      return await Connection.open(
-        endpoint,
-        settings: ConnectionSettings(sslMode: SslMode.disable),
-      );
-    } catch (e) {
-      if (i == 29) rethrow;
-      print('Waiting for database... (${i + 1}/30)');
-      await Future.delayed(const Duration(seconds: 1));
-    }
-  }
-
-  throw StateError('Could not connect to database');
 }
 
 /// CORS middleware for development.

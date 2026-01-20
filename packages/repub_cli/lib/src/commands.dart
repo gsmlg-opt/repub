@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:repub_migrate/repub_migrate.dart';
 import 'package:repub_model/repub_model.dart';
 import 'package:repub_server/repub_server.dart';
 import 'package:repub_storage/repub_storage.dart';
@@ -24,12 +23,15 @@ Commands:
 Environment Variables:
   REPUB_LISTEN_ADDR          Listen address (default: 0.0.0.0:8080)
   REPUB_BASE_URL             Base URL for the registry
-  REPUB_DATABASE_URL         PostgreSQL connection URL
+  REPUB_DATABASE_URL         Database URL (SQLite path or PostgreSQL URL)
+                             Default: sqlite:./data/repub.db
+                             PostgreSQL: postgres://user:pass@host:5432/db
+  REPUB_STORAGE_PATH         Local storage path (optional, uses S3 if not set)
   REPUB_S3_ENDPOINT          S3/MinIO endpoint
   REPUB_S3_REGION            S3 region (default: us-east-1)
   REPUB_S3_ACCESS_KEY        S3 access key
   REPUB_S3_SECRET_KEY        S3 secret key
-  REPUB_S3_BUCKET            S3 bucket name (default: repub)
+  REPUB_S3_BUCKET            S3 bucket name
   REPUB_REQUIRE_DOWNLOAD_AUTH  Require auth for downloads (default: false)
   REPUB_SIGNED_URL_TTL_SECONDS  Signed URL TTL (default: 3600)
 ''');
@@ -44,11 +46,12 @@ Future<void> runServe(List<String> args) async {
 Future<void> runMigrate() async {
   final config = Config.fromEnv();
 
+  print('Database type: ${config.databaseType.name}');
   print('Connecting to database...');
-  final conn = await connectDb(config);
+  final metadata = await MetadataStore.create(config);
 
   print('Running migrations...');
-  final count = await runMigrations(conn);
+  final count = await metadata.runMigrations();
 
   if (count == 0) {
     print('No pending migrations');
@@ -56,7 +59,7 @@ Future<void> runMigrate() async {
     print('Applied $count migration(s)');
   }
 
-  await conn.close();
+  await metadata.close();
 }
 
 /// Handle token commands.
@@ -77,8 +80,10 @@ Future<void> runTokenCommand(List<String> args) async {
   }
 
   final config = Config.fromEnv();
-  final conn = await connectDb(config);
-  final metadata = MetadataStore(conn);
+  final metadata = await MetadataStore.create(config);
+
+  // Ensure migrations are run
+  await metadata.runMigrations();
 
   try {
     switch (args[0]) {
@@ -132,6 +137,6 @@ Future<void> runTokenCommand(List<String> args) async {
         exit(1);
     }
   } finally {
-    await conn.close();
+    await metadata.close();
   }
 }

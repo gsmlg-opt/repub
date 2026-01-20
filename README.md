@@ -8,7 +8,8 @@ A self-hosted Dart/Flutter package registry implementing the [Hosted Pub Reposit
 - **Install packages**: Works with `dart pub get` using hosted URLs
 - **Bearer token auth**: Secure publish with scoped tokens
 - **Flexible storage**: Package archives stored locally or in S3-compatible storage (MinIO, AWS S3)
-- **PostgreSQL metadata**: Package metadata stored in PostgreSQL
+- **Flexible database**: SQLite (default) or PostgreSQL for metadata
+- **Zero external dependencies**: Docker image uses SQLite + local storage by default
 - **Melos monorepo**: Modular architecture with clear package boundaries
 
 ## Non-goals
@@ -143,8 +144,33 @@ All configuration is via environment variables:
 |----------|---------|-------------|
 | `REPUB_LISTEN_ADDR` | `0.0.0.0:8080` | Listen address |
 | `REPUB_BASE_URL` | `http://localhost:8080` | Public URL of the registry |
-| `REPUB_DATABASE_URL` | `postgres://repub:repub@localhost:5432/repub` | PostgreSQL connection URL |
 | `REPUB_REQUIRE_DOWNLOAD_AUTH` | `false` | Require auth for downloads |
+
+### Database Options
+
+Choose between SQLite (default, zero-config) or PostgreSQL:
+
+#### Option 1: SQLite (Default)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPUB_DATABASE_URL` | `sqlite:./data/repub.db` | SQLite database file path |
+
+Example:
+```bash
+export REPUB_DATABASE_URL=sqlite:/var/lib/repub/repub.db
+```
+
+#### Option 2: PostgreSQL
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPUB_DATABASE_URL` | *(none)* | PostgreSQL connection URL |
+
+Example:
+```bash
+export REPUB_DATABASE_URL=postgres://repub:repub@localhost:5432/repub
+```
 
 ### Storage Options
 
@@ -272,12 +298,17 @@ dart pub global activate melos
 # Bootstrap workspace
 melos bootstrap
 
-# Run locally with local file storage (requires postgres only)
+# Run locally with SQLite + local storage (zero external dependencies!)
+export REPUB_DATABASE_URL="sqlite:./data/repub.db"
+export REPUB_STORAGE_PATH="./data/packages"
+dart run -C packages/repub_server repub_server
+
+# Or run with PostgreSQL + local storage
 export REPUB_DATABASE_URL="postgres://repub:repub@localhost:5432/repub"
 export REPUB_STORAGE_PATH="./data/packages"
 dart run -C packages/repub_server repub_server
 
-# Or run locally with S3/MinIO (requires postgres and minio)
+# Or run with PostgreSQL + S3/MinIO
 export REPUB_DATABASE_URL="postgres://repub:repub@localhost:5432/repub"
 export REPUB_S3_ENDPOINT="http://localhost:9000"
 export REPUB_S3_ACCESS_KEY="minioadmin"
@@ -293,13 +324,11 @@ repub_model (no internal deps)
     ↑
 repub_auth (depends on: repub_model)
     ↑
-repub_migrate (no internal deps, uses postgres)
+repub_storage (depends on: repub_model; includes SQLite + PostgreSQL + S3)
     ↑
-repub_storage (depends on: repub_model)
+repub_server (depends on: repub_model, repub_auth, repub_storage)
     ↑
-repub_server (depends on: repub_model, repub_auth, repub_storage, repub_migrate)
-    ↑
-repub_cli (depends on: repub_model, repub_storage, repub_migrate, repub_server)
+repub_cli (depends on: repub_model, repub_storage, repub_server)
 ```
 
 ## License

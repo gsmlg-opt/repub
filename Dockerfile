@@ -35,9 +35,9 @@ RUN dart compile exe packages/repub_cli/bin/repub_cli.dart -o bin/repub_cli
 # Runtime stage
 FROM debian:bookworm-slim
 
-# Install CA certificates for HTTPS
+# Install CA certificates for HTTPS and SQLite
 RUN apt-get update && \
-    apt-get install -y ca-certificates && \
+    apt-get install -y ca-certificates libsqlite3-0 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -46,9 +46,18 @@ WORKDIR /app
 COPY --from=build /app/bin/repub_server /app/bin/repub_server
 COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
 
-# Create non-root user
-RUN useradd -r -s /bin/false repub
+# Create data directory for SQLite and local storage
+RUN mkdir -p /app/data
+
+# Create non-root user and set permissions
+RUN useradd -r -s /bin/false repub && \
+    chown -R repub:repub /app/data
+
 USER repub
+
+# Default environment: SQLite database and local file storage
+ENV REPUB_DATABASE_URL=sqlite:/app/data/repub.db
+ENV REPUB_STORAGE_PATH=/app/data/packages
 
 EXPOSE 8080
 
