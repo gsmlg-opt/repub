@@ -7,6 +7,10 @@ on:
         description: 'Image tag (e.g., v1.0.0, latest)'
         required: true
         default: 'latest'
+      git-ref:
+        description: 'Git ref to checkout (branch, tag, or SHA)'
+        required: false
+        default: 'main'
       test:
         description: 'Run Docker image tests'
         required: false
@@ -28,6 +32,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git-ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -39,12 +45,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      - name: Generate image tags
+        id: tags
+        run: |
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}"
+          if [ "${{ inputs.tag }}" != "latest" ]; then
+            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
@@ -57,6 +72,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git-ref }}
 
       - name: Build test image
         run: docker build -t repub-test .
