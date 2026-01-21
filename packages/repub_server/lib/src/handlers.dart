@@ -53,6 +53,17 @@ Router createRouter({
         headers: {'content-type': 'application/json'});
   });
 
+  // Admin endpoints (require admin scope)
+  router.get('/api/admin/stats', handlers.adminGetStats);
+  router.get('/api/admin/packages/local', handlers.adminListLocalPackages);
+  router.get('/api/admin/packages/cached', handlers.adminListCachedPackages);
+  router.delete('/api/admin/packages/<name>', handlers.adminDeletePackage);
+  router.delete('/api/admin/packages/<name>/versions/<version>',
+      handlers.adminDeletePackageVersion);
+  router.post('/api/admin/packages/<name>/discontinue',
+      handlers.adminDiscontinuePackage);
+  router.delete('/api/admin/cache', handlers.adminClearCache);
+
   // Web UI static files - serve from web build directory
   final webDir = _findWebDir();
   if (webDir != null) {
@@ -78,7 +89,10 @@ Router createRouter({
       }
 
       // For SPA routes, serve index.html
-      final indexReq = Request('GET', Uri.parse('/index.html'),
+      // Build absolute URI from original request
+      final requestedUri = req.requestedUri;
+      final indexUri = requestedUri.replace(path: '/index.html', query: '');
+      final indexReq = Request('GET', indexUri,
           context: req.context, headers: req.headers);
       return staticHandler(indexReq);
     });
@@ -765,5 +779,253 @@ class ApiHandlers {
       case AuthSuccess():
         throw StateError('Should not reach here');
     }
+  }
+
+  // ============ Admin Handlers ============
+
+  /// Authenticate admin request (requires admin scope).
+  Future<AuthResult> _authenticateAdmin(Request request) async {
+    return authenticate(
+      request,
+      lookupToken: metadata.getTokenByHash,
+      touchToken: metadata.touchToken,
+      requiredScope: 'admin',
+    );
+  }
+
+  /// GET `/api/admin/stats`
+  Future<Response> adminGetStats(Request request) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    final stats = await metadata.getAdminStats();
+
+    return Response.ok(
+      jsonEncode(stats.toJson()),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/api/admin/packages/local`
+  Future<Response> adminListLocalPackages(Request request) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    final result = await metadata.listPackagesByType(
+      isUpstreamCache: false,
+      page: page,
+      limit: limit.clamp(1, 100),
+    );
+
+    return Response.ok(
+      jsonEncode(result.toJson(config.baseUrl)),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/api/admin/packages/cached`
+  Future<Response> adminListCachedPackages(Request request) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    final result = await metadata.listPackagesByType(
+      isUpstreamCache: true,
+      page: page,
+      limit: limit.clamp(1, 100),
+    );
+
+    return Response.ok(
+      jsonEncode(result.toJson(config.baseUrl)),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// DELETE `/api/admin/packages/<name>`
+  Future<Response> adminDeletePackage(Request request, String name) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    // Get archive keys before deleting metadata
+    final archiveKeys = await metadata.getPackageArchiveKeys(name);
+
+    // Delete metadata
+    final versionCount = await metadata.deletePackage(name);
+
+    if (versionCount == 0 && archiveKeys.isEmpty) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Delete blobs
+    for (final key in archiveKeys) {
+      try {
+        await blobs.delete(key);
+      } catch (e) {
+        print('Warning: Failed to delete blob $key: $e');
+      }
+    }
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Deleted package $name with $versionCount version(s)',
+          'versionsDeleted': versionCount,
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// DELETE `/api/admin/packages/<name>/versions/<version>`
+  Future<Response> adminDeletePackageVersion(
+    Request request,
+    String name,
+    String version,
+  ) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    // Get archive key before deleting metadata
+    final archiveKey = await metadata.getVersionArchiveKey(name, version);
+
+    // Delete metadata
+    final deleted = await metadata.deletePackageVersion(name, version);
+
+    if (!deleted) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {
+            'code': 'not_found',
+            'message': 'Version $version of package $name not found',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Delete blob
+    if (archiveKey != null) {
+      try {
+        await blobs.delete(archiveKey);
+      } catch (e) {
+        print('Warning: Failed to delete blob $archiveKey: $e');
+      }
+    }
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Deleted version $version of package $name',
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// POST `/api/admin/packages/<name>/discontinue`
+  Future<Response> adminDiscontinuePackage(Request request, String name) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    // Parse body for optional replacedBy
+    String? replacedBy;
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      if (bodyBytes.isNotEmpty) {
+        final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+        replacedBy = body['replacedBy'] as String?;
+      }
+    } catch (_) {
+      // Ignore body parsing errors
+    }
+
+    final success = await metadata.discontinuePackage(name, replacedBy: replacedBy);
+
+    if (!success) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Package $name marked as discontinued',
+          if (replacedBy != null) 'replacedBy': replacedBy,
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// DELETE `/api/admin/cache`
+  Future<Response> adminClearCache(Request request) async {
+    final authResult = await _authenticateAdmin(request);
+    if (authResult is! AuthSuccess) {
+      return _authErrorResponse(authResult);
+    }
+
+    // Get all archive keys for cached packages before deleting
+    final cachedResult = await metadata.listPackagesByType(
+      isUpstreamCache: true,
+      page: 1,
+      limit: 10000, // Get all cached packages
+    );
+
+    final allArchiveKeys = <String>[];
+    for (final pkg in cachedResult.packages) {
+      final keys = await metadata.getPackageArchiveKeys(pkg.package.name);
+      allArchiveKeys.addAll(keys);
+    }
+
+    // Delete metadata
+    final packageCount = await metadata.clearAllCachedPackages();
+
+    // Delete blobs
+    var blobsDeleted = 0;
+    for (final key in allArchiveKeys) {
+      try {
+        await blobs.delete(key);
+        blobsDeleted++;
+      } catch (e) {
+        print('Warning: Failed to delete blob $key: $e');
+      }
+    }
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Cleared $packageCount cached package(s)',
+          'packagesDeleted': packageCount,
+          'blobsDeleted': blobsDeleted,
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
   }
 }

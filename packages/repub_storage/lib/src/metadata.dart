@@ -126,6 +126,36 @@ abstract class MetadataStore {
 
   /// Clean up expired sessions.
   Future<int> cleanupExpiredSessions();
+
+  // ============ Admin Operations ============
+
+  /// List packages filtered by type (local vs cached).
+  Future<PackageListResult> listPackagesByType({
+    required bool isUpstreamCache,
+    int page = 1,
+    int limit = 20,
+  });
+
+  /// Delete a package and all its versions. Returns version count deleted.
+  Future<int> deletePackage(String name);
+
+  /// Delete a single package version.
+  Future<bool> deletePackageVersion(String name, String version);
+
+  /// Mark a package as discontinued.
+  Future<bool> discontinuePackage(String name, {String? replacedBy});
+
+  /// Delete all upstream-cached packages. Returns package count deleted.
+  Future<int> clearAllCachedPackages();
+
+  /// Get admin statistics.
+  Future<AdminStats> getAdminStats();
+
+  /// Get archive keys for a package (for blob deletion).
+  Future<List<String>> getPackageArchiveKeys(String name);
+
+  /// Get archive key for a specific version (for blob deletion).
+  Future<String?> getVersionArchiveKey(String name, String version);
 }
 
 /// Metadata storage backed by PostgreSQL.
@@ -546,6 +576,161 @@ class PostgresMetadataStore extends MetadataStore {
     );
     return result.affectedRows;
   }
+
+  // ============ Admin Operations ============
+
+  @override
+  Future<PackageListResult> listPackagesByType({
+    required bool isUpstreamCache,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    // Get total count
+    final countResult = await _conn.execute(
+      Sql.named('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = @cache'),
+      parameters: {'cache': isUpstreamCache},
+    );
+    final total = countResult.first[0] as int;
+
+    // Get packages for this page
+    final offset = (page - 1) * limit;
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT name FROM packages
+        WHERE is_upstream_cache = @cache
+        ORDER BY updated_at DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'cache': isUpstreamCache, 'limit': limit, 'offset': offset},
+    );
+
+    final packages = <PackageInfo>[];
+    for (final row in result) {
+      final name = row[0] as String;
+      final info = await getPackageInfo(name);
+      if (info != null) {
+        packages.add(info);
+      }
+    }
+
+    return PackageListResult(
+      packages: packages,
+      total: total,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<int> deletePackage(String name) async {
+    // Get version count first
+    final countResult = await _conn.execute(
+      Sql.named('SELECT COUNT(*) FROM package_versions WHERE package_name = @name'),
+      parameters: {'name': name},
+    );
+    final versionCount = countResult.first[0] as int;
+
+    // Delete package (cascade will delete versions)
+    await _conn.execute(
+      Sql.named('DELETE FROM packages WHERE name = @name'),
+      parameters: {'name': name},
+    );
+
+    return versionCount;
+  }
+
+  @override
+  Future<bool> deletePackageVersion(String name, String version) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        DELETE FROM package_versions
+        WHERE package_name = @name AND version = @version
+      '''),
+      parameters: {'name': name, 'version': version},
+    );
+
+    // Check if package has no versions left
+    final remaining = await _conn.execute(
+      Sql.named('SELECT COUNT(*) FROM package_versions WHERE package_name = @name'),
+      parameters: {'name': name},
+    );
+    if ((remaining.first[0] as int) == 0) {
+      await _conn.execute(
+        Sql.named('DELETE FROM packages WHERE name = @name'),
+        parameters: {'name': name},
+      );
+    }
+
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> discontinuePackage(String name, {String? replacedBy}) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        UPDATE packages
+        SET is_discontinued = TRUE, replaced_by = @replaced
+        WHERE name = @name
+      '''),
+      parameters: {'name': name, 'replaced': replacedBy},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<int> clearAllCachedPackages() async {
+    // Get count first
+    final countResult = await _conn.execute(
+      'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = TRUE',
+    );
+    final count = countResult.first[0] as int;
+
+    // Delete all cached packages (cascade will delete versions)
+    await _conn.execute(
+      'DELETE FROM packages WHERE is_upstream_cache = TRUE',
+    );
+
+    return count;
+  }
+
+  @override
+  Future<AdminStats> getAdminStats() async {
+    final results = await Future.wait([
+      _conn.execute('SELECT COUNT(*) FROM packages'),
+      _conn.execute('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = FALSE'),
+      _conn.execute('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = TRUE'),
+      _conn.execute('SELECT COUNT(*) FROM package_versions'),
+    ]);
+
+    return AdminStats(
+      totalPackages: results[0].first[0] as int,
+      localPackages: results[1].first[0] as int,
+      cachedPackages: results[2].first[0] as int,
+      totalVersions: results[3].first[0] as int,
+    );
+  }
+
+  @override
+  Future<List<String>> getPackageArchiveKeys(String name) async {
+    final result = await _conn.execute(
+      Sql.named('SELECT archive_key FROM package_versions WHERE package_name = @name'),
+      parameters: {'name': name},
+    );
+    return result.map((row) => row[0] as String).toList();
+  }
+
+  @override
+  Future<String?> getVersionArchiveKey(String name, String version) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT archive_key FROM package_versions
+        WHERE package_name = @name AND version = @version
+      '''),
+      parameters: {'name': name, 'version': version},
+    );
+    if (result.isEmpty) return null;
+    return result.first[0] as String;
+  }
 }
 
 /// Metadata storage backed by SQLite.
@@ -935,6 +1120,145 @@ class SqliteMetadataStore extends MetadataStore {
     _db.execute('DELETE FROM upload_sessions WHERE expires_at < ?', [now]);
     return _db.updatedRows;
   }
+
+  // ============ Admin Operations ============
+
+  @override
+  Future<PackageListResult> listPackagesByType({
+    required bool isUpstreamCache,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    // Get total count
+    final cacheValue = isUpstreamCache ? 1 : 0;
+    final countResult = _db.select(
+      'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = ?',
+      [cacheValue],
+    );
+    final total = countResult.first.values.first as int;
+
+    // Get packages for this page
+    final offset = (page - 1) * limit;
+    final result = _db.select('''
+      SELECT name FROM packages
+      WHERE is_upstream_cache = ?
+      ORDER BY updated_at DESC
+      LIMIT ? OFFSET ?
+    ''', [cacheValue, limit, offset]);
+
+    final packages = <PackageInfo>[];
+    for (final row in result) {
+      final name = row['name'] as String;
+      final info = await getPackageInfo(name);
+      if (info != null) {
+        packages.add(info);
+      }
+    }
+
+    return PackageListResult(
+      packages: packages,
+      total: total,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<int> deletePackage(String name) async {
+    // Get version count first
+    final countResult = _db.select(
+      'SELECT COUNT(*) FROM package_versions WHERE package_name = ?',
+      [name],
+    );
+    final versionCount = countResult.first.values.first as int;
+
+    // Delete package (cascade will delete versions)
+    _db.execute('DELETE FROM packages WHERE name = ?', [name]);
+
+    return versionCount;
+  }
+
+  @override
+  Future<bool> deletePackageVersion(String name, String version) async {
+    _db.execute('''
+      DELETE FROM package_versions
+      WHERE package_name = ? AND version = ?
+    ''', [name, version]);
+    final deleted = _db.updatedRows > 0;
+
+    // Check if package has no versions left
+    final remaining = _db.select(
+      'SELECT COUNT(*) FROM package_versions WHERE package_name = ?',
+      [name],
+    );
+    if ((remaining.first.values.first as int) == 0) {
+      _db.execute('DELETE FROM packages WHERE name = ?', [name]);
+    }
+
+    return deleted;
+  }
+
+  @override
+  Future<bool> discontinuePackage(String name, {String? replacedBy}) async {
+    _db.execute('''
+      UPDATE packages
+      SET is_discontinued = 1, replaced_by = ?
+      WHERE name = ?
+    ''', [replacedBy, name]);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<int> clearAllCachedPackages() async {
+    // Get count first
+    final countResult = _db.select(
+      'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 1',
+    );
+    final count = countResult.first.values.first as int;
+
+    // Delete all cached packages (cascade will delete versions)
+    _db.execute('DELETE FROM packages WHERE is_upstream_cache = 1');
+
+    return count;
+  }
+
+  @override
+  Future<AdminStats> getAdminStats() async {
+    final totalResult = _db.select('SELECT COUNT(*) FROM packages');
+    final localResult = _db.select(
+      'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 0',
+    );
+    final cachedResult = _db.select(
+      'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 1',
+    );
+    final versionsResult = _db.select('SELECT COUNT(*) FROM package_versions');
+
+    return AdminStats(
+      totalPackages: totalResult.first.values.first as int,
+      localPackages: localResult.first.values.first as int,
+      cachedPackages: cachedResult.first.values.first as int,
+      totalVersions: versionsResult.first.values.first as int,
+    );
+  }
+
+  @override
+  Future<List<String>> getPackageArchiveKeys(String name) async {
+    final result = _db.select(
+      'SELECT archive_key FROM package_versions WHERE package_name = ?',
+      [name],
+    );
+    return result.map((row) => row['archive_key'] as String).toList();
+  }
+
+  @override
+  Future<String?> getVersionArchiveKey(String name, String version) async {
+    final result = _db.select('''
+      SELECT archive_key FROM package_versions
+      WHERE package_name = ? AND version = ?
+    ''', [name, version]);
+    if (result.isEmpty) return null;
+    return result.first['archive_key'] as String;
+  }
 }
 
 // PostgreSQL migrations
@@ -980,6 +1304,10 @@ const _postgresMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_upload_sessions_expires
       ON upload_sessions(expires_at);
   ''',
+  '002_add_upstream_cache': '''
+    ALTER TABLE packages ADD COLUMN is_upstream_cache BOOLEAN NOT NULL DEFAULT FALSE;
+    CREATE INDEX IF NOT EXISTS idx_packages_upstream_cache ON packages(is_upstream_cache);
+  ''',
 };
 
 // SQLite migrations
@@ -1024,6 +1352,10 @@ const _sqliteMigrations = <String, String>{
 
     CREATE INDEX IF NOT EXISTS idx_upload_sessions_expires
       ON upload_sessions(expires_at);
+  ''',
+  '002_add_upstream_cache': '''
+    ALTER TABLE packages ADD COLUMN is_upstream_cache INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS idx_packages_upstream_cache ON packages(is_upstream_cache);
   ''',
 };
 

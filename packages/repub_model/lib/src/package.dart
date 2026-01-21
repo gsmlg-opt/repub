@@ -79,6 +79,35 @@ int _compareSemver(String a, String b) {
   return 0;
 }
 
+/// Admin dashboard statistics.
+class AdminStats {
+  final int totalPackages;
+  final int localPackages;
+  final int cachedPackages;
+  final int totalVersions;
+
+  const AdminStats({
+    required this.totalPackages,
+    required this.localPackages,
+    required this.cachedPackages,
+    required this.totalVersions,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'totalPackages': totalPackages,
+        'localPackages': localPackages,
+        'cachedPackages': cachedPackages,
+        'totalVersions': totalVersions,
+      };
+
+  factory AdminStats.fromJson(Map<String, dynamic> json) => AdminStats(
+        totalPackages: json['totalPackages'] as int,
+        localPackages: json['localPackages'] as int,
+        cachedPackages: json['cachedPackages'] as int,
+        totalVersions: json['totalVersions'] as int,
+      );
+}
+
 /// Result of listing packages with pagination.
 class PackageListResult {
   final List<PackageInfo> packages;

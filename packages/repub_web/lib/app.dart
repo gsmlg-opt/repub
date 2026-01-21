@@ -1,6 +1,9 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr_router/jaspr_router.dart';
 
+import 'pages/admin/admin_cached_packages.dart';
+import 'pages/admin/admin_local_packages.dart';
+import 'pages/admin/admin_page.dart';
 import 'pages/home_page.dart';
 import 'pages/package_page.dart';
 import 'pages/search_page.dart';
@@ -31,6 +34,22 @@ class App extends StatelessComponent {
           builder: (context, state) => SearchPage(
             query: state.queryParams['q'] ?? '',
           ),
+        ),
+        // Admin routes
+        Route(
+          path: '/admin',
+          title: 'Admin - Repub',
+          builder: (context, state) => const AdminPage(),
+        ),
+        Route(
+          path: '/admin/packages/local',
+          title: 'Local Packages - Admin',
+          builder: (context, state) => const AdminLocalPackagesPage(),
+        ),
+        Route(
+          path: '/admin/packages/cached',
+          title: 'Cached Packages - Admin',
+          builder: (context, state) => const AdminCachedPackagesPage(),
         ),
       ],
     );
