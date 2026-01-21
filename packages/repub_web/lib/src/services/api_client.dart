@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:html' show window;
 import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model_web.dart';
+import 'package:web/web.dart' as web;
 
 /// API client for communicating with the Repub backend
 class ApiClient {
@@ -15,7 +15,7 @@ class ApiClient {
   /// Detect API base URL based on current location.
   /// In dev mode (port 8081), use API server on port 8080.
   static String _detectBaseUrl() {
-    final location = window.location;
+    final location = web.window.location;
     // Dev mode: web on 8081, API on 8080
     if (location.port == '8081') {
       return '${location.protocol}//${location.hostname}:8080';
