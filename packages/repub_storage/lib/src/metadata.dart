@@ -72,12 +72,14 @@ abstract class MetadataStore {
   Future<PackageVersion?> getPackageVersion(String packageName, String version);
 
   /// Create or update a package and add a new version.
+  /// If [isUpstreamCache] is true, the package is cached from upstream.
   Future<void> upsertPackageVersion({
     required String packageName,
     required String version,
     required Map<String, dynamic> pubspec,
     required String archiveKey,
     required String archiveSha256,
+    bool isUpstreamCache = false,
   });
 
   /// Check if a version already exists.
@@ -276,15 +278,16 @@ class PostgresMetadataStore extends MetadataStore {
     required Map<String, dynamic> pubspec,
     required String archiveKey,
     required String archiveSha256,
+    bool isUpstreamCache = false,
   }) async {
     await _conn.runTx((session) async {
       await session.execute(
         Sql.named('''
-          INSERT INTO packages (name, created_at, updated_at)
-          VALUES (@name, NOW(), NOW())
+          INSERT INTO packages (name, created_at, updated_at, is_upstream_cache)
+          VALUES (@name, NOW(), NOW(), @is_upstream_cache)
           ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
         '''),
-        parameters: {'name': packageName},
+        parameters: {'name': packageName, 'is_upstream_cache': isUpstreamCache},
       );
 
       await session.execute(
@@ -292,6 +295,7 @@ class PostgresMetadataStore extends MetadataStore {
           INSERT INTO package_versions
             (package_name, version, pubspec_json, archive_key, archive_sha256, published_at)
           VALUES (@name, @version, @pubspec, @archive_key, @sha256, NOW())
+          ON CONFLICT (package_name, version) DO NOTHING
         '''),
         parameters: {
           'name': packageName,
@@ -698,21 +702,23 @@ class SqliteMetadataStore extends MetadataStore {
     required Map<String, dynamic> pubspec,
     required String archiveKey,
     required String archiveSha256,
+    bool isUpstreamCache = false,
   }) async {
     final now = DateTime.now().toIso8601String();
 
     _db.execute('BEGIN TRANSACTION');
     try {
       _db.execute('''
-        INSERT INTO packages (name, created_at, updated_at)
-        VALUES (?, ?, ?)
+        INSERT INTO packages (name, created_at, updated_at, is_upstream_cache)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT (name) DO UPDATE SET updated_at = ?
-      ''', [packageName, now, now, now]);
+      ''', [packageName, now, now, isUpstreamCache ? 1 : 0, now]);
 
       _db.execute('''
         INSERT INTO package_versions
           (package_name, version, pubspec_json, archive_key, archive_sha256, published_at)
         VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT (package_name, version) DO NOTHING
       ''', [
         packageName,
         version,

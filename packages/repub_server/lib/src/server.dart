@@ -14,6 +14,11 @@ Future<void> startServer({Config? config}) async {
   print('Starting Repub server...');
   print('Base URL: ${cfg.baseUrl}');
   print('Database: ${cfg.databaseType.name}');
+  if (cfg.enableUpstreamProxy) {
+    print('Upstream proxy: ${cfg.upstreamUrl}');
+  } else {
+    print('Upstream proxy: disabled');
+  }
 
   // Create metadata store (handles connection and migrations)
   print('Connecting to database...');

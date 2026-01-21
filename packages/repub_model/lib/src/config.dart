@@ -23,6 +23,13 @@ class Config {
   final bool requireDownloadAuth;
   final int signedUrlTtlSeconds;
 
+  /// Upstream pub server URL for caching proxy mode.
+  /// When a package is not found locally, it will be fetched from upstream.
+  final String upstreamUrl;
+
+  /// Whether to enable upstream proxy/caching.
+  final bool enableUpstreamProxy;
+
   const Config({
     required this.listenAddr,
     required this.listenPort,
@@ -36,6 +43,8 @@ class Config {
     this.s3Bucket,
     required this.requireDownloadAuth,
     required this.signedUrlTtlSeconds,
+    required this.upstreamUrl,
+    required this.enableUpstreamProxy,
   });
 
   /// Get the database type based on the URL scheme.
@@ -92,6 +101,8 @@ class Config {
       s3Bucket: _envOptional('REPUB_S3_BUCKET'),
       requireDownloadAuth: _envBool('REPUB_REQUIRE_DOWNLOAD_AUTH', false),
       signedUrlTtlSeconds: _envInt('REPUB_SIGNED_URL_TTL_SECONDS', 3600),
+      upstreamUrl: _env('REPUB_UPSTREAM_URL', 'https://pub.dev'),
+      enableUpstreamProxy: _envBool('REPUB_ENABLE_UPSTREAM_PROXY', true),
     );
   }
 

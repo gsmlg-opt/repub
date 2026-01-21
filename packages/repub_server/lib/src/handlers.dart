@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:repub_auth/repub_auth.dart';
 import 'package:repub_model/repub_model.dart';
@@ -11,6 +12,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
 import 'publish.dart';
+import 'upstream.dart';
 
 /// Create the API router.
 Router createRouter({
@@ -121,11 +123,20 @@ class ApiHandlers {
   // In-memory storage for upload data (sessionId -> bytes)
   final Map<String, Uint8List> _uploadData = {};
 
+  // Upstream client for caching proxy
+  UpstreamClient? _upstream;
+
   ApiHandlers({
     required this.config,
     required this.metadata,
     required this.blobs,
   });
+
+  /// Get the upstream client (lazy initialization).
+  UpstreamClient? get upstream {
+    if (!config.enableUpstreamProxy) return null;
+    return _upstream ??= UpstreamClient(baseUrl: config.upstreamUrl);
+  }
 
   /// GET `/api/packages`
   Future<Response> listPackages(Request request) async {
@@ -206,6 +217,16 @@ class ApiHandlers {
     }
 
     final info = await metadata.getPackageInfo(name);
+
+    // If not found locally, try upstream
+    if (info == null && upstream != null) {
+      final upstreamInfo = await upstream!.getPackage(name);
+      if (upstreamInfo != null) {
+        // Return upstream info directly (don't cache metadata, only cache on download)
+        return _buildUpstreamPackageResponse(upstreamInfo);
+      }
+    }
+
     if (info == null) {
       return Response.notFound(
         jsonEncode({
@@ -260,6 +281,29 @@ class ApiHandlers {
     }
 
     final versionInfo = await metadata.getPackageVersion(name, version);
+
+    // If not found locally, try upstream
+    if (versionInfo == null && upstream != null) {
+      final upstreamVersion = await upstream!.getVersion(name, version);
+      if (upstreamVersion != null) {
+        // Return upstream version info with our archive URL
+        final archiveUrl =
+            '${config.baseUrl}/packages/$name/versions/$version.tar.gz';
+        return Response.ok(
+          jsonEncode({
+            'version': upstreamVersion.version,
+            'pubspec': upstreamVersion.pubspec,
+            'archive_url': archiveUrl,
+            if (upstreamVersion.archiveSha256 != null)
+              'archive_sha256': upstreamVersion.archiveSha256,
+            if (upstreamVersion.published != null)
+              'published': upstreamVersion.published!.toIso8601String(),
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    }
+
     if (versionInfo == null) {
       return Response.notFound(
         jsonEncode({
@@ -518,40 +562,129 @@ class ApiHandlers {
       }
     }
 
-    // Get version info
+    // Get version info from local storage
     final versionInfo = await metadata.getPackageVersion(name, version);
-    if (versionInfo == null) {
-      return Response.notFound(
-        jsonEncode({
-          'error': {
-            'code': 'not_found',
-            'message': 'Version $version of package $name not found',
+
+    // If found locally, serve from local storage
+    if (versionInfo != null) {
+      try {
+        final bytes = await blobs.getArchive(versionInfo.archiveKey);
+        return Response.ok(
+          Stream.value(bytes),
+          headers: {
+            'content-type': 'application/octet-stream',
+            'content-length': bytes.length.toString(),
           },
-        }),
-        headers: {'content-type': 'application/json'},
-      );
+        );
+      } catch (e) {
+        // If local storage fails, try upstream
+        print('Local storage error for $name@$version: $e');
+      }
     }
 
-    try {
-      final bytes = await blobs.getArchive(versionInfo.archiveKey);
-      return Response.ok(
-        Stream.value(bytes),
-        headers: {
-          'content-type': 'application/octet-stream',
-          'content-length': bytes.length.toString(),
-        },
-      );
-    } catch (e) {
-      return Response.internalServerError(
-        body: jsonEncode({
-          'error': {
-            'code': 'storage_error',
-            'message': 'Failed to retrieve archive'
-          },
-        }),
-        headers: {'content-type': 'application/json'},
-      );
+    // Try to fetch from upstream and cache
+    if (upstream != null) {
+      final upstreamVersion = await upstream!.getVersion(name, version);
+      if (upstreamVersion != null && upstreamVersion.archiveUrl.isNotEmpty) {
+        print('Fetching $name@$version from upstream: ${upstreamVersion.archiveUrl}');
+        final archiveBytes = await upstream!.downloadArchive(upstreamVersion.archiveUrl);
+
+        if (archiveBytes != null) {
+          // Cache the archive
+          try {
+            final sha256Hash = sha256.convert(archiveBytes).toString();
+            final archiveKey = blobs.archiveKey(name, version, sha256Hash);
+
+            // Store to blob storage
+            await blobs.putArchive(key: archiveKey, data: archiveBytes);
+
+            // Store metadata (cache the package info)
+            await metadata.upsertPackageVersion(
+              packageName: name,
+              version: version,
+              pubspec: upstreamVersion.pubspec,
+              archiveKey: archiveKey,
+              archiveSha256: sha256Hash,
+              isUpstreamCache: true,
+            );
+
+            print('Cached $name@$version from upstream');
+
+            return Response.ok(
+              Stream.value(archiveBytes),
+              headers: {
+                'content-type': 'application/octet-stream',
+                'content-length': archiveBytes.length.toString(),
+              },
+            );
+          } catch (e) {
+            print('Failed to cache $name@$version: $e');
+            // Still return the archive even if caching failed
+            return Response.ok(
+              Stream.value(archiveBytes),
+              headers: {
+                'content-type': 'application/octet-stream',
+                'content-length': archiveBytes.length.toString(),
+              },
+            );
+          }
+        }
+      }
     }
+
+    return Response.notFound(
+      jsonEncode({
+        'error': {
+          'code': 'not_found',
+          'message': 'Version $version of package $name not found',
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// Build response for upstream package info.
+  Response _buildUpstreamPackageResponse(UpstreamPackageInfo info) {
+    // Build version list with our archive URLs
+    final versions = <Map<String, dynamic>>[];
+    for (final v in info.versions) {
+      final archiveUrl =
+          '${config.baseUrl}/packages/${info.name}/versions/${v.version}.tar.gz';
+      versions.add({
+        'version': v.version,
+        'pubspec': v.pubspec,
+        'archive_url': archiveUrl,
+        if (v.archiveSha256 != null) 'archive_sha256': v.archiveSha256,
+        if (v.published != null) 'published': v.published!.toIso8601String(),
+      });
+    }
+
+    final latest = info.latest;
+    Map<String, dynamic>? latestJson;
+    if (latest != null) {
+      final latestArchiveUrl =
+          '${config.baseUrl}/packages/${info.name}/versions/${latest.version}.tar.gz';
+      latestJson = {
+        'version': latest.version,
+        'pubspec': latest.pubspec,
+        'archive_url': latestArchiveUrl,
+        if (latest.archiveSha256 != null) 'archive_sha256': latest.archiveSha256,
+        if (latest.published != null) 'published': latest.published!.toIso8601String(),
+      };
+    }
+
+    final response = {
+      'name': info.name,
+      if (latestJson != null) 'latest': latestJson,
+      'versions': versions,
+      if (info.isDiscontinued) 'isDiscontinued': true,
+      if (info.replacedBy != null) 'replacedBy': info.replacedBy,
+    };
+
+    return Response.ok(
+      jsonEncode(response),
+      headers: {'content-type': 'application/json'},
+    );
   }
 
   Future<Uint8List> _parseMultipartUpload(Request request) async {

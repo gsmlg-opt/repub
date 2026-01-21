@@ -54,6 +54,16 @@ const migrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_upload_sessions_expires
       ON upload_sessions(expires_at);
   ''',
+
+  '002_upstream_cache': '''
+    -- Add upstream cache flag to packages
+    -- This marks packages that were cached from upstream (e.g., pub.dev)
+    ALTER TABLE packages ADD COLUMN IF NOT EXISTS is_upstream_cache BOOLEAN NOT NULL DEFAULT FALSE;
+
+    -- Index for filtering local vs cached packages
+    CREATE INDEX IF NOT EXISTS idx_packages_upstream_cache
+      ON packages(is_upstream_cache);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.
