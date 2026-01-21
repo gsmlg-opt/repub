@@ -60,19 +60,9 @@ melos:
       packageFilters:
         scope: repub_server
 
-    server:dev:
-      description: Start API server and web dev server with hot reload (run in separate terminal or use &)
-      run: |
-        echo "Starting development environment..."
-        echo "API server: http://localhost:8080"
-        echo "Web UI (hot reload): http://localhost:8081"
-        echo ""
-        echo "Run these commands in separate terminals:"
-        echo "  Terminal 1: melos run server"
-        echo "  Terminal 2: melos run dev:web"
-        echo ""
-        echo "Or run both in background:"
-        echo "  melos run server & melos run dev:web"
+    dev:
+      description: Start API server and web UI with hot reload (single command)
+      run: bash scripts/dev.sh
 
     build:
       description: Build production binary

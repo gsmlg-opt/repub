@@ -3,11 +3,15 @@ targets:
     builders:
       jaspr_builder:
         enabled: true
-      build_web_compilers:web_entrypoint:
+      build_web_compilers:entrypoint:
         generate_for:
           - web/main.dart
-        options:
+        # Use DDC for development (faster builds, better debugging)
+        # dart2js is used for release builds
+        release_options:
           compiler: dart2js
           dart2js_args:
             - --minify
             - -O2
+        dev_options:
+          compiler: dartdevc
