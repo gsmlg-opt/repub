@@ -28,7 +28,7 @@ class _PackagePageState extends State<PackagePage> {
   }
 
   Future<void> _loadPackage() async {
-    final apiClient = ApiClient(baseUrl: '');
+    final apiClient = ApiClient();
     try {
       final info = await apiClient.getPackage(component.packageName);
       setState(() {

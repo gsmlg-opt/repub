@@ -26,7 +26,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadPackages() async {
-    final apiClient = ApiClient(baseUrl: '');
+    final apiClient = ApiClient();
     try {
       final response = await apiClient.listPackages();
       setState(() {

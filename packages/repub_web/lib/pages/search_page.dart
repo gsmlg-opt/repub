@@ -35,7 +35,7 @@ class _SearchPageState extends State<SearchPage> {
       _error = null;
     });
 
-    final apiClient = ApiClient(baseUrl: '');
+    final apiClient = ApiClient();
     try {
       final response = await apiClient.searchPackages(component.query);
       setState(() {
