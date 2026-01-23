@@ -33,15 +33,21 @@ Future<void> main(List<String> args) async {
     print('Applied $migrated migration(s)');
   }
 
-  // Create blob storage
+  // Create blob storage for local packages
   final blobs = BlobStore.fromConfig(cfg);
   await blobs.ensureReady();
 
-  // Create API router
+  // Create blob storage for cached upstream packages
+  final cacheBlobs = BlobStore.cacheFromConfig(cfg);
+  await cacheBlobs.ensureReady();
+
+  // Create API router (disable static files - use webdev proxy instead)
   final apiRouter = createRouter(
     config: cfg,
     metadata: metadata,
     blobs: blobs,
+    cacheBlobs: cacheBlobs,
+    serveStaticFiles: false,
   );
 
   // Create proxy handler for web dev server
@@ -69,38 +75,57 @@ Future<void> main(List<String> args) async {
   Future<Response> combinedHandler(Request request) async {
     final path = request.url.path;
 
-    // API routes - handle directly
-    // /api/* - API endpoints
-    // /packages/<name>/versions/<version>.tar.gz - Package downloads
-    // /health - Health check
-    if (path.startsWith('api/') || path == 'health') {
-      return await apiRouter(request);
+    try {
+      // API routes - handle directly
+      // /api/* - API endpoints
+      // /packages/<name>/versions/<version>.tar.gz - Package downloads
+      // /health - Health check
+      if (path.startsWith('api/') || path == 'health') {
+        return await apiRouter(request);
+      }
+
+      // Package download route: /packages/<name>/versions/<version>.tar.gz
+      if (path.startsWith('packages/') && path.contains('/versions/')) {
+        return await apiRouter(request);
+      }
+
+      // Everything else - proxy to webdev
+      final response = await webdevProxy(request);
+
+      // SPA fallback: if webdev returns 404 for a non-asset route,
+      // serve index.html instead (for client-side routing)
+      if (response.statusCode == 404 && !isAssetPath(path)) {
+        // Request index.html from webdev
+        final indexUri = request.requestedUri.replace(path: '/', query: '');
+        final indexReq = Request('GET', indexUri,
+            context: request.context, headers: request.headers);
+        return await webdevProxy(indexReq);
+      }
+
+      return response;
+    } catch (e, stack) {
+      // Check if it's a connection refused to webdev (expected during startup)
+      final errorStr = e.toString();
+      if (errorStr.contains('Connection refused') && errorStr.contains('8081')) {
+        // Webdev not ready yet - return a friendly message without stack trace
+        return Response(
+          503,
+          body: 'Webdev server starting... Please refresh in a moment.',
+          headers: {'content-type': 'text/plain', 'retry-after': '2'},
+        );
+      }
+
+      // Log other errors with full stack trace
+      print('\x1B[31m[ERROR]\x1B[0m ${request.method} /${request.url.path}');
+      print('\x1B[31m$e\x1B[0m');
+      print('\x1B[33m$stack\x1B[0m');
+      return Response.internalServerError(body: 'Internal Server Error: $e');
     }
-
-    // Package download route: /packages/<name>/versions/<version>.tar.gz
-    if (path.startsWith('packages/') && path.contains('/versions/')) {
-      return await apiRouter(request);
-    }
-
-    // Everything else - proxy to webdev
-    final response = await webdevProxy(request);
-
-    // SPA fallback: if webdev returns 404 for a non-asset route,
-    // serve index.html instead (for client-side routing)
-    if (response.statusCode == 404 && !isAssetPath(path)) {
-      // Request index.html from webdev
-      final indexUri = request.requestedUri.replace(path: '/', query: '');
-      final indexReq = Request('GET', indexUri,
-          context: request.context, headers: request.headers);
-      return await webdevProxy(indexReq);
-    }
-
-    return response;
   }
 
-  // Add middleware
+  // Add middleware with custom access logging
   final handler = const Pipeline()
-      .addMiddleware(logRequests())
+      .addMiddleware(_accessLogMiddleware())
       .addMiddleware(_corsMiddleware())
       .addHandler(combinedHandler);
 
@@ -124,6 +149,51 @@ Future<void> main(List<String> args) async {
     await metadata.close();
     exit(0);
   });
+}
+
+/// Access log middleware with colored output.
+Middleware _accessLogMiddleware() {
+  return (Handler innerHandler) {
+    return (Request request) async {
+      final stopwatch = Stopwatch()..start();
+
+      Response response;
+      try {
+        response = await innerHandler(request);
+      } catch (e) {
+        // Don't log here - let the error handler in combinedHandler do it
+        rethrow;
+      }
+
+      stopwatch.stop();
+
+      final status = response.statusCode;
+
+      // Skip logging 500 errors - those are already logged with stack trace
+      if (status >= 500) {
+        return response;
+      }
+
+      final method = request.method.padRight(6);
+      final path = '/${request.url.path}';
+      final duration = '${stopwatch.elapsedMilliseconds}ms'.padLeft(6);
+
+      // Color code based on status
+      String statusColor;
+      if (status >= 400) {
+        statusColor = '\x1B[33m'; // Yellow
+      } else if (status >= 300) {
+        statusColor = '\x1B[36m'; // Cyan
+      } else {
+        statusColor = '\x1B[32m'; // Green
+      }
+      const reset = '\x1B[0m';
+
+      stdout.writeln('$statusColor$status$reset $method $path $duration');
+
+      return response;
+    };
+  };
 }
 
 /// CORS middleware for development.

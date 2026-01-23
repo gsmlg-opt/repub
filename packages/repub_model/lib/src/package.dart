@@ -5,6 +5,7 @@ class Package {
   final DateTime updatedAt;
   final bool isDiscontinued;
   final String? replacedBy;
+  final bool isUpstreamCache;
 
   const Package({
     required this.name,
@@ -12,6 +13,7 @@ class Package {
     required this.updatedAt,
     this.isDiscontinued = false,
     this.replacedBy,
+    this.isUpstreamCache = false,
   });
 
   Map<String, dynamic> toJson() => {
