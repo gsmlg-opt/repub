@@ -71,6 +71,11 @@ class Layout extends StatelessComponent {
                       classes: 'text-gray-600 hover:text-gray-900 font-medium',
                       [Component.text('Search')],
                     ),
+                    a(
+                      href: '/docs',
+                      classes: 'text-gray-600 hover:text-gray-900 font-medium',
+                      [Component.text('Docs')],
+                    ),
                   ],
                 ),
               ],

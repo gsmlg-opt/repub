@@ -4,9 +4,11 @@ import 'package:jaspr_router/jaspr_router.dart';
 import 'pages/admin/admin_cached_packages.dart';
 import 'pages/admin/admin_local_packages.dart';
 import 'pages/admin/admin_page.dart';
+import 'pages/docs_page.dart';
 import 'pages/home_page.dart';
 import 'pages/package_page.dart';
 import 'pages/search_page.dart';
+import 'pages/upstream_package_page.dart';
 
 @client
 class App extends StatelessComponent {
@@ -34,6 +36,18 @@ class App extends StatelessComponent {
           builder: (context, state) => SearchPage(
             query: state.queryParams['q'] ?? '',
           ),
+        ),
+        Route(
+          path: '/upstream-packages/:name',
+          title: 'Upstream Package Details',
+          builder: (context, state) => UpstreamPackagePage(
+            packageName: state.params['name']!,
+          ),
+        ),
+        Route(
+          path: '/docs',
+          title: 'Documentation - Repub',
+          builder: (context, state) => const DocsPage(),
         ),
         // Admin routes
         Route(
