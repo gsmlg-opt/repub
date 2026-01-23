@@ -1,6 +1,8 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
+// Layout updated: 2026-01-23
+
 /// Main layout wrapper with header and footer
 class Layout extends StatelessComponent {
   final List<Component> children;
@@ -74,7 +76,7 @@ class Layout extends StatelessComponent {
                     a(
                       href: '/docs',
                       classes: 'text-gray-600 hover:text-gray-900 font-medium',
-                      [Component.text('Docs')],
+                      [Component.text('Documentation')],
                     ),
                   ],
                 ),

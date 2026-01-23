@@ -17,7 +17,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 # Create data directories if they don't exist
-mkdir -p data/packages data/metadata
+mkdir -p data/packages data/metadata data/cache
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Repub Development Environment${NC}"
@@ -38,25 +38,22 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start webdev server on 8081 (for hot reload) - run silently in background
-echo -e "${GREEN}[WEB]${NC} Starting webdev server for hot reload on port 8081..."
-cd packages/repub_web
-dart run webdev serve web:8081 --auto=refresh > /dev/null 2>&1 &
-WEB_PID=$!
-cd "$PROJECT_ROOT"
-
-# Wait for webdev to be ready
-sleep 3
-
-# Start unified dev server on 8080 (proxies to webdev + handles API)
+# Start unified dev server on 8080 first (handles API + proxies to webdev)
 echo -e "${BLUE}[DEV]${NC} Starting unified dev server on port 8080..."
 REPUB_STORAGE_PATH=./data/packages \
 REPUB_DATABASE_URL=sqlite:./data/metadata/repub.db \
 dart run packages/repub_server/bin/repub_dev_server.dart 2>&1 | sed "s/^/$(printf "${BLUE}[DEV]${NC} ")/" &
 SERVER_PID=$!
 
-# Wait a moment for the server to start
+# Wait for dev server to be ready
 sleep 2
+
+# Start webdev server on 8081 (for hot reload)
+echo -e "${GREEN}[WEB]${NC} Starting webdev server for hot reload on port 8081..."
+cd packages/repub_web
+dart run webdev serve web:8081 --auto=refresh 2>&1 | sed "s/^/$(printf "${GREEN}[WEB]${NC} ")/" &
+WEB_PID=$!
+cd "$PROJECT_ROOT"
 
 echo ""
 echo -e "${GREEN}✓ Development environment ready!${NC}"
