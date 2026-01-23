@@ -213,7 +213,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<Package?> getPackage(String name) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT name, created_at, updated_at, is_discontinued, replaced_by
+        SELECT name, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
         FROM packages WHERE name = @name
       '''),
       parameters: {'name': name},
@@ -228,6 +228,7 @@ class PostgresMetadataStore extends MetadataStore {
       updatedAt: row[2] as DateTime,
       isDiscontinued: row[3] as bool,
       replacedBy: row[4] as String?,
+      isUpstreamCache: row[5] as bool,
     );
   }
 
@@ -803,7 +804,7 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<Package?> getPackage(String name) async {
     final result = _db.select('''
-      SELECT name, created_at, updated_at, is_discontinued, replaced_by
+      SELECT name, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
       FROM packages WHERE name = ?
     ''', [name]);
 
@@ -816,6 +817,7 @@ class SqliteMetadataStore extends MetadataStore {
       updatedAt: DateTime.parse(row['updated_at'] as String),
       isDiscontinued: (row['is_discontinued'] as int) == 1,
       replacedBy: row['replaced_by'] as String?,
+      isUpstreamCache: (row['is_upstream_cache'] as int) == 1,
     );
   }
 

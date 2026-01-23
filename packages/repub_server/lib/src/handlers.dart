@@ -15,14 +15,17 @@ import 'publish.dart';
 import 'upstream.dart';
 
 /// Create the API router.
+/// Set [serveStaticFiles] to false in dev mode to use webdev proxy instead.
 Router createRouter({
   required Config config,
   required MetadataStore metadata,
   required BlobStore blobs,
+  required BlobStore cacheBlobs,
+  bool serveStaticFiles = true,
 }) {
   final router = Router();
   final handlers =
-      ApiHandlers(config: config, metadata: metadata, blobs: blobs);
+      ApiHandlers(config: config, metadata: metadata, blobs: blobs, cacheBlobs: cacheBlobs);
 
   // List all packages (for web UI)
   router.get('/api/packages', handlers.listPackages);
@@ -68,38 +71,40 @@ Router createRouter({
       handlers.adminDiscontinuePackage);
   router.delete('/api/admin/cache', handlers.adminClearCache);
 
-  // Web UI static files - serve from web build directory
-  final webDir = _findWebDir();
-  if (webDir != null) {
-    final staticHandler = createStaticHandler(
-      webDir,
-      defaultDocument: 'index.html',
-    );
+  // Web UI static files - serve from web build directory (skip in dev mode)
+  if (serveStaticFiles) {
+    final webDir = _findWebDir();
+    if (webDir != null) {
+      final staticHandler = createStaticHandler(
+        webDir,
+        defaultDocument: 'index.html',
+      );
 
-    // Serve index.html for SPA routes
-    router.get('/', (Request req) => staticHandler(req));
+      // Serve index.html for SPA routes
+      router.get('/', (Request req) => staticHandler(req));
 
-    // Serve static assets
-    router.all('/<path|.*>', (Request req, String path) async {
-      // Check if it's an API route first
-      if (path.startsWith('api/') || path.startsWith('packages/')) {
-        return Response.notFound('Not found');
-      }
+      // Serve static assets
+      router.all('/<path|.*>', (Request req, String path) async {
+        // Check if it's an API route first
+        if (path.startsWith('api/') || path.startsWith('packages/')) {
+          return Response.notFound('Not found');
+        }
 
-      // Try to serve static file
-      final response = await staticHandler(req);
-      if (response.statusCode != 404) {
-        return response;
-      }
+        // Try to serve static file
+        final response = await staticHandler(req);
+        if (response.statusCode != 404) {
+          return response;
+        }
 
-      // For SPA routes, serve index.html
-      // Build absolute URI from original request
-      final requestedUri = req.requestedUri;
-      final indexUri = requestedUri.replace(path: '/index.html', query: '');
-      final indexReq = Request('GET', indexUri,
-          context: req.context, headers: req.headers);
-      return staticHandler(indexReq);
-    });
+        // For SPA routes, serve index.html
+        // Build absolute URI from original request
+        final requestedUri = req.requestedUri;
+        final indexUri = requestedUri.replace(path: '/index.html', query: '');
+        final indexReq = Request('GET', indexUri,
+            context: req.context, headers: req.headers);
+        return staticHandler(indexReq);
+      });
+    }
   }
 
   return router;
@@ -137,6 +142,7 @@ class ApiHandlers {
   final Config config;
   final MetadataStore metadata;
   final BlobStore blobs;
+  final BlobStore cacheBlobs;
 
   // In-memory storage for upload data (sessionId -> bytes)
   final Map<String, Uint8List> _uploadData = {};
@@ -148,6 +154,7 @@ class ApiHandlers {
     required this.config,
     required this.metadata,
     required this.blobs,
+    required this.cacheBlobs,
   });
 
   /// Get the upstream client (lazy initialization).
@@ -261,32 +268,31 @@ class ApiHandlers {
         );
       }
 
-      // Fetch full package info for the first 'limit' results
-      final upstreamInfos = <PackageInfo>[];
-      for (final name in packageNames.take(limit.clamp(1, 100))) {
-        final upstreamPkg = await upstream!.getPackage(name);
-        if (upstreamPkg != null) {
-          upstreamInfos.add(PackageInfo(
-            package: Package(
-              name: upstreamPkg.name,
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-              isDiscontinued: upstreamPkg.isDiscontinued,
-              replacedBy: upstreamPkg.replacedBy,
-            ),
-            versions: upstreamPkg.versions.map((v) {
-              return PackageVersion(
-                packageName: v.packageName,
-                version: v.version,
-                pubspec: v.pubspec,
-                archiveKey: v.archiveUrl,
-                archiveSha256: v.archiveSha256 ?? '',
-                publishedAt: v.published ?? DateTime.now(),
-              );
-            }).toList(),
-          ));
-        }
-      }
+      // Fetch full package info in parallel with concurrency limit
+      final namesToFetch = packageNames.take(limit.clamp(1, 100)).toList();
+      final upstreamPackages = await upstream!.getPackagesBatch(namesToFetch);
+
+      final upstreamInfos = upstreamPackages.map((upstreamPkg) {
+        return PackageInfo(
+          package: Package(
+            name: upstreamPkg.name,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            isDiscontinued: upstreamPkg.isDiscontinued,
+            replacedBy: upstreamPkg.replacedBy,
+          ),
+          versions: upstreamPkg.versions.map((v) {
+            return PackageVersion(
+              packageName: v.packageName,
+              version: v.version,
+              pubspec: v.pubspec,
+              archiveKey: v.archiveUrl,
+              archiveSha256: v.archiveSha256 ?? '',
+              publishedAt: v.published ?? DateTime.now(),
+            );
+          }).toList(),
+        );
+      }).toList();
 
       final upstreamResult = PackageListResult(
         packages: upstreamInfos,
@@ -714,13 +720,18 @@ class ApiHandlers {
       }
     }
 
-    // Get version info from local storage
+    // Get version info from database
     final versionInfo = await metadata.getPackageVersion(name, version);
 
-    // If found locally, serve from local storage
+    // If found in database, serve from appropriate storage
     if (versionInfo != null) {
       try {
-        final bytes = await blobs.getArchive(versionInfo.archiveKey);
+        // Check if this is a cached upstream package
+        final pkgInfo = await metadata.getPackageInfo(name);
+        final isCache = pkgInfo?.package.isUpstreamCache ?? false;
+        final store = isCache ? cacheBlobs : blobs;
+
+        final bytes = await store.getArchive(versionInfo.archiveKey);
         return Response.ok(
           Stream.value(bytes),
           headers: {
@@ -729,8 +740,8 @@ class ApiHandlers {
           },
         );
       } catch (e) {
-        // If local storage fails, try upstream
-        print('Local storage error for $name@$version: $e');
+        // If storage fails, try upstream
+        print('Storage error for $name@$version: $e');
       }
     }
 
@@ -742,13 +753,13 @@ class ApiHandlers {
         final archiveBytes = await upstream!.downloadArchive(upstreamVersion.archiveUrl);
 
         if (archiveBytes != null) {
-          // Cache the archive
+          // Cache the archive in cache storage
           try {
             final sha256Hash = sha256.convert(archiveBytes).toString();
-            final archiveKey = blobs.archiveKey(name, version, sha256Hash);
+            final archiveKey = cacheBlobs.archiveKey(name, version, sha256Hash);
 
-            // Store to blob storage
-            await blobs.putArchive(key: archiveKey, data: archiveBytes);
+            // Store to cache blob storage
+            await cacheBlobs.putArchive(key: archiveKey, data: archiveBytes);
 
             // Store metadata (cache the package info)
             await metadata.upsertPackageVersion(
@@ -969,6 +980,11 @@ class ApiHandlers {
 
   /// DELETE `/api/admin/packages/<name>`
   Future<Response> adminDeletePackage(Request request, String name) async {
+    // Check if this is a cached package before deleting
+    final pkgInfo = await metadata.getPackageInfo(name);
+    final isCache = pkgInfo?.package.isUpstreamCache ?? false;
+    final store = isCache ? cacheBlobs : blobs;
+
     // Get archive keys before deleting metadata
     final archiveKeys = await metadata.getPackageArchiveKeys(name);
 
@@ -984,10 +1000,10 @@ class ApiHandlers {
       );
     }
 
-    // Delete blobs
+    // Delete blobs from appropriate storage
     for (final key in archiveKeys) {
       try {
-        await blobs.delete(key);
+        await store.delete(key);
       } catch (e) {
         print('Warning: Failed to delete blob $key: $e');
       }
@@ -1010,6 +1026,11 @@ class ApiHandlers {
     String name,
     String version,
   ) async {
+    // Check if this is a cached package before deleting
+    final pkgInfo = await metadata.getPackageInfo(name);
+    final isCache = pkgInfo?.package.isUpstreamCache ?? false;
+    final store = isCache ? cacheBlobs : blobs;
+
     // Get archive key before deleting metadata
     final archiveKey = await metadata.getVersionArchiveKey(name, version);
 
@@ -1028,10 +1049,10 @@ class ApiHandlers {
       );
     }
 
-    // Delete blob
+    // Delete blob from appropriate storage
     if (archiveKey != null) {
       try {
-        await blobs.delete(archiveKey);
+        await store.delete(archiveKey);
       } catch (e) {
         print('Warning: Failed to delete blob $archiveKey: $e');
       }
@@ -1101,14 +1122,14 @@ class ApiHandlers {
     // Delete metadata
     final packageCount = await metadata.clearAllCachedPackages();
 
-    // Delete blobs
+    // Delete blobs from cache storage
     var blobsDeleted = 0;
     for (final key in allArchiveKeys) {
       try {
-        await blobs.delete(key);
+        await cacheBlobs.delete(key);
         blobsDeleted++;
       } catch (e) {
-        print('Warning: Failed to delete blob $key: $e');
+        print('Warning: Failed to delete cached blob $key: $e');
       }
     }
 

@@ -31,18 +31,23 @@ Future<void> startServer({Config? config}) async {
     print('Applied $migrated migration(s)');
   }
 
-  // Create blob storage
+  // Create blob storage for local packages
   final blobs = BlobStore.fromConfig(cfg);
+
+  // Create blob storage for cached upstream packages
+  final cacheBlobs = BlobStore.cacheFromConfig(cfg);
 
   // Ensure storage is ready
   print('Checking storage...');
   await blobs.ensureReady();
+  await cacheBlobs.ensureReady();
 
   // Create router
   final router = createRouter(
     config: cfg,
     metadata: metadata,
     blobs: blobs,
+    cacheBlobs: cacheBlobs,
   );
 
   // Add logging middleware
