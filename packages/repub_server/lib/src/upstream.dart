@@ -8,6 +8,9 @@ class UpstreamClient {
   final String baseUrl;
   final http.Client _client;
 
+  /// Default timeout for HTTP requests.
+  static const _timeout = Duration(seconds: 10);
+
   UpstreamClient({required this.baseUrl}) : _client = http.Client();
 
   /// Fetch package info from upstream.
@@ -15,7 +18,7 @@ class UpstreamClient {
   Future<UpstreamPackageInfo?> getPackage(String name) async {
     final url = '$baseUrl/api/packages/$name';
     try {
-      final response = await _client.get(Uri.parse(url));
+      final response = await _client.get(Uri.parse(url)).timeout(_timeout);
 
       if (response.statusCode == 404) {
         return null;
@@ -34,12 +37,30 @@ class UpstreamClient {
     }
   }
 
+  /// Fetch multiple packages in parallel with concurrency limit.
+  Future<List<UpstreamPackageInfo>> getPackagesBatch(
+    List<String> names, {
+    int concurrency = 5,
+  }) async {
+    final results = <UpstreamPackageInfo>[];
+
+    // Process in batches to limit concurrency
+    for (var i = 0; i < names.length; i += concurrency) {
+      final batch = names.skip(i).take(concurrency);
+      final futures = batch.map((name) => getPackage(name));
+      final batchResults = await Future.wait(futures);
+      results.addAll(batchResults.whereType<UpstreamPackageInfo>());
+    }
+
+    return results;
+  }
+
   /// Fetch a specific version info from upstream.
   /// Returns null if version not found.
   Future<UpstreamVersionInfo?> getVersion(String name, String version) async {
     final url = '$baseUrl/api/packages/$name/versions/$version';
     try {
-      final response = await _client.get(Uri.parse(url));
+      final response = await _client.get(Uri.parse(url)).timeout(_timeout);
 
       if (response.statusCode == 404) {
         return null;
@@ -64,7 +85,7 @@ class UpstreamClient {
   Future<List<String>> searchPackages(String query, {int page = 1}) async {
     final url = '$baseUrl/api/search?q=${Uri.encodeComponent(query)}&page=$page';
     try {
-      final response = await _client.get(Uri.parse(url));
+      final response = await _client.get(Uri.parse(url)).timeout(_timeout);
 
       if (response.statusCode == 404) {
         return [];
@@ -92,7 +113,10 @@ class UpstreamClient {
   /// Returns null if download fails.
   Future<Uint8List?> downloadArchive(String archiveUrl) async {
     try {
-      final response = await _client.get(Uri.parse(archiveUrl));
+      // Use longer timeout for archive downloads
+      final response = await _client.get(Uri.parse(archiveUrl)).timeout(
+        const Duration(seconds: 60),
+      );
 
       if (response.statusCode != 200) {
         print('Upstream error downloading archive: ${response.statusCode}');
