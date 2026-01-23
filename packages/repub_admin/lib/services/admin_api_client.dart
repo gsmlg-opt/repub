@@ -298,6 +298,43 @@ class AdminApiClient {
     );
   }
 
+  Future<List<SiteConfig>> getConfig() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/config'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch config: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final configs = (json['config'] as List<dynamic>?)
+            ?.map((c) => SiteConfig.fromJson(c as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return configs;
+  }
+
+  Future<void> setConfig(String name, String value) async {
+    final response = await _client.put(
+      Uri.parse('$baseUrl/admin/api/config/$name'),
+      headers: _headers,
+      body: jsonEncode({'value': value}),
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to update config: ${response.body}',
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }

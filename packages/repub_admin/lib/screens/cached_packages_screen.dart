@@ -59,7 +59,7 @@ class _CachedPackagesScreenState extends ConsumerState<CachedPackagesScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        await ref.refresh(cachedPackagesProvider(_currentPage).future);
+        ref.invalidate(cachedPackagesProvider(_currentPage));
       }
     } catch (e) {
       if (mounted) {

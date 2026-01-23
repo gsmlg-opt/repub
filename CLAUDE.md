@@ -71,7 +71,7 @@ repub_auth ← repub_storage
 | `repub_server` | HTTP API using Shelf framework |
 | `repub_cli` | Admin CLI for tokens, migrations, server startup |
 | `repub_web` | Public web UI using Jaspr framework (package browsing, search, docs) |
-| `repub_admin` | Admin web UI using Flutter (package management, stats dashboard) |
+| `repub_admin` | Admin web UI using Flutter (package management, stats dashboard, site configuration) |
 
 ### Storage Backends
 

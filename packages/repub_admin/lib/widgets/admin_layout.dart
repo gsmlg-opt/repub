@@ -118,6 +118,14 @@ class AdminLayout extends StatelessWidget {
             isPermanent: isPermanent,
           ),
           const Divider(),
+          _buildNavItem(
+            context,
+            icon: Icons.settings,
+            title: 'Site Configuration',
+            path: '/config',
+            isPermanent: isPermanent,
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.open_in_new),
             title: const Text('View Registry'),
