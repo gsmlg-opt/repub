@@ -83,7 +83,8 @@ class UpstreamClient {
   /// Returns list of package names that match the query.
   /// pub.dev search API returns simple list of package names, not full package info.
   Future<List<String>> searchPackages(String query, {int page = 1}) async {
-    final url = '$baseUrl/api/search?q=${Uri.encodeComponent(query)}&page=$page';
+    final url =
+        '$baseUrl/api/search?q=${Uri.encodeComponent(query)}&page=$page';
     try {
       final response = await _client.get(Uri.parse(url)).timeout(_timeout);
 
@@ -115,8 +116,8 @@ class UpstreamClient {
     try {
       // Use longer timeout for archive downloads
       final response = await _client.get(Uri.parse(archiveUrl)).timeout(
-        const Duration(seconds: 60),
-      );
+            const Duration(seconds: 60),
+          );
 
       if (response.statusCode != 200) {
         print('Upstream error downloading archive: ${response.statusCode}');
@@ -156,12 +157,14 @@ class UpstreamPackageInfo {
     final versionsJson = json['versions'] as List<dynamic>? ?? [];
 
     final versions = versionsJson
-        .map((v) => UpstreamVersionInfo.fromJson(name, v as Map<String, dynamic>))
+        .map((v) =>
+            UpstreamVersionInfo.fromJson(name, v as Map<String, dynamic>))
         .toList();
 
     UpstreamVersionInfo? latest;
     if (json['latest'] != null) {
-      latest = UpstreamVersionInfo.fromJson(name, json['latest'] as Map<String, dynamic>);
+      latest = UpstreamVersionInfo.fromJson(
+          name, json['latest'] as Map<String, dynamic>);
     }
 
     return UpstreamPackageInfo(
@@ -192,7 +195,8 @@ class UpstreamVersionInfo {
     this.published,
   });
 
-  factory UpstreamVersionInfo.fromJson(String packageName, Map<String, dynamic> json) {
+  factory UpstreamVersionInfo.fromJson(
+      String packageName, Map<String, dynamic> json) {
     return UpstreamVersionInfo(
       packageName: packageName,
       version: json['version'] as String,
