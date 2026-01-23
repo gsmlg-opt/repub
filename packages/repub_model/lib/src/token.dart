@@ -1,69 +1,32 @@
 /// Authentication token for API access.
+/// Tokens authenticate users - permissions are determined by package ownership.
 class AuthToken {
   final String tokenHash;
+  final String userId;
   final String label;
-  final List<String> scopes;
   final DateTime createdAt;
   final DateTime? lastUsedAt;
+  final DateTime? expiresAt;
 
   const AuthToken({
     required this.tokenHash,
+    required this.userId,
     required this.label,
-    required this.scopes,
     required this.createdAt,
     this.lastUsedAt,
+    this.expiresAt,
   });
 
-  /// Check if this token has the required scope.
-  bool hasScope(String requiredScope) {
-    // Admin scope grants all permissions
-    if (scopes.contains('admin')) return true;
+  /// Check if token is expired.
+  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 
-    // Direct match
-    if (scopes.contains(requiredScope)) return true;
-
-    // Check for wildcard scopes
-    // e.g., 'publish:all' grants 'publish:pkg:foo'
-    if (requiredScope.startsWith('publish:pkg:') &&
-        scopes.contains('publish:all')) {
-      return true;
-    }
-
-    // read:all grants any read
-    if (requiredScope.startsWith('read:') && scopes.contains('read:all')) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /// Check if token can publish a specific package.
-  bool canPublish(String packageName) {
-    return hasScope('publish:all') || hasScope('publish:pkg:$packageName');
-  }
-
-  /// Check if token can read/download packages.
-  bool canRead() {
-    return hasScope('read:all');
-  }
-}
-
-/// Available token scopes.
-class TokenScopes {
-  static const admin = 'admin';
-  static const publishAll = 'publish:all';
-  static const readAll = 'read:all';
-
-  static String publishPackage(String name) => 'publish:pkg:$name';
-
-  /// Valid scope patterns.
-  static bool isValid(String scope) {
-    if (scope == admin || scope == publishAll || scope == readAll) {
-      return true;
-    }
-    if (scope.startsWith('publish:pkg:') && scope.length > 12) {
-      return true;
-    }
-    return false;
-  }
+  /// Convert to JSON for API response (excludes token hash).
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        if (lastUsedAt != null)
+          'lastUsedAt': lastUsedAt!.toUtc().toIso8601String(),
+        if (expiresAt != null)
+          'expiresAt': expiresAt!.toUtc().toIso8601String(),
+      };
 }
