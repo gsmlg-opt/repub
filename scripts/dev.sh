@@ -49,9 +49,10 @@ SERVER_PID=$!
 sleep 2
 
 # Start webdev server on 8081 (for hot reload)
+# Use --hostname 0.0.0.0 to allow access from other machines on the network
 echo -e "${GREEN}[WEB]${NC} Starting webdev server for hot reload on port 8081..."
 cd packages/repub_web
-dart run webdev serve web:8081 --auto=refresh 2>&1 | sed "s/^/$(printf "${GREEN}[WEB]${NC} ")/" &
+dart run webdev serve web:8081 --auto=refresh --hostname 0.0.0.0 2>&1 | sed "s/^/$(printf "${GREEN}[WEB]${NC} ")/" &
 WEB_PID=$!
 cd "$PROJECT_ROOT"
 

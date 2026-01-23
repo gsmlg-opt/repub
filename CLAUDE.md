@@ -5,7 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Project Constitution
 
 CRITICAL CONSTRAINTS (read these before every task):
-- Do not add any auth to the admin page, there is external auth module to manage this.
 - The client auth token are not mandatory, we are a self-hosted project, that only use by the package owner themself.
 - Do not add SSL support because this project will live after a reverse proxy server.
 - Do not change default listen address in development mode.
