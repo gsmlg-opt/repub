@@ -1,6 +1,7 @@
 /// A package in the registry.
 class Package {
   final String name;
+  final String? ownerId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isDiscontinued;
@@ -9,6 +10,7 @@ class Package {
 
   const Package({
     required this.name,
+    this.ownerId,
     required this.createdAt,
     required this.updatedAt,
     this.isDiscontinued = false,
@@ -16,8 +18,19 @@ class Package {
     this.isUpstreamCache = false,
   });
 
+  /// Check if a user can publish to this package.
+  bool canPublish(String? userId) {
+    // Upstream cached packages cannot be published to
+    if (isUpstreamCache) return false;
+    // No owner means anyone can publish (legacy packages)
+    if (ownerId == null) return true;
+    // Owner can always publish
+    return ownerId == userId;
+  }
+
   Map<String, dynamic> toJson() => {
         'name': name,
+        if (ownerId != null) 'ownerId': ownerId,
         if (isDiscontinued) 'isDiscontinued': true,
         if (replacedBy != null) 'replacedBy': replacedBy,
       };
@@ -143,7 +156,8 @@ class PackageListResult {
               return v.toJson(archiveUrl);
             }).toList(),
             if (p.package.isDiscontinued) 'isDiscontinued': true,
-            if (p.package.replacedBy != null) 'replacedBy': p.package.replacedBy,
+            if (p.package.replacedBy != null)
+              'replacedBy': p.package.replacedBy,
           };
         }).toList(),
         'total': total,
