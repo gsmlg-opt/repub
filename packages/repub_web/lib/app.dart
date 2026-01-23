@@ -3,9 +3,6 @@ import 'package:jaspr_router/jaspr_router.dart';
 
 import 'pages/account/account_page.dart';
 import 'pages/account/tokens_page.dart';
-import 'pages/admin/admin_cached_packages.dart';
-import 'pages/admin/admin_local_packages.dart';
-import 'pages/admin/admin_page.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
 import 'pages/docs_page.dart';
@@ -74,22 +71,6 @@ class App extends StatelessComponent {
           path: '/account/tokens',
           title: 'API Tokens - Repub',
           builder: (context, state) => const TokensPage(),
-        ),
-        // Admin routes
-        Route(
-          path: '/admin',
-          title: 'Admin - Repub',
-          builder: (context, state) => const AdminPage(),
-        ),
-        Route(
-          path: '/admin/packages/local',
-          title: 'Local Packages - Admin',
-          builder: (context, state) => const AdminLocalPackagesPage(),
-        ),
-        Route(
-          path: '/admin/packages/cached',
-          title: 'Cached Packages - Admin',
-          builder: (context, state) => const AdminCachedPackagesPage(),
         ),
       ],
     );
