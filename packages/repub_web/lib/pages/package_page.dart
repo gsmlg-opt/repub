@@ -93,7 +93,9 @@ class _PackagePageState extends State<PackagePage> {
       [
         div(
           classes: 'inline-block p-4 bg-gray-100 rounded-full mb-4',
-          [span(classes: 'text-4xl', [RawText('&#x1F4E6;')])],
+          [
+            span(classes: 'text-4xl', [RawText('&#x1F4E6;')])
+          ],
         ),
         h2(
           classes: 'text-2xl font-semibold text-gray-900 mb-2',
@@ -101,11 +103,15 @@ class _PackagePageState extends State<PackagePage> {
         ),
         p(
           classes: 'text-gray-600 mb-6',
-          [Component.text('The package "${component.packageName}" does not exist.')],
+          [
+            Component.text(
+                'The package "${component.packageName}" does not exist.')
+          ],
         ),
         a(
           href: '/',
-          classes: 'inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
+          classes:
+              'inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
           [Component.text('Browse all packages')],
         ),
       ],
@@ -118,7 +124,9 @@ class _PackagePageState extends State<PackagePage> {
       [
         div(
           classes: 'inline-block p-4 bg-red-50 rounded-full mb-4',
-          [span(classes: 'text-red-500 text-4xl', [Component.text('!')])],
+          [
+            span(classes: 'text-red-500 text-4xl', [Component.text('!')])
+          ],
         ),
         h2(
           classes: 'text-xl font-semibold text-gray-900 mb-2',
@@ -140,7 +148,8 @@ class _PackagePageState extends State<PackagePage> {
   Component _buildPackageDetail(PackageInfo info) {
     final latest = info.latest;
     final pubspec = latest?.pubspec ?? {};
-    final description = pubspec['description'] as String? ?? 'No description available';
+    final description =
+        pubspec['description'] as String? ?? 'No description available';
     final homepage = pubspec['homepage'] as String?;
     final repository = pubspec['repository'] as String?;
     final documentation = pubspec['documentation'] as String?;
@@ -161,7 +170,9 @@ class _PackagePageState extends State<PackagePage> {
                 ),
               ]),
               li(classes: 'text-gray-400', [Component.text('/')]),
-              li(classes: 'text-gray-900 font-medium', [Component.text(component.packageName)]),
+              li(
+                  classes: 'text-gray-900 font-medium',
+                  [Component.text(component.packageName)]),
             ],
           ),
         ],
@@ -181,7 +192,8 @@ class _PackagePageState extends State<PackagePage> {
                 ),
                 if (info.package.isDiscontinued)
                   div(
-                    classes: 'inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full mb-2',
+                    classes:
+                        'inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full mb-2',
                     [
                       Component.text('Discontinued'),
                       if (info.package.replacedBy != null)
@@ -202,7 +214,8 @@ class _PackagePageState extends State<PackagePage> {
                   classes: 'text-right',
                   [
                     span(
-                      classes: 'inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-mono text-lg',
+                      classes:
+                          'inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-mono text-lg',
                       [Component.text('v${latest.version}')],
                     ),
                   ],
@@ -248,7 +261,10 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
               if (pubspec['dependencies'] != null)
                 _buildSection(
                   'Dependencies',
-                  [_buildDependencies(pubspec['dependencies'] as Map<String, dynamic>)],
+                  [
+                    _buildDependencies(
+                        pubspec['dependencies'] as Map<String, dynamic>)
+                  ],
                 ),
             ],
           ),
@@ -268,9 +284,11 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
                   [
                     if (latest != null)
                       ..._buildMetadataItem('Latest', latest.version),
-                    ..._buildMetadataItem('Versions', info.versions.length.toString()),
+                    ..._buildMetadataItem(
+                        'Versions', info.versions.length.toString()),
                     if (latest != null)
-                      ..._buildMetadataItem('Published', _formatDate(latest.publishedAt)),
+                      ..._buildMetadataItem(
+                          'Published', _formatDate(latest.publishedAt)),
                     if (pubspec['environment'] != null)
                       ..._buildMetadataItem('SDK', _formatSdk(pubspec)),
                   ],
@@ -294,7 +312,8 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
                         li([
                           a(
                             href: homepage,
-                            classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                            classes:
+                                'text-blue-600 hover:text-blue-800 flex items-center',
                             attributes: {'target': '_blank', 'rel': 'noopener'},
                             [Component.text('Homepage')],
                           ),
@@ -303,7 +322,8 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
                         li([
                           a(
                             href: repository,
-                            classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                            classes:
+                                'text-blue-600 hover:text-blue-800 flex items-center',
                             attributes: {'target': '_blank', 'rel': 'noopener'},
                             [Component.text('Repository')],
                           ),
@@ -312,7 +332,8 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
                         li([
                           a(
                             href: documentation,
-                            classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                            classes:
+                                'text-blue-600 hover:text-blue-800 flex items-center',
                             attributes: {'target': '_blank', 'rel': 'noopener'},
                             [Component.text('Documentation')],
                           ),
@@ -332,7 +353,8 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
       classes: 'mb-8',
       [
         h2(
-          classes: 'text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200',
+          classes:
+              'text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200',
           [Component.text(title)],
         ),
         ...children,
@@ -342,14 +364,18 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
 
   Component _buildCodeBlock(String code) {
     return pre(
-      classes: 'bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono',
-      [Component.element(tag: 'code', children: [Component.text(code)])],
+      classes:
+          'bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono',
+      [
+        Component.element(tag: 'code', children: [Component.text(code)])
+      ],
     );
   }
 
   Component _buildVersionsTable(List<PackageVersion> versions) {
     // Sort versions by publishedAt descending
-    final sorted = [...versions]..sort((v1, v2) => v2.publishedAt.compareTo(v1.publishedAt));
+    final sorted = [...versions]
+      ..sort((v1, v2) => v2.publishedAt.compareTo(v1.publishedAt));
 
     return div(
       classes: 'overflow-hidden rounded-lg border border-gray-200',
@@ -362,15 +388,18 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
               [
                 tr([
                   th(
-                    classes: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    classes:
+                        'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                     [Component.text('Version')],
                   ),
                   th(
-                    classes: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    classes:
+                        'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                     [Component.text('Published')],
                   ),
                   th(
-                    classes: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    classes:
+                        'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                     [Component.text('SDK')],
                   ),
                 ]),
@@ -391,11 +420,13 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
                       ],
                     ),
                     td(
-                      classes: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
+                      classes:
+                          'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
                       [Component.text(_formatDate(version.publishedAt))],
                     ),
                     td(
-                      classes: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
+                      classes:
+                          'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
                       [Component.text(_formatSdk(version.pubspec))],
                     ),
                   ]),
@@ -418,11 +449,14 @@ dart pub add ${component.packageName} --hosted-url=\${REPUB_URL}'''),
       [
         for (final entry in deps.entries)
           span(
-            classes: 'inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm',
+            classes:
+                'inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm',
             [
               span(classes: 'font-medium', [Component.text(entry.key)]),
               span(classes: 'mx-1 text-gray-400', [Component.text(':')]),
-              span(classes: 'text-gray-500', [Component.text(entry.value.toString())]),
+              span(
+                  classes: 'text-gray-500',
+                  [Component.text(entry.value.toString())]),
             ],
           ),
       ],

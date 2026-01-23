@@ -67,7 +67,8 @@ class ApiClient {
   }
 
   /// List all packages (paginated)
-  Future<PackageListResponse> listPackages({int page = 1, int limit = 20}) async {
+  Future<PackageListResponse> listPackages(
+      {int page = 1, int limit = 20}) async {
     final response = await _client.get(
       Uri.parse('$baseUrl/api/packages?page=$page&limit=$limit'),
     );
@@ -94,9 +95,11 @@ class ApiClient {
   }
 
   /// Search packages by query (local packages only)
-  Future<PackageListResponse> searchPackages(String query, {int page = 1, int limit = 20}) async {
+  Future<PackageListResponse> searchPackages(String query,
+      {int page = 1, int limit = 20}) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/api/packages/search?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
+      Uri.parse(
+          '$baseUrl/api/packages/search?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
     );
 
     if (response.statusCode != 200) {
@@ -121,9 +124,11 @@ class ApiClient {
   }
 
   /// Search packages from upstream (pub.dev)
-  Future<PackageListResponse> searchPackagesUpstream(String query, {int page = 1, int limit = 20}) async {
+  Future<PackageListResponse> searchPackagesUpstream(String query,
+      {int page = 1, int limit = 20}) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/api/packages/search/upstream?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
+      Uri.parse(
+          '$baseUrl/api/packages/search/upstream?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
     );
 
     if (response.statusCode == 503) {
@@ -195,14 +200,16 @@ class ApiClient {
     );
 
     final versions = (json['versions'] as List<dynamic>?)
-            ?.map((v) => _parsePackageVersion(json['name'] as String, v as Map<String, dynamic>))
+            ?.map((v) => _parsePackageVersion(
+                json['name'] as String, v as Map<String, dynamic>))
             .toList() ??
         [];
 
     return PackageInfo(package: package, versions: versions);
   }
 
-  PackageVersion _parsePackageVersion(String packageName, Map<String, dynamic> json) {
+  PackageVersion _parsePackageVersion(
+      String packageName, Map<String, dynamic> json) {
     return PackageVersion(
       packageName: packageName,
       version: json['version'] as String,

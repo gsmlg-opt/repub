@@ -13,11 +13,11 @@ class AdminCachedPackagesPage extends StatefulComponent {
   const AdminCachedPackagesPage({super.key});
 
   @override
-  State<AdminCachedPackagesPage> createState() => _AdminCachedPackagesPageState();
+  State<AdminCachedPackagesPage> createState() =>
+      _AdminCachedPackagesPageState();
 }
 
 class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
-
   bool _loading = true;
   String? _error;
   PackageListResponse? _response;
@@ -31,9 +31,7 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
     _loadPackages();
   }
 
-
   Future<void> _loadPackages({int page = 1}) async {
-
     setState(() {
       _loading = true;
       _error = null;
@@ -47,7 +45,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
         _loading = false;
       });
     } catch (e) {
-      if (e is AdminApiException && (e.statusCode == 401 || e.statusCode == 403)) {
+      if (e is AdminApiException &&
+          (e.statusCode == 401 || e.statusCode == 403)) {
         web.window.location.href = '/admin';
         return;
       }
@@ -61,8 +60,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
   }
 
   Future<void> _deletePackage(String name) async {
-
-    final confirmed = web.window.confirm('Are you sure you want to delete cached package "$name"?');
+    final confirmed = web.window
+        .confirm('Are you sure you want to delete cached package "$name"?');
     if (!confirmed) return;
 
     final client = AdminApiClient();
@@ -84,7 +83,6 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
   }
 
   Future<void> _clearAllCache() async {
-
     final confirmed = web.window.confirm(
       'Are you sure you want to clear ALL cached packages? This action cannot be undone.',
     );
@@ -114,12 +112,10 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
     }
   }
 
-
   @override
   Component build(BuildContext context) {
     return AdminLayout(
       currentPath: '/admin/packages/cached',
-      
       children: [
         // Action message
         if (_actionMessage != null)
@@ -135,7 +131,9 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
                   button(
                     type: ButtonType.button,
                     classes: 'text-gray-400 hover:text-gray-600',
-                    events: {'click': (_) => setState(() => _actionMessage = null)},
+                    events: {
+                      'click': (_) => setState(() => _actionMessage = null)
+                    },
                     [Component.text('x')],
                   ),
                 ],
@@ -177,7 +175,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
           [
             for (var i = 0; i < 5; i++)
               div(
-                classes: 'flex items-center justify-between py-4 border-b border-gray-100 last:border-0',
+                classes:
+                    'flex items-center justify-between py-4 border-b border-gray-100 last:border-0',
                 [
                   div([
                     div(classes: 'h-5 bg-gray-200 rounded w-40 mb-2', []),
@@ -212,7 +211,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
         ),
         button(
           type: ButtonType.button,
-          classes: 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
+          classes:
+              'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
           events: {'click': (_) => _loadPackages()},
           [Component.text('Try again')],
         ),
@@ -237,7 +237,10 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
           ),
           p(
             classes: 'text-gray-600',
-            [Component.text('Packages from pub.dev will appear here when downloaded through this registry.')],
+            [
+              Component.text(
+                  'Packages from pub.dev will appear here when downloaded through this registry.')
+            ],
           ),
         ],
       );
@@ -256,7 +259,10 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
                 div([
                   span(
                     classes: 'text-sm text-purple-700 font-medium',
-                    [Component.text('${response.total} cached package${response.total != 1 ? "s" : ""}')],
+                    [
+                      Component.text(
+                          '${response.total} cached package${response.total != 1 ? "s" : ""}')
+                    ],
                   ),
                   p(
                     classes: 'text-xs text-purple-600 mt-1',
@@ -269,12 +275,10 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
         ),
         // Package list
         div([
-          for (final pkg in response.packages)
-            _buildPackageRow(pkg),
+          for (final pkg in response.packages) _buildPackageRow(pkg),
         ]),
         // Pagination
-        if (response.totalPages > 1)
-          _buildPagination(response),
+        if (response.totalPages > 1) _buildPagination(response),
       ],
     );
   }
@@ -282,7 +286,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
   Component _buildPackageRow(PackageInfo pkg) {
     final latest = pkg.latest;
     return div(
-      classes: 'px-6 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50',
+      classes:
+          'px-6 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50',
       [
         div(
           classes: 'flex items-center justify-between',
@@ -298,7 +303,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
                     [Component.text(pkg.package.name)],
                   ),
                   span(
-                    classes: 'px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded',
+                    classes:
+                        'px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded',
                     [Component.text('Cached')],
                   ),
                 ],
@@ -306,7 +312,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
               div(
                 classes: 'text-sm text-gray-500 mt-1',
                 [
-                  Component.text('v${latest?.version ?? "?"} - ${pkg.versions.length} version${pkg.versions.length != 1 ? "s" : ""}'),
+                  Component.text(
+                      'v${latest?.version ?? "?"} - ${pkg.versions.length} version${pkg.versions.length != 1 ? "s" : ""}'),
                 ],
               ),
             ]),
@@ -316,13 +323,15 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
               [
                 a(
                   href: 'https://pub.dev/packages/${pkg.package.name}',
-                  classes: 'px-3 py-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors',
+                  classes:
+                      'px-3 py-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors',
                   attributes: {'target': '_blank'},
                   [Component.text('View on pub.dev')],
                 ),
                 button(
                   type: ButtonType.button,
-                  classes: 'px-3 py-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors',
+                  classes:
+                      'px-3 py-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors',
                   events: {'click': (_) => _deletePackage(pkg.package.name)},
                   [Component.text('Delete')],
                 ),
@@ -336,12 +345,14 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
 
   Component _buildPagination(PackageListResponse response) {
     return div(
-      classes: 'px-6 py-4 border-t border-gray-200 flex justify-center items-center space-x-2',
+      classes:
+          'px-6 py-4 border-t border-gray-200 flex justify-center items-center space-x-2',
       [
         if (response.hasPrevPage)
           button(
             type: ButtonType.button,
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             events: {'click': (_) => _loadPackages(page: response.page - 1)},
             [Component.text('Previous')],
           ),
@@ -352,7 +363,8 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
         if (response.hasNextPage)
           button(
             type: ButtonType.button,
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             events: {'click': (_) => _loadPackages(page: response.page + 1)},
             [Component.text('Next')],
           ),

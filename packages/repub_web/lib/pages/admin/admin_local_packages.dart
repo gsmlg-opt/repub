@@ -53,7 +53,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
   }
 
   Future<void> _deletePackage(String name) async {
-    final confirmed = web.window.confirm('Are you sure you want to delete "$name" and all its versions?');
+    final confirmed = web.window.confirm(
+        'Are you sure you want to delete "$name" and all its versions?');
     if (!confirmed) return;
 
     final client = AdminApiClient();
@@ -117,7 +118,9 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
                   button(
                     type: ButtonType.button,
                     classes: 'text-gray-400 hover:text-gray-600',
-                    events: {'click': (_) => setState(() => _actionMessage = null)},
+                    events: {
+                      'click': (_) => setState(() => _actionMessage = null)
+                    },
                     [Component.text('x')],
                   ),
                 ],
@@ -144,7 +147,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
           [
             for (var i = 0; i < 5; i++)
               div(
-                classes: 'flex items-center justify-between py-4 border-b border-gray-100 last:border-0',
+                classes:
+                    'flex items-center justify-between py-4 border-b border-gray-100 last:border-0',
                 [
                   div([
                     div(classes: 'h-5 bg-gray-200 rounded w-40 mb-2', []),
@@ -179,7 +183,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
         ),
         button(
           type: ButtonType.button,
-          classes: 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
+          classes:
+              'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
           events: {'click': (_) => _loadPackages()},
           [Component.text('Try again')],
         ),
@@ -215,22 +220,24 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
       [
         // Header
         div(
-          classes: 'px-6 py-4 border-b border-gray-200 flex justify-between items-center',
+          classes:
+              'px-6 py-4 border-b border-gray-200 flex justify-between items-center',
           [
             span(
               classes: 'text-sm text-gray-500',
-              [Component.text('${response.total} local package${response.total != 1 ? "s" : ""}')],
+              [
+                Component.text(
+                    '${response.total} local package${response.total != 1 ? "s" : ""}')
+              ],
             ),
           ],
         ),
         // Package list
         div([
-          for (final pkg in response.packages)
-            _buildPackageRow(pkg),
+          for (final pkg in response.packages) _buildPackageRow(pkg),
         ]),
         // Pagination
-        if (response.totalPages > 1)
-          _buildPagination(response),
+        if (response.totalPages > 1) _buildPagination(response),
       ],
     );
   }
@@ -238,7 +245,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
   Component _buildPackageRow(PackageInfo pkg) {
     final latest = pkg.latest;
     return div(
-      classes: 'px-6 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50',
+      classes:
+          'px-6 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50',
       [
         div(
           classes: 'flex items-center justify-between',
@@ -255,7 +263,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
                   ),
                   if (pkg.package.isDiscontinued)
                     span(
-                      classes: 'px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded',
+                      classes:
+                          'px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded',
                       [Component.text('Discontinued')],
                     ),
                 ],
@@ -263,7 +272,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
               div(
                 classes: 'text-sm text-gray-500 mt-1',
                 [
-                  Component.text('v${latest?.version ?? "?"} - ${pkg.versions.length} version${pkg.versions.length != 1 ? "s" : ""}'),
+                  Component.text(
+                      'v${latest?.version ?? "?"} - ${pkg.versions.length} version${pkg.versions.length != 1 ? "s" : ""}'),
                 ],
               ),
             ]),
@@ -274,13 +284,17 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
                 if (!pkg.package.isDiscontinued)
                   button(
                     type: ButtonType.button,
-                    classes: 'px-3 py-1.5 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded hover:bg-yellow-100 transition-colors',
-                    events: {'click': (_) => _discontinuePackage(pkg.package.name)},
+                    classes:
+                        'px-3 py-1.5 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded hover:bg-yellow-100 transition-colors',
+                    events: {
+                      'click': (_) => _discontinuePackage(pkg.package.name)
+                    },
                     [Component.text('Discontinue')],
                   ),
                 button(
                   type: ButtonType.button,
-                  classes: 'px-3 py-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors',
+                  classes:
+                      'px-3 py-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors',
                   events: {'click': (_) => _deletePackage(pkg.package.name)},
                   [Component.text('Delete')],
                 ),
@@ -294,12 +308,14 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
 
   Component _buildPagination(PackageListResponse response) {
     return div(
-      classes: 'px-6 py-4 border-t border-gray-200 flex justify-center items-center space-x-2',
+      classes:
+          'px-6 py-4 border-t border-gray-200 flex justify-center items-center space-x-2',
       [
         if (response.hasPrevPage)
           button(
             type: ButtonType.button,
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             events: {'click': (_) => _loadPackages(page: response.page - 1)},
             [Component.text('Previous')],
           ),
@@ -310,7 +326,8 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
         if (response.hasNextPage)
           button(
             type: ButtonType.button,
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             events: {'click': (_) => _loadPackages(page: response.page + 1)},
             [Component.text('Next')],
           ),

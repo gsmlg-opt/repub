@@ -49,7 +49,8 @@ class AdminLayout extends StatelessComponent {
               classes: 'flex items-center space-x-3',
               [
                 div(
-                  classes: 'w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center',
+                  classes:
+                      'w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center',
                   [
                     span(
                       classes: 'text-white font-bold text-xl',
@@ -76,8 +77,10 @@ class AdminLayout extends StatelessComponent {
           classes: 'flex-1 p-4 space-y-2',
           [
             _navLink('/admin', 'Dashboard', _isActive('/admin')),
-            _navLink('/admin/packages/local', 'Local Packages', _isActive('/admin/packages/local')),
-            _navLink('/admin/packages/cached', 'Cached Packages', _isActive('/admin/packages/cached')),
+            _navLink('/admin/packages/local', 'Local Packages',
+                _isActive('/admin/packages/local')),
+            _navLink('/admin/packages/cached', 'Cached Packages',
+                _isActive('/admin/packages/cached')),
           ],
         ),
         // Footer
@@ -86,7 +89,8 @@ class AdminLayout extends StatelessComponent {
           [
             a(
               href: '/',
-              classes: 'flex items-center text-gray-400 hover:text-white transition-colors',
+              classes:
+                  'flex items-center text-gray-400 hover:text-white transition-colors',
               [
                 span(classes: 'mr-2', [Component.text('<-')]),
                 Component.text('Back to Registry'),

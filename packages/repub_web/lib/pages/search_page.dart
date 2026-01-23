@@ -64,7 +64,8 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _searchUpstream(ApiClient apiClient) async {
     try {
-      final upstreamResponse = await apiClient.searchPackagesUpstream(component.query);
+      final upstreamResponse =
+          await apiClient.searchPackagesUpstream(component.query);
       setState(() {
         _upstreamResponse = upstreamResponse;
         _upstreamLoading = false;
@@ -100,7 +101,8 @@ class _SearchPageState extends State<SearchPage> {
     return Layout(
       children: [
         _buildSearchHeader(),
-        _buildSearchResults(_localResponse!, _upstreamResponse, _upstreamLoading),
+        _buildSearchResults(
+            _localResponse!, _upstreamResponse, _upstreamLoading),
       ],
     );
   }
@@ -122,7 +124,8 @@ class _SearchPageState extends State<SearchPage> {
                 input(
                   type: InputType.text,
                   name: 'q',
-                  classes: 'flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
+                  classes:
+                      'flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
                   attributes: {
                     'placeholder': 'Search packages...',
                     'value': component.query,
@@ -130,7 +133,8 @@ class _SearchPageState extends State<SearchPage> {
                 ),
                 button(
                   type: ButtonType.submit,
-                  classes: 'px-6 py-3 bg-blue-600 text-white font-medium rounded-r-lg hover:bg-blue-700 transition-colors',
+                  classes:
+                      'px-6 py-3 bg-blue-600 text-white font-medium rounded-r-lg hover:bg-blue-700 transition-colors',
                   [Component.text('Search')],
                 ),
               ],
@@ -159,12 +163,17 @@ class _SearchPageState extends State<SearchPage> {
                   input(
                     type: InputType.text,
                     name: 'q',
-                    classes: 'flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
-                    attributes: {'placeholder': 'Search packages...', 'autofocus': 'true'},
+                    classes:
+                        'flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
+                    attributes: {
+                      'placeholder': 'Search packages...',
+                      'autofocus': 'true'
+                    },
                   ),
                   button(
                     type: ButtonType.submit,
-                    classes: 'px-6 py-3 bg-blue-600 text-white font-medium rounded-r-lg hover:bg-blue-700 transition-colors',
+                    classes:
+                        'px-6 py-3 bg-blue-600 text-white font-medium rounded-r-lg hover:bg-blue-700 transition-colors',
                     [Component.text('Search')],
                   ),
                 ],
@@ -178,7 +187,9 @@ class _SearchPageState extends State<SearchPage> {
         [
           div(
             classes: 'inline-block p-4 bg-gray-100 rounded-full mb-4',
-            [span(classes: 'text-4xl', [RawText('&#x1F50D;')])],
+            [
+              span(classes: 'text-4xl', [RawText('&#x1F50D;')])
+            ],
           ),
           h2(
             classes: 'text-xl font-semibold text-gray-900 mb-2',
@@ -186,7 +197,10 @@ class _SearchPageState extends State<SearchPage> {
           ),
           p(
             classes: 'text-gray-600',
-            [Component.text('Search by package name or keywords in the description.')],
+            [
+              Component.text(
+                  'Search by package name or keywords in the description.')
+            ],
           ),
         ],
       ),
@@ -199,7 +213,8 @@ class _SearchPageState extends State<SearchPage> {
       [
         for (var i = 0; i < 6; i++)
           div(
-            classes: 'bg-white rounded-lg border border-gray-200 p-6 animate-pulse',
+            classes:
+                'bg-white rounded-lg border border-gray-200 p-6 animate-pulse',
             [
               div(classes: 'h-6 bg-gray-200 rounded w-1/2 mb-3', []),
               div(classes: 'h-4 bg-gray-200 rounded w-full mb-2', []),
@@ -216,7 +231,9 @@ class _SearchPageState extends State<SearchPage> {
       [
         div(
           classes: 'inline-block p-4 bg-red-50 rounded-full mb-4',
-          [span(classes: 'text-red-500 text-4xl', [Component.text('!')])],
+          [
+            span(classes: 'text-red-500 text-4xl', [Component.text('!')])
+          ],
         ),
         h2(
           classes: 'text-xl font-semibold text-gray-900 mb-2',
@@ -252,7 +269,10 @@ class _SearchPageState extends State<SearchPage> {
               ),
               span(
                 classes: 'text-gray-500',
-                [Component.text('${localResponse.total} result${localResponse.total != 1 ? "s" : ""}')],
+                [
+                  Component.text(
+                      '${localResponse.total} result${localResponse.total != 1 ? "s" : ""}')
+                ],
               ),
             ],
           ),
@@ -274,8 +294,7 @@ class _SearchPageState extends State<SearchPage> {
                 ),
               ],
             ),
-          if (localResponse.totalPages > 1)
-            _buildPagination(localResponse),
+          if (localResponse.totalPages > 1) _buildPagination(localResponse),
         ],
       ),
 
@@ -298,7 +317,10 @@ class _SearchPageState extends State<SearchPage> {
               else if (hasUpstreamResults)
                 span(
                   classes: 'text-gray-500',
-                  [Component.text('${upstreamResponse!.total} result${upstreamResponse.total != 1 ? "s" : ""}')],
+                  [
+                    Component.text(
+                        '${upstreamResponse!.total} result${upstreamResponse.total != 1 ? "s" : ""}')
+                  ],
                 ),
             ],
           ),
@@ -333,8 +355,10 @@ class _SearchPageState extends State<SearchPage> {
       [
         if (response.hasPrevPage)
           a(
-            href: '/search?q=${Uri.encodeComponent(component.query)}&page=${response.page - 1}',
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            href:
+                '/search?q=${Uri.encodeComponent(component.query)}&page=${response.page - 1}',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             [Component.text('Previous')],
           ),
         span(
@@ -343,8 +367,10 @@ class _SearchPageState extends State<SearchPage> {
         ),
         if (response.hasNextPage)
           a(
-            href: '/search?q=${Uri.encodeComponent(component.query)}&page=${response.page + 1}',
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            href:
+                '/search?q=${Uri.encodeComponent(component.query)}&page=${response.page + 1}',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             [Component.text('Next')],
           ),
       ],

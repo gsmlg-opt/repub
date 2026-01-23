@@ -54,7 +54,7 @@ class AdminApiClient {
   /// Get admin statistics.
   Future<AdminStats> getStats() async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/api/admin/stats'),
+      Uri.parse('$baseUrl/admin/api/stats'),
       headers: _headers,
     );
 
@@ -70,9 +70,10 @@ class AdminApiClient {
   }
 
   /// List local packages.
-  Future<PackageListResponse> listLocalPackages({int page = 1, int limit = 20}) async {
+  Future<PackageListResponse> listLocalPackages(
+      {int page = 1, int limit = 20}) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/api/admin/packages/local?page=$page&limit=$limit'),
+      Uri.parse('$baseUrl/admin/api/packages/local?page=$page&limit=$limit'),
       headers: _headers,
     );
 
@@ -94,12 +95,12 @@ class AdminApiClient {
   }
 
   /// List cached packages.
-  Future<PackageListResponse> listCachedPackages({int page = 1, int limit = 20}) async {
+  Future<PackageListResponse> listCachedPackages(
+      {int page = 1, int limit = 20}) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/api/admin/packages/cached?page=$page&limit=$limit'),
+      Uri.parse('$baseUrl/admin/api/packages/cached?page=$page&limit=$limit'),
       headers: _headers,
     );
-
 
     if (response.statusCode != 200) {
       throw AdminApiException(
@@ -114,10 +115,9 @@ class AdminApiClient {
   /// Delete a package.
   Future<DeleteResult> deletePackage(String name) async {
     final response = await _client.delete(
-      Uri.parse('$baseUrl/api/admin/packages/$name'),
+      Uri.parse('$baseUrl/admin/api/packages/$name'),
       headers: _headers,
     );
-
 
     if (response.statusCode == 404) {
       throw AdminApiException(
@@ -144,10 +144,9 @@ class AdminApiClient {
   /// Delete a package version.
   Future<DeleteResult> deletePackageVersion(String name, String version) async {
     final response = await _client.delete(
-      Uri.parse('$baseUrl/api/admin/packages/$name/versions/$version'),
+      Uri.parse('$baseUrl/admin/api/packages/$name/versions/$version'),
       headers: _headers,
     );
-
 
     if (response.statusCode == 404) {
       throw AdminApiException(
@@ -171,11 +170,10 @@ class AdminApiClient {
   /// Discontinue a package.
   Future<void> discontinuePackage(String name, {String? replacedBy}) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/admin/packages/$name/discontinue'),
+      Uri.parse('$baseUrl/admin/api/packages/$name/discontinue'),
       headers: _headers,
       body: replacedBy != null ? jsonEncode({'replacedBy': replacedBy}) : null,
     );
-
 
     if (response.statusCode == 404) {
       throw AdminApiException(
@@ -195,10 +193,9 @@ class AdminApiClient {
   /// Clear all cached packages.
   Future<ClearCacheResult> clearCache() async {
     final response = await _client.delete(
-      Uri.parse('$baseUrl/api/admin/cache'),
+      Uri.parse('$baseUrl/admin/api/cache'),
       headers: _headers,
     );
-
 
     if (response.statusCode != 200) {
       throw AdminApiException(
@@ -216,7 +213,8 @@ class AdminApiClient {
     );
   }
 
-  PackageListResponse _parsePackageListResponse(String body, int page, int limit) {
+  PackageListResponse _parsePackageListResponse(
+      String body, int page, int limit) {
     final json = jsonDecode(body) as Map<String, dynamic>;
     final packages = (json['packages'] as List<dynamic>?)
             ?.map((p) => _parsePackageInfo(p as Map<String, dynamic>))
@@ -241,14 +239,16 @@ class AdminApiClient {
     );
 
     final versions = (json['versions'] as List<dynamic>?)
-            ?.map((v) => _parsePackageVersion(json['name'] as String, v as Map<String, dynamic>))
+            ?.map((v) => _parsePackageVersion(
+                json['name'] as String, v as Map<String, dynamic>))
             .toList() ??
         [];
 
     return PackageInfo(package: package, versions: versions);
   }
 
-  PackageVersion _parsePackageVersion(String packageName, Map<String, dynamic> json) {
+  PackageVersion _parsePackageVersion(
+      String packageName, Map<String, dynamic> json) {
     return PackageVersion(
       packageName: packageName,
       version: json['version'] as String,

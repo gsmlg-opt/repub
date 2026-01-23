@@ -98,7 +98,8 @@ class _AdminPageState extends State<AdminPage> {
         ),
         button(
           type: ButtonType.button,
-          classes: 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
+          classes:
+              'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
           events: {'click': (_) => _loadStats()},
           [Component.text('Try again')],
         ),
@@ -112,10 +113,14 @@ class _AdminPageState extends State<AdminPage> {
       div(
         classes: 'grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8',
         [
-          _statCard('Total Packages', stats.totalPackages.toString(), 'bg-blue-500'),
-          _statCard('Local Packages', stats.localPackages.toString(), 'bg-green-500'),
-          _statCard('Cached Packages', stats.cachedPackages.toString(), 'bg-purple-500'),
-          _statCard('Total Versions', stats.totalVersions.toString(), 'bg-orange-500'),
+          _statCard(
+              'Total Packages', stats.totalPackages.toString(), 'bg-blue-500'),
+          _statCard(
+              'Local Packages', stats.localPackages.toString(), 'bg-green-500'),
+          _statCard('Cached Packages', stats.cachedPackages.toString(),
+              'bg-purple-500'),
+          _statCard('Total Versions', stats.totalVersions.toString(),
+              'bg-orange-500'),
         ],
       ),
       // Quick actions
@@ -176,7 +181,8 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  Component _actionCard(String title, String description, String href, String colorClasses) {
+  Component _actionCard(
+      String title, String description, String href, String colorClasses) {
     return a(
       href: href,
       classes: 'block p-4 border rounded-lg transition-colors $colorClasses',

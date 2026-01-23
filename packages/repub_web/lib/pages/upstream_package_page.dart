@@ -93,7 +93,9 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
       [
         div(
           classes: 'inline-block p-4 bg-gray-100 rounded-full mb-4',
-          [span(classes: 'text-4xl', [RawText('&#x1F4E6;')])],
+          [
+            span(classes: 'text-4xl', [RawText('&#x1F4E6;')])
+          ],
         ),
         h2(
           classes: 'text-2xl font-semibold text-gray-900 mb-2',
@@ -101,11 +103,15 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
         ),
         p(
           classes: 'text-gray-600 mb-6',
-          [Component.text('The package "${component.packageName}" was not found on pub.dev.')],
+          [
+            Component.text(
+                'The package "${component.packageName}" was not found on pub.dev.')
+          ],
         ),
         a(
           href: '/',
-          classes: 'inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
+          classes:
+              'inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
           [Component.text('Browse all packages')],
         ),
       ],
@@ -118,7 +124,9 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
       [
         div(
           classes: 'inline-block p-4 bg-red-50 rounded-full mb-4',
-          [span(classes: 'text-red-500 text-4xl', [Component.text('!')])],
+          [
+            span(classes: 'text-red-500 text-4xl', [Component.text('!')])
+          ],
         ),
         h2(
           classes: 'text-xl font-semibold text-gray-900 mb-2',
@@ -140,7 +148,8 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
   Component _buildPackageDetail(PackageInfo info) {
     final latest = info.latest;
     final pubspec = latest?.pubspec ?? {};
-    final description = pubspec['description'] as String? ?? 'No description available';
+    final description =
+        pubspec['description'] as String? ?? 'No description available';
     final homepage = pubspec['homepage'] as String?;
     final repository = pubspec['repository'] as String?;
     final documentation = pubspec['documentation'] as String?;
@@ -169,7 +178,9 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
                 ),
               ]),
               li(classes: 'text-gray-400', [Component.text('/')]),
-              li(classes: 'text-gray-900 font-medium', [Component.text(component.packageName)]),
+              li(
+                  classes: 'text-gray-900 font-medium',
+                  [Component.text(component.packageName)]),
             ],
           ),
         ],
@@ -177,7 +188,8 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
 
       // Upstream badge
       div(
-        classes: 'mb-4 inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full',
+        classes:
+            'mb-4 inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full',
         [
           Component.text('📦 From pub.dev'),
         ],
@@ -197,14 +209,16 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
                 ),
                 if (info.package.isDiscontinued)
                   div(
-                    classes: 'inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full mb-2',
+                    classes:
+                        'inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full mb-2',
                     [
                       Component.text('Discontinued'),
                       if (info.package.replacedBy != null)
                         span([
                           Component.text(' - Use '),
                           a(
-                            href: '/upstream-packages/${info.package.replacedBy}',
+                            href:
+                                '/upstream-packages/${info.package.replacedBy}',
                             classes: 'underline',
                             [Component.text(info.package.replacedBy!)],
                           ),
@@ -218,7 +232,8 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
                   classes: 'text-right',
                   [
                     span(
-                      classes: 'inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-mono text-lg',
+                      classes:
+                          'inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-mono text-lg',
                       [Component.text('v${latest.version}')],
                     ),
                   ],
@@ -246,7 +261,10 @@ class _UpstreamPackagePageState extends State<UpstreamPackagePage> {
                 [
                   p(
                     classes: 'text-gray-700 mb-4',
-                    [Component.text('This package is from pub.dev. You can use it directly or cache it locally.')],
+                    [
+                      Component.text(
+                          'This package is from pub.dev. You can use it directly or cache it locally.')
+                    ],
                   ),
                   _buildCodeBlock('''
 # Add to your pubspec.yaml dependencies:
@@ -268,7 +286,10 @@ dart pub get'''),
               if (pubspec['dependencies'] != null)
                 _buildSection(
                   'Dependencies',
-                  [_buildDependencies(pubspec['dependencies'] as Map<String, dynamic>)],
+                  [
+                    _buildDependencies(
+                        pubspec['dependencies'] as Map<String, dynamic>)
+                  ],
                 ),
             ],
           ),
@@ -288,9 +309,11 @@ dart pub get'''),
                   [
                     if (latest != null)
                       ..._buildMetadataItem('Latest', latest.version),
-                    ..._buildMetadataItem('Versions', info.versions.length.toString()),
+                    ..._buildMetadataItem(
+                        'Versions', info.versions.length.toString()),
                     if (latest != null)
-                      ..._buildMetadataItem('Published', _formatDate(latest.publishedAt)),
+                      ..._buildMetadataItem(
+                          'Published', _formatDate(latest.publishedAt)),
                     if (pubspec['environment'] != null)
                       ..._buildMetadataItem('SDK', _formatSdk(pubspec)),
                   ],
@@ -314,7 +337,8 @@ dart pub get'''),
                         li([
                           a(
                             href: homepage,
-                            classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                            classes:
+                                'text-blue-600 hover:text-blue-800 flex items-center',
                             attributes: {'target': '_blank', 'rel': 'noopener'},
                             [Component.text('Homepage')],
                           ),
@@ -323,7 +347,8 @@ dart pub get'''),
                         li([
                           a(
                             href: repository,
-                            classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                            classes:
+                                'text-blue-600 hover:text-blue-800 flex items-center',
                             attributes: {'target': '_blank', 'rel': 'noopener'},
                             [Component.text('Repository')],
                           ),
@@ -332,15 +357,18 @@ dart pub get'''),
                         li([
                           a(
                             href: documentation,
-                            classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                            classes:
+                                'text-blue-600 hover:text-blue-800 flex items-center',
                             attributes: {'target': '_blank', 'rel': 'noopener'},
                             [Component.text('Documentation')],
                           ),
                         ]),
                       li([
                         a(
-                          href: 'https://pub.dev/packages/${component.packageName}',
-                          classes: 'text-blue-600 hover:text-blue-800 flex items-center',
+                          href:
+                              'https://pub.dev/packages/${component.packageName}',
+                          classes:
+                              'text-blue-600 hover:text-blue-800 flex items-center',
                           attributes: {'target': '_blank', 'rel': 'noopener'},
                           [Component.text('View on pub.dev')],
                         ),
@@ -360,7 +388,8 @@ dart pub get'''),
       classes: 'mb-8',
       [
         h2(
-          classes: 'text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200',
+          classes:
+              'text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200',
           [Component.text(title)],
         ),
         ...children,
@@ -370,14 +399,18 @@ dart pub get'''),
 
   Component _buildCodeBlock(String code) {
     return pre(
-      classes: 'bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono',
-      [Component.element(tag: 'code', children: [Component.text(code)])],
+      classes:
+          'bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono',
+      [
+        Component.element(tag: 'code', children: [Component.text(code)])
+      ],
     );
   }
 
   Component _buildVersionsTable(List<PackageVersion> versions) {
     // Sort versions by publishedAt descending
-    final sorted = [...versions]..sort((v1, v2) => v2.publishedAt.compareTo(v1.publishedAt));
+    final sorted = [...versions]
+      ..sort((v1, v2) => v2.publishedAt.compareTo(v1.publishedAt));
 
     return div(
       classes: 'overflow-hidden rounded-lg border border-gray-200',
@@ -390,15 +423,18 @@ dart pub get'''),
               [
                 tr([
                   th(
-                    classes: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    classes:
+                        'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                     [Component.text('Version')],
                   ),
                   th(
-                    classes: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    classes:
+                        'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                     [Component.text('Published')],
                   ),
                   th(
-                    classes: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    classes:
+                        'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                     [Component.text('SDK')],
                   ),
                 ]),
@@ -419,11 +455,13 @@ dart pub get'''),
                       ],
                     ),
                     td(
-                      classes: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
+                      classes:
+                          'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
                       [Component.text(_formatDate(version.publishedAt))],
                     ),
                     td(
-                      classes: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
+                      classes:
+                          'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
                       [Component.text(_formatSdk(version.pubspec))],
                     ),
                   ]),
@@ -446,11 +484,14 @@ dart pub get'''),
       [
         for (final entry in deps.entries)
           span(
-            classes: 'inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm',
+            classes:
+                'inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm',
             [
               span(classes: 'font-medium', [Component.text(entry.key)]),
               span(classes: 'mx-1 text-gray-400', [Component.text(':')]),
-              span(classes: 'text-gray-500', [Component.text(entry.value.toString())]),
+              span(
+                  classes: 'text-gray-500',
+                  [Component.text(entry.value.toString())]),
             ],
           ),
       ],

@@ -81,7 +81,10 @@ class _HomePageState extends State<HomePage> {
         ),
         p(
           classes: 'text-lg text-gray-600 max-w-2xl mx-auto',
-          [Component.text('A private Dart package repository for your team. Browse, search, and manage your packages.')],
+          [
+            Component.text(
+                'A private Dart package repository for your team. Browse, search, and manage your packages.')
+          ],
         ),
         // Search box
         div(
@@ -96,12 +99,14 @@ class _HomePageState extends State<HomePage> {
                     input(
                       type: InputType.text,
                       name: 'q',
-                      classes: 'flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
+                      classes:
+                          'flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
                       attributes: {'placeholder': 'Search packages...'},
                     ),
                     button(
                       type: ButtonType.submit,
-                      classes: 'px-6 py-3 bg-blue-600 text-white font-medium rounded-r-lg hover:bg-blue-700 transition-colors',
+                      classes:
+                          'px-6 py-3 bg-blue-600 text-white font-medium rounded-r-lg hover:bg-blue-700 transition-colors',
                       [Component.text('Search')],
                     ),
                   ],
@@ -120,7 +125,8 @@ class _HomePageState extends State<HomePage> {
       [
         for (var i = 0; i < 6; i++)
           div(
-            classes: 'bg-white rounded-lg border border-gray-200 p-6 animate-pulse',
+            classes:
+                'bg-white rounded-lg border border-gray-200 p-6 animate-pulse',
             [
               div(classes: 'h-6 bg-gray-200 rounded w-1/2 mb-3', []),
               div(classes: 'h-4 bg-gray-200 rounded w-full mb-2', []),
@@ -192,7 +198,10 @@ class _HomePageState extends State<HomePage> {
           ),
           span(
             classes: 'text-gray-500',
-            [Component.text('${response.total} package${response.total != 1 ? "s" : ""}')],
+            [
+              Component.text(
+                  '${response.total} package${response.total != 1 ? "s" : ""}')
+            ],
           ),
         ],
       ),
@@ -200,13 +209,11 @@ class _HomePageState extends State<HomePage> {
       div(
         classes: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
         [
-          for (final pkg in response.packages)
-            PackageCard(packageInfo: pkg),
+          for (final pkg in response.packages) PackageCard(packageInfo: pkg),
         ],
       ),
       // Pagination
-      if (response.totalPages > 1)
-        _buildPagination(response),
+      if (response.totalPages > 1) _buildPagination(response),
     ]);
   }
 
@@ -217,7 +224,8 @@ class _HomePageState extends State<HomePage> {
         if (response.hasPrevPage)
           a(
             href: '/?page=${response.page - 1}',
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             [Component.text('Previous')],
           ),
         span(
@@ -227,7 +235,8 @@ class _HomePageState extends State<HomePage> {
         if (response.hasNextPage)
           a(
             href: '/?page=${response.page + 1}',
-            classes: 'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
+            classes:
+                'px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50',
             [Component.text('Next')],
           ),
       ],

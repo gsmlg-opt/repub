@@ -7,12 +7,14 @@ class PackageCard extends StatelessComponent {
   final PackageInfo packageInfo;
   final bool isUpstream;
 
-  const PackageCard({required this.packageInfo, this.isUpstream = false, super.key});
+  const PackageCard(
+      {required this.packageInfo, this.isUpstream = false, super.key});
 
   @override
   Component build(BuildContext context) {
     final latest = packageInfo.latest;
-    final description = latest?.pubspec['description'] as String? ?? 'No description available';
+    final description =
+        latest?.pubspec['description'] as String? ?? 'No description available';
     final packageUrl = isUpstream
         ? '/upstream-packages/${packageInfo.package.name}'
         : '/packages/${packageInfo.package.name}';
@@ -22,7 +24,8 @@ class PackageCard extends StatelessComponent {
       classes: 'block',
       [
         div(
-          classes: 'package-card bg-white rounded-lg border border-gray-200 p-6 transition-all cursor-pointer',
+          classes:
+              'package-card bg-white rounded-lg border border-gray-200 p-6 transition-all cursor-pointer',
           [
             // Package name and version
             div(
@@ -30,18 +33,21 @@ class PackageCard extends StatelessComponent {
               [
                 div([
                   h3(
-                    classes: 'text-lg font-semibold text-blue-600 hover:text-blue-800',
+                    classes:
+                        'text-lg font-semibold text-blue-600 hover:text-blue-800',
                     [Component.text(packageInfo.package.name)],
                   ),
                   if (packageInfo.package.isDiscontinued)
                     span(
-                      classes: 'inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full',
+                      classes:
+                          'inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full',
                       [Component.text('Discontinued')],
                     ),
                 ]),
                 if (latest != null)
                   span(
-                    classes: 'px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full font-mono',
+                    classes:
+                        'px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full font-mono',
                     [Component.text('v${latest.version}')],
                   ),
               ],
@@ -57,10 +63,12 @@ class PackageCard extends StatelessComponent {
               [
                 if (latest != null)
                   span([
-                    Component.text('Published ${_formatDate(latest.publishedAt)}'),
+                    Component.text(
+                        'Published ${_formatDate(latest.publishedAt)}'),
                   ]),
                 span([
-                  Component.text('${packageInfo.versions.length} version${packageInfo.versions.length != 1 ? "s" : ""}'),
+                  Component.text(
+                      '${packageInfo.versions.length} version${packageInfo.versions.length != 1 ? "s" : ""}'),
                 ]),
               ],
             ),
