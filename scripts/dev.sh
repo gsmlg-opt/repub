@@ -25,7 +25,8 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${YELLOW}Unified Dev Server:${NC}  http://localhost:8080"
 echo -e "${YELLOW}  - API endpoints at /api/*${NC}"
-echo -e "${YELLOW}  - Web UI with hot reload${NC}"
+echo -e "${YELLOW}  - Web UI (Jaspr) with hot reload${NC}"
+echo -e "${YELLOW}  - Admin UI (Flutter) at /admin with hot reload${NC}"
 echo ""
 
 # Cleanup function
@@ -48,17 +49,26 @@ SERVER_PID=$!
 # Wait for dev server to be ready
 sleep 2
 
-# Start webdev server on 8081 (for hot reload)
+# Start webdev server on 8081 (for Jaspr hot reload)
 # Use --hostname 0.0.0.0 to allow access from other machines on the network
-echo -e "${GREEN}[WEB]${NC} Starting webdev server for hot reload on port 8081..."
+echo -e "${GREEN}[WEB]${NC} Starting webdev server for Jaspr hot reload on port 8081..."
 cd packages/repub_web
 dart run webdev serve web:8081 --auto=refresh --hostname 0.0.0.0 2>&1 | sed "s/^/$(printf "${GREEN}[WEB]${NC} ")/" &
 WEB_PID=$!
 cd "$PROJECT_ROOT"
 
+# Start Flutter admin dev server on 8082 (for Flutter hot reload)
+echo -e "${GREEN}[ADMIN]${NC} Starting Flutter admin dev server on port 8082..."
+cd packages/repub_admin
+flutter run -d web-server --web-port 8082 --web-hostname 0.0.0.0 --web-browser-flag="--disable-web-security" 2>&1 | sed "s/^/$(printf "${GREEN}[ADMIN]${NC} ")/" &
+ADMIN_PID=$!
+cd "$PROJECT_ROOT"
+
 echo ""
 echo -e "${GREEN}✓ Development environment ready!${NC}"
 echo -e "Open ${YELLOW}http://localhost:8080${NC} in your browser"
+echo -e "  - Web UI: ${YELLOW}http://localhost:8080/${NC}"
+echo -e "  - Admin UI: ${YELLOW}http://localhost:8080/admin${NC}"
 echo -e "Press ${RED}Ctrl+C${NC} to stop all services"
 echo ""
 

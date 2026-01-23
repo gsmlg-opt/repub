@@ -16,7 +16,7 @@ CRITICAL CONSTRAINTS (read these before every task):
 melos bootstrap
 
 # Development - unified server on port 8080 with hot reload
-# Access everything at http://localhost:8080 (API + web UI)
+# Access everything at http://localhost:8080 (API + web UI + admin UI)
 melos run dev
 
 # Run API server only (SQLite + local storage, no external deps)
@@ -25,8 +25,13 @@ melos run server
 # Build production binary
 melos run build
 
-# Build web UI for production
-melos run build:web
+# Build web UIs for production
+melos run build:web        # Build Jaspr web UI
+melos run build:admin      # Build Flutter admin UI
+
+# Run dev servers individually
+melos run dev:web          # Jaspr web UI on port 8081
+melos run dev:admin        # Flutter admin UI on port 8082
 
 # Quality checks
 melos run analyze          # Static analysis with fatal-infos
@@ -51,7 +56,8 @@ repub_auth ← repub_storage
     ↑          ↑
     └──────────┴──→ repub_server ← repub_cli
                          ↑
-                    repub_web (Jaspr framework)
+                         ├──→ repub_web (Jaspr - public UI)
+                         └──→ repub_admin (Flutter - admin UI)
 ```
 
 ### Packages
@@ -64,7 +70,8 @@ repub_auth ← repub_storage
 | `repub_migrate` | SQL schema migrations |
 | `repub_server` | HTTP API using Shelf framework |
 | `repub_cli` | Admin CLI for tokens, migrations, server startup |
-| `repub_web` | Web UI using Jaspr framework |
+| `repub_web` | Public web UI using Jaspr framework (package browsing, search, docs) |
+| `repub_admin` | Admin web UI using Flutter (package management, stats dashboard) |
 
 ### Storage Backends
 
@@ -85,10 +92,11 @@ repub_auth ← repub_storage
 ### Development Server
 
 The dev server (`repub_dev_server.dart`) provides a unified development experience on port 8080:
-- **API routes** (`/api/*`, `/packages/*`, `/health`) - Handled directly by the server
-- **Web UI** (all other routes) - Proxied to webdev on port 8081 for hot reload
+- **API routes** (`/api/*`, `/admin/api/*`, `/packages/*`, `/health`) - Handled directly by the server
+- **Admin UI** (`/admin/*`) - Proxied to Flutter dev server on port 8082 for hot reload
+- **Web UI** (all other routes) - Proxied to Jaspr webdev on port 8081 for hot reload
 - Users only access `http://localhost:8080` for everything
-- Web changes reload instantly via webdev's hot reload mechanism
+- All UI changes reload instantly via their respective hot reload mechanisms
 
 ### Token Scopes
 

@@ -15,6 +15,7 @@ workspace:
   - packages/repub_server
   - packages/repub_cli
   - packages/repub_web
+  - packages/repub_admin
 
 melos:
   command:
@@ -81,3 +82,15 @@ melos:
       run: dart run build_runner serve web:8081
       packageFilters:
         scope: repub_web
+
+    build:admin:
+      description: Build Flutter admin web app
+      run: flutter build web --release --base-href "/admin/" --output build/web
+      packageFilters:
+        scope: repub_admin
+
+    dev:admin:
+      description: Run Flutter admin in development mode (port 8082)
+      run: flutter run -d web-server --web-port 8082 --web-hostname 0.0.0.0 --web-browser-flag="--disable-web-security"
+      packageFilters:
+        scope: repub_admin

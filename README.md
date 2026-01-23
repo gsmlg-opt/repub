@@ -16,8 +16,7 @@ A self-hosted Dart/Flutter package registry implementing the [Hosted Pub Reposit
 
 - pub.dev analyzer/scoring
 - Mirroring/proxying pub.dev
-- Web UI
-- User accounts / OAuth
+- User accounts / OAuth (self-hosted for package owners only)
 
 ## Project Structure
 
@@ -33,11 +32,14 @@ repub/
 │   ├── repub_storage/      # PostgreSQL + S3 storage
 │   ├── repub_migrate/      # SQL migrations
 │   ├── repub_server/       # HTTP server (main API)
-│   └── repub_cli/          # Admin CLI
+│   ├── repub_cli/          # Admin CLI
+│   ├── repub_web/          # Public web UI (Jaspr)
+│   └── repub_admin/        # Admin web UI (Flutter)
 ├── docker-compose.yml
 ├── Dockerfile
 └── scripts/
-    └── smoke_test.sh
+    ├── smoke_test.sh
+    └── dev.sh              # Development environment script
 ```
 
 ## Quickstart
@@ -347,11 +349,16 @@ dart run -C packages/repub_server repub_server
 ### Development Server
 
 The `melos run dev` command starts a unified development server on **port 8080** that includes:
-- **API server** - All API endpoints at `/api/*`, `/packages/*`, `/health`
-- **Web UI** - Admin panel and package browser with hot reload
+- **API server** - All API endpoints at `/api/*`, `/admin/api/*`, `/packages/*`, `/health`
+- **Public Web UI** - Package browsing, search, and documentation (Jaspr with hot reload)
+- **Admin UI** - Admin dashboard and package management at `/admin` (Flutter with hot reload)
 - **Single URL** - Access everything at `http://localhost:8080`
 
-The dev server internally proxies web UI requests to webdev (running on 8081) to provide instant hot reload when you modify frontend code.
+The dev server internally proxies:
+- Web UI requests to Jaspr webdev (running on 8081)
+- Admin UI requests to Flutter dev server (running on 8082)
+
+This provides instant hot reload when you modify any frontend code.
 
 ## Package Dependencies
 
@@ -364,7 +371,9 @@ repub_storage (depends on: repub_model; includes SQLite + PostgreSQL + S3)
     ↑
 repub_server (depends on: repub_model, repub_auth, repub_storage)
     ↑
-repub_cli (depends on: repub_model, repub_storage, repub_server)
+    ├── repub_cli (depends on: repub_model, repub_storage, repub_server)
+    ├── repub_web (depends on: repub_model; Jaspr web UI)
+    └── repub_admin (depends on: repub_model; Flutter admin UI)
 ```
 
 ## License
