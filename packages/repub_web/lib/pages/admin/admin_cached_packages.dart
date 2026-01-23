@@ -17,9 +17,7 @@ class AdminCachedPackagesPage extends StatefulComponent {
 }
 
 class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
-  static const _tokenKey = 'repub_admin_token';
 
-  String? _token;
   bool _loading = true;
   String? _error;
   PackageListResponse? _response;
@@ -30,29 +28,18 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
   @override
   void initState() {
     super.initState();
-    _checkAuth();
-  }
-
-  void _checkAuth() {
-    final stored = web.window.localStorage.getItem(_tokenKey);
-    if (stored == null || stored.isEmpty) {
-      // Redirect to admin login
-      web.window.location.href = '/admin';
-      return;
-    }
-    _token = stored;
     _loadPackages();
   }
 
+
   Future<void> _loadPackages({int page = 1}) async {
-    if (_token == null) return;
 
     setState(() {
       _loading = true;
       _error = null;
     });
 
-    final client = AdminApiClient(token: _token!);
+    final client = AdminApiClient();
     try {
       final response = await client.listCachedPackages(page: page);
       setState(() {
@@ -74,12 +61,11 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
   }
 
   Future<void> _deletePackage(String name) async {
-    if (_token == null) return;
 
     final confirmed = web.window.confirm('Are you sure you want to delete cached package "$name"?');
     if (!confirmed) return;
 
-    final client = AdminApiClient(token: _token!);
+    final client = AdminApiClient();
     try {
       final result = await client.deletePackage(name);
       setState(() {
@@ -98,7 +84,6 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
   }
 
   Future<void> _clearAllCache() async {
-    if (_token == null) return;
 
     final confirmed = web.window.confirm(
       'Are you sure you want to clear ALL cached packages? This action cannot be undone.',
@@ -109,7 +94,7 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
       _clearing = true;
     });
 
-    final client = AdminApiClient(token: _token!);
+    final client = AdminApiClient();
     try {
       final result = await client.clearCache();
       setState(() {
@@ -129,16 +114,12 @@ class _AdminCachedPackagesPageState extends State<AdminCachedPackagesPage> {
     }
   }
 
-  void _logout() {
-    web.window.localStorage.removeItem(_tokenKey);
-    web.window.location.href = '/admin';
-  }
 
   @override
   Component build(BuildContext context) {
     return AdminLayout(
       currentPath: '/admin/packages/cached',
-      onLogout: _logout,
+      
       children: [
         // Action message
         if (_actionMessage != null)

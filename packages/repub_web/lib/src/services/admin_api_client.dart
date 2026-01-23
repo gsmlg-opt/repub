@@ -27,13 +27,12 @@ class AdminStats {
       );
 }
 
-/// Admin API client with token-based authentication.
+/// Admin API client (no built-in auth - use external auth).
 class AdminApiClient {
   final String baseUrl;
-  final String token;
   final http.Client _client;
 
-  AdminApiClient({required this.token, String? baseUrl})
+  AdminApiClient({String? baseUrl})
       : baseUrl = baseUrl ?? _detectBaseUrl(),
         _client = http.Client();
 
@@ -48,34 +47,16 @@ class AdminApiClient {
     return '';
   }
 
-  Map<String, String> get _authHeaders => {
-        'Authorization': 'Bearer $token',
+  Map<String, String> get _headers => {
         'Content-Type': 'application/json',
       };
-
-  /// Validate the token by fetching stats.
-  Future<bool> validateToken() async {
-    try {
-      await getStats();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
 
   /// Get admin statistics.
   Future<AdminStats> getStats() async {
     final response = await _client.get(
       Uri.parse('$baseUrl/api/admin/stats'),
-      headers: _authHeaders,
+      headers: _headers,
     );
-
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AdminApiException(
-        statusCode: response.statusCode,
-        message: 'Unauthorized: Invalid or missing admin token',
-      );
-    }
 
     if (response.statusCode != 200) {
       throw AdminApiException(
@@ -92,10 +73,10 @@ class AdminApiClient {
   Future<PackageListResponse> listLocalPackages({int page = 1, int limit = 20}) async {
     final response = await _client.get(
       Uri.parse('$baseUrl/api/admin/packages/local?page=$page&limit=$limit'),
-      headers: _authHeaders,
+      headers: _headers,
     );
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
+    if (response.statusCode != 200) {
       throw AdminApiException(
         statusCode: response.statusCode,
         message: 'Unauthorized',
@@ -116,15 +97,9 @@ class AdminApiClient {
   Future<PackageListResponse> listCachedPackages({int page = 1, int limit = 20}) async {
     final response = await _client.get(
       Uri.parse('$baseUrl/api/admin/packages/cached?page=$page&limit=$limit'),
-      headers: _authHeaders,
+      headers: _headers,
     );
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AdminApiException(
-        statusCode: response.statusCode,
-        message: 'Unauthorized',
-      );
-    }
 
     if (response.statusCode != 200) {
       throw AdminApiException(
@@ -140,15 +115,9 @@ class AdminApiClient {
   Future<DeleteResult> deletePackage(String name) async {
     final response = await _client.delete(
       Uri.parse('$baseUrl/api/admin/packages/$name'),
-      headers: _authHeaders,
+      headers: _headers,
     );
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AdminApiException(
-        statusCode: response.statusCode,
-        message: 'Unauthorized',
-      );
-    }
 
     if (response.statusCode == 404) {
       throw AdminApiException(
@@ -176,15 +145,9 @@ class AdminApiClient {
   Future<DeleteResult> deletePackageVersion(String name, String version) async {
     final response = await _client.delete(
       Uri.parse('$baseUrl/api/admin/packages/$name/versions/$version'),
-      headers: _authHeaders,
+      headers: _headers,
     );
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AdminApiException(
-        statusCode: response.statusCode,
-        message: 'Unauthorized',
-      );
-    }
 
     if (response.statusCode == 404) {
       throw AdminApiException(
@@ -209,16 +172,10 @@ class AdminApiClient {
   Future<void> discontinuePackage(String name, {String? replacedBy}) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/api/admin/packages/$name/discontinue'),
-      headers: _authHeaders,
+      headers: _headers,
       body: replacedBy != null ? jsonEncode({'replacedBy': replacedBy}) : null,
     );
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AdminApiException(
-        statusCode: response.statusCode,
-        message: 'Unauthorized',
-      );
-    }
 
     if (response.statusCode == 404) {
       throw AdminApiException(
@@ -239,15 +196,9 @@ class AdminApiClient {
   Future<ClearCacheResult> clearCache() async {
     final response = await _client.delete(
       Uri.parse('$baseUrl/api/admin/cache'),
-      headers: _authHeaders,
+      headers: _headers,
     );
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AdminApiException(
-        statusCode: response.statusCode,
-        message: 'Unauthorized',
-      );
-    }
 
     if (response.statusCode != 200) {
       throw AdminApiException(

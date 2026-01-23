@@ -782,24 +782,11 @@ class ApiHandlers {
   }
 
   // ============ Admin Handlers ============
-
-  /// Authenticate admin request (requires admin scope).
-  Future<AuthResult> _authenticateAdmin(Request request) async {
-    return authenticate(
-      request,
-      lookupToken: metadata.getTokenByHash,
-      touchToken: metadata.touchToken,
-      requiredScope: 'admin',
-    );
-  }
+  // Note: Admin endpoints have no built-in auth.
+  // Use external auth (reverse proxy, HTTP Basic Auth, etc.)
 
   /// GET `/api/admin/stats`
   Future<Response> adminGetStats(Request request) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     final stats = await metadata.getAdminStats();
 
     return Response.ok(
@@ -810,11 +797,6 @@ class ApiHandlers {
 
   /// GET `/api/admin/packages/local`
   Future<Response> adminListLocalPackages(Request request) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
     final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
@@ -832,11 +814,6 @@ class ApiHandlers {
 
   /// GET `/api/admin/packages/cached`
   Future<Response> adminListCachedPackages(Request request) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
     final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
@@ -854,11 +831,6 @@ class ApiHandlers {
 
   /// DELETE `/api/admin/packages/<name>`
   Future<Response> adminDeletePackage(Request request, String name) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     // Get archive keys before deleting metadata
     final archiveKeys = await metadata.getPackageArchiveKeys(name);
 
@@ -900,11 +872,6 @@ class ApiHandlers {
     String name,
     String version,
   ) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     // Get archive key before deleting metadata
     final archiveKey = await metadata.getVersionArchiveKey(name, version);
 
@@ -944,11 +911,6 @@ class ApiHandlers {
 
   /// POST `/api/admin/packages/<name>/discontinue`
   Future<Response> adminDiscontinuePackage(Request request, String name) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     // Parse body for optional replacedBy
     String? replacedBy;
     try {
@@ -985,11 +947,6 @@ class ApiHandlers {
 
   /// DELETE `/api/admin/cache`
   Future<Response> adminClearCache(Request request) async {
-    final authResult = await _authenticateAdmin(request);
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
-    }
-
     // Get all archive keys for cached packages before deleting
     final cachedResult = await metadata.listPackagesByType(
       isUpstreamCache: true,

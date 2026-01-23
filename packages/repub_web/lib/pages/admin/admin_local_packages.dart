@@ -17,9 +17,6 @@ class AdminLocalPackagesPage extends StatefulComponent {
 }
 
 class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
-  static const _tokenKey = 'repub_admin_token';
-
-  String? _token;
   bool _loading = true;
   String? _error;
   PackageListResponse? _response;
@@ -29,29 +26,16 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
   @override
   void initState() {
     super.initState();
-    _checkAuth();
-  }
-
-  void _checkAuth() {
-    final stored = web.window.localStorage.getItem(_tokenKey);
-    if (stored == null || stored.isEmpty) {
-      // Redirect to admin login
-      web.window.location.href = '/admin';
-      return;
-    }
-    _token = stored;
     _loadPackages();
   }
 
   Future<void> _loadPackages({int page = 1}) async {
-    if (_token == null) return;
-
     setState(() {
       _loading = true;
       _error = null;
     });
 
-    final client = AdminApiClient(token: _token!);
+    final client = AdminApiClient();
     try {
       final response = await client.listLocalPackages(page: page);
       setState(() {
@@ -59,10 +43,6 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
         _loading = false;
       });
     } catch (e) {
-      if (e is AdminApiException && (e.statusCode == 401 || e.statusCode == 403)) {
-        web.window.location.href = '/admin';
-        return;
-      }
       setState(() {
         _error = e is AdminApiException ? e.message : e.toString();
         _loading = false;
@@ -73,12 +53,10 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
   }
 
   Future<void> _deletePackage(String name) async {
-    if (_token == null) return;
-
     final confirmed = web.window.confirm('Are you sure you want to delete "$name" and all its versions?');
     if (!confirmed) return;
 
-    final client = AdminApiClient(token: _token!);
+    final client = AdminApiClient();
     try {
       final result = await client.deletePackage(name);
       setState(() {
@@ -97,11 +75,9 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
   }
 
   Future<void> _discontinuePackage(String name) async {
-    if (_token == null) return;
-
     final replacedBy = web.window.prompt('Replace with package (optional):');
 
-    final client = AdminApiClient(token: _token!);
+    final client = AdminApiClient();
     try {
       await client.discontinuePackage(
         name,
@@ -122,16 +98,10 @@ class _AdminLocalPackagesPageState extends State<AdminLocalPackagesPage> {
     }
   }
 
-  void _logout() {
-    web.window.localStorage.removeItem(_tokenKey);
-    web.window.location.href = '/admin';
-  }
-
   @override
   Component build(BuildContext context) {
     return AdminLayout(
       currentPath: '/admin/packages/local',
-      onLogout: _logout,
       children: [
         // Action message
         if (_actionMessage != null)

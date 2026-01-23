@@ -1,16 +1,14 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
-/// Admin layout with sidebar navigation.
+/// Admin layout with sidebar navigation (no built-in auth).
 class AdminLayout extends StatelessComponent {
   final List<Component> children;
   final String currentPath;
-  final VoidCallback? onLogout;
 
   const AdminLayout({
     required this.children,
     required this.currentPath,
-    this.onLogout,
     super.key,
   });
 
@@ -121,21 +119,9 @@ class AdminLayout extends StatelessComponent {
     return header(
       classes: 'bg-white shadow-sm border-b border-gray-200 px-6 py-4',
       [
-        div(
-          classes: 'flex items-center justify-between',
-          [
-            h1(
-              classes: 'text-xl font-semibold text-gray-900',
-              [Component.text(_getPageTitle())],
-            ),
-            if (onLogout != null)
-              button(
-                type: ButtonType.button,
-                classes: 'px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors',
-                events: {'click': (e) => onLogout!()},
-                [Component.text('Logout')],
-              ),
-          ],
+        h1(
+          classes: 'text-xl font-semibold text-gray-900',
+          [Component.text(_getPageTitle())],
         ),
       ],
     );
