@@ -17,9 +17,11 @@ class SearchPage extends StatefulComponent {
 }
 
 class _SearchPageState extends State<SearchPage> {
-  bool _loading = false;
+  bool _localLoading = false;
+  bool _upstreamLoading = false;
   String? _error;
-  PackageListResponse? _response;
+  PackageListResponse? _localResponse;
+  PackageListResponse? _upstreamResponse;
 
   @override
   void initState() {
@@ -30,22 +32,47 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _search() async {
+    // Search local packages first
     setState(() {
-      _loading = true;
+      _localLoading = true;
+      _upstreamLoading = true;
       _error = null;
+      _localResponse = null;
+      _upstreamResponse = null;
     });
 
     final apiClient = ApiClient();
     try {
-      final response = await apiClient.searchPackages(component.query);
+      // Fetch local results
+      final localResponse = await apiClient.searchPackages(component.query);
       setState(() {
-        _response = response;
-        _loading = false;
+        _localResponse = localResponse;
+        _localLoading = false;
       });
+
+      // Then fetch upstream results asynchronously
+      _searchUpstream(apiClient);
     } catch (e) {
       setState(() {
         _error = e.toString();
-        _loading = false;
+        _localLoading = false;
+        _upstreamLoading = false;
+      });
+      apiClient.dispose();
+    }
+  }
+
+  Future<void> _searchUpstream(ApiClient apiClient) async {
+    try {
+      final upstreamResponse = await apiClient.searchPackagesUpstream(component.query);
+      setState(() {
+        _upstreamResponse = upstreamResponse;
+        _upstreamLoading = false;
+      });
+    } catch (e) {
+      // Silently fail upstream search - not critical
+      setState(() {
+        _upstreamLoading = false;
       });
     } finally {
       apiClient.dispose();
@@ -58,7 +85,7 @@ class _SearchPageState extends State<SearchPage> {
       return Layout(children: [_buildEmptySearch()]);
     }
 
-    if (_loading) {
+    if (_localLoading) {
       return Layout(
         children: [_buildSearchHeader(), _buildLoadingState()],
       );
@@ -71,7 +98,10 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     return Layout(
-      children: [_buildSearchHeader(), _buildSearchResults(_response!)],
+      children: [
+        _buildSearchHeader(),
+        _buildSearchResults(_localResponse!, _upstreamResponse, _upstreamLoading),
+      ],
     );
   }
 
@@ -200,58 +230,100 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Component _buildSearchResults(PackageListResponse response) {
-    if (response.packages.isEmpty) {
-      return div(
-        classes: 'text-center py-12',
-        [
-          div(
-            classes: 'inline-block p-4 bg-gray-100 rounded-full mb-4',
-            [span(classes: 'text-4xl', [RawText('&#x1F50D;')])],
-          ),
-          h2(
-            classes: 'text-xl font-semibold text-gray-900 mb-2',
-            [Component.text('No packages found')],
-          ),
-          p(
-            classes: 'text-gray-600 mb-6',
-            [Component.text('No packages match "${component.query}". Try a different search term.')],
-          ),
-          a(
-            href: '/',
-            classes: 'text-blue-600 hover:text-blue-800',
-            [Component.text('Browse all packages')],
-          ),
-        ],
-      );
-    }
+  Component _buildSearchResults(
+    PackageListResponse localResponse,
+    PackageListResponse? upstreamResponse,
+    bool upstreamLoading,
+  ) {
+    final hasLocalResults = localResponse.packages.isNotEmpty;
+    final hasUpstreamResults = upstreamResponse?.packages.isNotEmpty ?? false;
 
     return Component.fragment([
-      // Results header
+      // Local packages section
       div(
-        classes: 'flex items-center justify-between mb-6',
+        classes: 'mb-8',
         [
-          h2(
-            classes: 'text-xl font-semibold text-gray-900',
-            [Component.text('Results for "${component.query}"')],
+          div(
+            classes: 'flex items-center justify-between mb-6',
+            [
+              h2(
+                classes: 'text-xl font-semibold text-gray-900',
+                [Component.text('Local Packages')],
+              ),
+              span(
+                classes: 'text-gray-500',
+                [Component.text('${localResponse.total} result${localResponse.total != 1 ? "s" : ""}')],
+              ),
+            ],
           ),
-          span(
-            classes: 'text-gray-500',
-            [Component.text('${response.total} result${response.total != 1 ? "s" : ""}')],
-          ),
+          if (hasLocalResults)
+            div(
+              classes: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
+              [
+                for (final pkg in localResponse.packages)
+                  PackageCard(packageInfo: pkg),
+              ],
+            )
+          else
+            div(
+              classes: 'text-center py-8 bg-gray-50 rounded-lg',
+              [
+                p(
+                  classes: 'text-gray-600',
+                  [Component.text('No local packages found')],
+                ),
+              ],
+            ),
+          if (localResponse.totalPages > 1)
+            _buildPagination(localResponse),
         ],
       ),
-      // Results grid
+
+      // Upstream packages section
       div(
-        classes: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
+        classes: 'mb-8',
         [
-          for (final pkg in response.packages)
-            PackageCard(packageInfo: pkg),
+          div(
+            classes: 'flex items-center justify-between mb-6',
+            [
+              h2(
+                classes: 'text-xl font-semibold text-gray-900',
+                [Component.text('Packages from pub.dev')],
+              ),
+              if (upstreamLoading)
+                span(
+                  classes: 'text-gray-500',
+                  [Component.text('Loading...')],
+                )
+              else if (hasUpstreamResults)
+                span(
+                  classes: 'text-gray-500',
+                  [Component.text('${upstreamResponse!.total} result${upstreamResponse.total != 1 ? "s" : ""}')],
+                ),
+            ],
+          ),
+          if (upstreamLoading)
+            _buildLoadingState()
+          else if (hasUpstreamResults)
+            div(
+              classes: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
+              [
+                for (final pkg in upstreamResponse!.packages)
+                  PackageCard(packageInfo: pkg, isUpstream: true),
+              ],
+            )
+          else
+            div(
+              classes: 'text-center py-8 bg-gray-50 rounded-lg',
+              [
+                p(
+                  classes: 'text-gray-600',
+                  [Component.text('No packages found on pub.dev')],
+                ),
+              ],
+            ),
         ],
       ),
-      // Pagination
-      if (response.totalPages > 1)
-        _buildPagination(response),
     ]);
   }
 

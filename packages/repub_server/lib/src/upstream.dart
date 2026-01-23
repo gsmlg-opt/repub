@@ -58,6 +58,36 @@ class UpstreamClient {
     }
   }
 
+  /// Search for packages on upstream.
+  /// Returns list of package names that match the query.
+  /// pub.dev search API returns simple list of package names, not full package info.
+  Future<List<String>> searchPackages(String query, {int page = 1}) async {
+    final url = '$baseUrl/api/search?q=${Uri.encodeComponent(query)}&page=$page';
+    try {
+      final response = await _client.get(Uri.parse(url));
+
+      if (response.statusCode == 404) {
+        return [];
+      }
+
+      if (response.statusCode != 200) {
+        print('Upstream error searching "$query": ${response.statusCode}');
+        return [];
+      }
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final packages = (json['packages'] as List<dynamic>?)
+              ?.map((p) => (p as Map<String, dynamic>)['package'] as String)
+              .toList() ??
+          [];
+
+      return packages;
+    } catch (e) {
+      print('Upstream error searching "$query": $e');
+      return [];
+    }
+  }
+
   /// Download package archive from upstream.
   /// Returns null if download fails.
   Future<Uint8List?> downloadArchive(String archiveUrl) async {

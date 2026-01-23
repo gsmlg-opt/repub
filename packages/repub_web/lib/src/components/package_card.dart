@@ -5,16 +5,20 @@ import 'package:repub_model/repub_model_web.dart';
 /// Card component for displaying package summary
 class PackageCard extends StatelessComponent {
   final PackageInfo packageInfo;
+  final bool isUpstream;
 
-  const PackageCard({required this.packageInfo, super.key});
+  const PackageCard({required this.packageInfo, this.isUpstream = false, super.key});
 
   @override
   Component build(BuildContext context) {
     final latest = packageInfo.latest;
     final description = latest?.pubspec['description'] as String? ?? 'No description available';
+    final packageUrl = isUpstream
+        ? '/upstream-packages/${packageInfo.package.name}'
+        : '/packages/${packageInfo.package.name}';
 
     return a(
-      href: '/packages/${packageInfo.package.name}',
+      href: packageUrl,
       classes: 'block',
       [
         div(

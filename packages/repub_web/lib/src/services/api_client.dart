@@ -93,7 +93,7 @@ class ApiClient {
     );
   }
 
-  /// Search packages by query
+  /// Search packages by query (local packages only)
   Future<PackageListResponse> searchPackages(String query, {int page = 1, int limit = 20}) async {
     final response = await _client.get(
       Uri.parse('$baseUrl/api/packages/search?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
@@ -118,6 +118,71 @@ class ApiClient {
       page: json['page'] as int? ?? page,
       limit: json['limit'] as int? ?? limit,
     );
+  }
+
+  /// Search packages from upstream (pub.dev)
+  Future<PackageListResponse> searchPackagesUpstream(String query, {int page = 1, int limit = 20}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/packages/search/upstream?q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),
+    );
+
+    if (response.statusCode == 503) {
+      // Upstream disabled
+      return PackageListResponse(
+        packages: [],
+        total: 0,
+        page: page,
+        limit: limit,
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to search upstream packages: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final packages = (json['packages'] as List<dynamic>?)
+            ?.map((p) => _parsePackageInfo(p as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return PackageListResponse(
+      packages: packages,
+      total: json['total'] as int? ?? packages.length,
+      page: json['page'] as int? ?? page,
+      limit: json['limit'] as int? ?? limit,
+    );
+  }
+
+  /// Get upstream package info from pub.dev
+  Future<PackageInfo?> getUpstreamPackage(String name) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/upstream/packages/$name'),
+    );
+
+    if (response.statusCode == 404) {
+      return null;
+    }
+
+    if (response.statusCode == 503) {
+      throw ApiException(
+        statusCode: 503,
+        message: 'Upstream is not enabled',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch upstream package: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return _parsePackageInfo(json);
   }
 
   PackageInfo _parsePackageInfo(Map<String, dynamic> json) {
