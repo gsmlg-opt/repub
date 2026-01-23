@@ -73,6 +73,7 @@ abstract class MetadataStore {
 
   /// Create or update a package and add a new version.
   /// If [isUpstreamCache] is true, the package is cached from upstream.
+  /// If [ownerId] is provided, it sets the package owner (for new packages only).
   Future<void> upsertPackageVersion({
     required String packageName,
     required String version,
@@ -80,6 +81,7 @@ abstract class MetadataStore {
     required String archiveKey,
     required String archiveSha256,
     bool isUpstreamCache = false,
+    String? ownerId,
   });
 
   /// Check if a version already exists.
@@ -89,7 +91,8 @@ abstract class MetadataStore {
   Future<PackageListResult> listPackages({int page = 1, int limit = 20});
 
   /// Search packages by name or description.
-  Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20});
+  Future<PackageListResult> searchPackages(String query,
+      {int page = 1, int limit = 20});
 
   // ============ Auth Tokens ============
 
@@ -99,14 +102,15 @@ abstract class MetadataStore {
   /// Update last_used_at for a token.
   Future<void> touchToken(String tokenHash);
 
-  /// Create a new token, returns the plaintext token.
+  /// Create a new token for a user, returns the plaintext token.
   Future<String> createToken({
+    required String userId,
     required String label,
-    required List<String> scopes,
+    DateTime? expiresAt,
   });
 
-  /// List all tokens.
-  Future<List<Map<String, dynamic>>> listTokens();
+  /// List tokens, optionally filtered by user.
+  Future<List<AuthToken>> listTokens({String? userId});
 
   /// Delete a token by label.
   Future<bool> deleteToken(String label);
@@ -156,6 +160,62 @@ abstract class MetadataStore {
 
   /// Get archive key for a specific version (for blob deletion).
   Future<String?> getVersionArchiveKey(String name, String version);
+
+  // ============ Users ============
+
+  /// Create a new user, returns the user ID.
+  Future<String> createUser({
+    required String email,
+    String? passwordHash,
+    String? name,
+  });
+
+  /// Get a user by ID.
+  Future<User?> getUser(String id);
+
+  /// Get a user by email.
+  Future<User?> getUserByEmail(String email);
+
+  /// Update a user's profile.
+  Future<bool> updateUser(String id,
+      {String? name, String? passwordHash, bool? isActive});
+
+  /// Update user's last login timestamp.
+  Future<void> touchUserLogin(String id);
+
+  /// Delete a user (transfers packages to anonymous).
+  Future<bool> deleteUser(String id);
+
+  /// List all users with pagination.
+  Future<List<User>> listUsers({int page = 1, int limit = 20});
+
+  // ============ Site Config ============
+
+  /// Get a site config value.
+  Future<SiteConfig?> getConfig(String name);
+
+  /// Set a site config value.
+  Future<void> setConfig(String name, String value);
+
+  /// Get all site config values.
+  Future<List<SiteConfig>> getAllConfig();
+
+  // ============ User Sessions ============
+
+  /// Create a user session, returns the session object with ID.
+  Future<UserSession> createUserSession({
+    required String userId,
+    Duration ttl = const Duration(hours: 24),
+  });
+
+  /// Get a user session by ID.
+  Future<UserSession?> getUserSession(String sessionId);
+
+  /// Delete a user session.
+  Future<bool> deleteUserSession(String sessionId);
+
+  /// Clean up expired user sessions.
+  Future<int> cleanupExpiredUserSessions();
 }
 
 /// Metadata storage backed by PostgreSQL.
@@ -195,7 +255,8 @@ class PostgresMetadataStore extends MetadataStore {
           }
         }
         await session.execute(
-          Sql.named('INSERT INTO schema_migrations (version) VALUES (@version)'),
+          Sql.named(
+              'INSERT INTO schema_migrations (version) VALUES (@version)'),
           parameters: {'version': migration.key},
         );
       });
@@ -213,7 +274,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<Package?> getPackage(String name) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT name, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
+        SELECT name, owner_id, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
         FROM packages WHERE name = @name
       '''),
       parameters: {'name': name},
@@ -224,11 +285,12 @@ class PostgresMetadataStore extends MetadataStore {
     final row = result.first;
     return Package(
       name: row[0] as String,
-      createdAt: row[1] as DateTime,
-      updatedAt: row[2] as DateTime,
-      isDiscontinued: row[3] as bool,
-      replacedBy: row[4] as String?,
-      isUpstreamCache: row[5] as bool,
+      ownerId: row[1] as String?,
+      createdAt: row[2] as DateTime,
+      updatedAt: row[3] as DateTime,
+      isDiscontinued: row[4] as bool,
+      replacedBy: row[5] as String?,
+      isUpstreamCache: row[6] as bool,
     );
   }
 
@@ -310,15 +372,20 @@ class PostgresMetadataStore extends MetadataStore {
     required String archiveKey,
     required String archiveSha256,
     bool isUpstreamCache = false,
+    String? ownerId,
   }) async {
     await _conn.runTx((session) async {
       await session.execute(
         Sql.named('''
-          INSERT INTO packages (name, created_at, updated_at, is_upstream_cache)
-          VALUES (@name, NOW(), NOW(), @is_upstream_cache)
+          INSERT INTO packages (name, owner_id, created_at, updated_at, is_upstream_cache)
+          VALUES (@name, @owner_id, NOW(), NOW(), @is_upstream_cache)
           ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
         '''),
-        parameters: {'name': packageName, 'is_upstream_cache': isUpstreamCache},
+        parameters: {
+          'name': packageName,
+          'owner_id': ownerId,
+          'is_upstream_cache': isUpstreamCache,
+        },
       );
 
       await session.execute(
@@ -354,7 +421,8 @@ class PostgresMetadataStore extends MetadataStore {
   @override
   Future<PackageListResult> listPackages({int page = 1, int limit = 20}) async {
     // Get total count (only local packages, exclude cached)
-    final countResult = await _conn.execute('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = false');
+    final countResult = await _conn.execute(
+        'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = false');
     final total = countResult.first[0] as int;
 
     // Get packages for this page (only local packages)
@@ -387,7 +455,8 @@ class PostgresMetadataStore extends MetadataStore {
   }
 
   @override
-  Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20}) async {
+  Future<PackageListResult> searchPackages(String query,
+      {int page = 1, int limit = 20}) async {
     final searchTerm = '%${query.toLowerCase()}%';
 
     // Get total count (only local packages, exclude cached, match name only)
@@ -435,7 +504,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<AuthToken?> getTokenByHash(String tokenHash) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT token_hash, label, scopes, created_at, last_used_at
+        SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
         FROM auth_tokens WHERE token_hash = @hash
       '''),
       parameters: {'hash': tokenHash},
@@ -444,17 +513,13 @@ class PostgresMetadataStore extends MetadataStore {
     if (result.isEmpty) return null;
 
     final row = result.first;
-    final scopes = row[2];
-    final scopesList = scopes is List
-        ? scopes.cast<String>()
-        : (scopes as List<dynamic>).cast<String>();
-
     return AuthToken(
       tokenHash: row[0] as String,
-      label: row[1] as String,
-      scopes: scopesList,
+      userId: row[1] as String? ?? User.anonymousId,
+      label: row[2] as String,
       createdAt: row[3] as DateTime,
       lastUsedAt: row[4] as DateTime?,
+      expiresAt: row[5] as DateTime?,
     );
   }
 
@@ -471,40 +536,55 @@ class PostgresMetadataStore extends MetadataStore {
 
   @override
   Future<String> createToken({
+    required String userId,
     required String label,
-    required List<String> scopes,
+    DateTime? expiresAt,
   }) async {
     final token = MetadataStore._uuid.v4() + MetadataStore._uuid.v4();
     final tokenHash = sha256.convert(utf8.encode(token)).toString();
 
     await _conn.execute(
       Sql.named('''
-        INSERT INTO auth_tokens (token_hash, label, scopes)
-        VALUES (@hash, @label, @scopes)
+        INSERT INTO auth_tokens (token_hash, user_id, label, expires_at)
+        VALUES (@hash, @userId, @label, @expiresAt)
       '''),
-      parameters: {'hash': tokenHash, 'label': label, 'scopes': scopes},
+      parameters: {
+        'hash': tokenHash,
+        'userId': userId,
+        'label': label,
+        'expiresAt': expiresAt,
+      },
     );
 
     return token;
   }
 
   @override
-  Future<List<Map<String, dynamic>>> listTokens() async {
-    final result = await _conn.execute('''
-      SELECT label, scopes, created_at, last_used_at
-      FROM auth_tokens ORDER BY created_at DESC
-    ''');
+  Future<List<AuthToken>> listTokens({String? userId}) async {
+    final sql = userId != null
+        ? '''
+          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          FROM auth_tokens WHERE user_id = @userId ORDER BY created_at DESC
+        '''
+        : '''
+          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          FROM auth_tokens ORDER BY created_at DESC
+        ''';
+
+    final result = await _conn.execute(
+      Sql.named(sql),
+      parameters: userId != null ? {'userId': userId} : {},
+    );
 
     return result.map((row) {
-      final scopes = row[1];
-      return {
-        'label': row[0] as String,
-        'scopes': scopes is List
-            ? scopes.cast<String>()
-            : (scopes as List<dynamic>).cast<String>(),
-        'created_at': (row[2] as DateTime).toIso8601String(),
-        'last_used_at': (row[3] as DateTime?)?.toIso8601String(),
-      };
+      return AuthToken(
+        tokenHash: row[0] as String,
+        userId: row[1] as String? ?? User.anonymousId,
+        label: row[2] as String,
+        createdAt: row[3] as DateTime,
+        lastUsedAt: row[4] as DateTime?,
+        expiresAt: row[5] as DateTime?,
+      );
     }).toList();
   }
 
@@ -587,7 +667,8 @@ class PostgresMetadataStore extends MetadataStore {
   }) async {
     // Get total count
     final countResult = await _conn.execute(
-      Sql.named('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = @cache'),
+      Sql.named(
+          'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = @cache'),
       parameters: {'cache': isUpstreamCache},
     );
     final total = countResult.first[0] as int;
@@ -625,7 +706,8 @@ class PostgresMetadataStore extends MetadataStore {
   Future<int> deletePackage(String name) async {
     // Get version count first
     final countResult = await _conn.execute(
-      Sql.named('SELECT COUNT(*) FROM package_versions WHERE package_name = @name'),
+      Sql.named(
+          'SELECT COUNT(*) FROM package_versions WHERE package_name = @name'),
       parameters: {'name': name},
     );
     final versionCount = countResult.first[0] as int;
@@ -651,7 +733,8 @@ class PostgresMetadataStore extends MetadataStore {
 
     // Check if package has no versions left
     final remaining = await _conn.execute(
-      Sql.named('SELECT COUNT(*) FROM package_versions WHERE package_name = @name'),
+      Sql.named(
+          'SELECT COUNT(*) FROM package_versions WHERE package_name = @name'),
       parameters: {'name': name},
     );
     if ((remaining.first[0] as int) == 0) {
@@ -697,8 +780,10 @@ class PostgresMetadataStore extends MetadataStore {
   Future<AdminStats> getAdminStats() async {
     final results = await Future.wait([
       _conn.execute('SELECT COUNT(*) FROM packages'),
-      _conn.execute('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = FALSE'),
-      _conn.execute('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = TRUE'),
+      _conn.execute(
+          'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = FALSE'),
+      _conn.execute(
+          'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = TRUE'),
       _conn.execute('SELECT COUNT(*) FROM package_versions'),
     ]);
 
@@ -713,7 +798,8 @@ class PostgresMetadataStore extends MetadataStore {
   @override
   Future<List<String>> getPackageArchiveKeys(String name) async {
     final result = await _conn.execute(
-      Sql.named('SELECT archive_key FROM package_versions WHERE package_name = @name'),
+      Sql.named(
+          'SELECT archive_key FROM package_versions WHERE package_name = @name'),
       parameters: {'name': name},
     );
     return result.map((row) => row[0] as String).toList();
@@ -730,6 +816,278 @@ class PostgresMetadataStore extends MetadataStore {
     );
     if (result.isEmpty) return null;
     return result.first[0] as String;
+  }
+
+  // ============ Users ============
+
+  @override
+  Future<String> createUser({
+    required String email,
+    String? passwordHash,
+    String? name,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO users (id, email, password_hash, name)
+        VALUES (@id, @email, @passwordHash, @name)
+      '''),
+      parameters: {
+        'id': id,
+        'email': email,
+        'passwordHash': passwordHash,
+        'name': name,
+      },
+    );
+    return id;
+  }
+
+  @override
+  Future<User?> getUser(String id) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, email, password_hash, name, is_active, created_at, last_login_at
+        FROM users WHERE id = @id
+      '''),
+      parameters: {'id': id},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return User(
+      id: row[0] as String,
+      email: row[1] as String,
+      passwordHash: row[2] as String?,
+      name: row[3] as String?,
+      isActive: row[4] as bool,
+      createdAt: row[5] as DateTime,
+      lastLoginAt: row[6] as DateTime?,
+    );
+  }
+
+  @override
+  Future<User?> getUserByEmail(String email) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, email, password_hash, name, is_active, created_at, last_login_at
+        FROM users WHERE email = @email
+      '''),
+      parameters: {'email': email},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return User(
+      id: row[0] as String,
+      email: row[1] as String,
+      passwordHash: row[2] as String?,
+      name: row[3] as String?,
+      isActive: row[4] as bool,
+      createdAt: row[5] as DateTime,
+      lastLoginAt: row[6] as DateTime?,
+    );
+  }
+
+  @override
+  Future<bool> updateUser(String id,
+      {String? name, String? passwordHash, bool? isActive}) async {
+    final updates = <String>[];
+    final params = <String, Object?>{'id': id};
+    if (name != null) {
+      updates.add('name = @name');
+      params['name'] = name;
+    }
+    if (passwordHash != null) {
+      updates.add('password_hash = @passwordHash');
+      params['passwordHash'] = passwordHash;
+    }
+    if (isActive != null) {
+      updates.add('is_active = @isActive');
+      params['isActive'] = isActive;
+    }
+    if (updates.isEmpty) return false;
+
+    final result = await _conn.execute(
+      Sql.named('UPDATE users SET ${updates.join(', ')} WHERE id = @id'),
+      parameters: params,
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<void> touchUserLogin(String id) async {
+    await _conn.execute(
+      Sql.named('UPDATE users SET last_login_at = NOW() WHERE id = @id'),
+      parameters: {'id': id},
+    );
+  }
+
+  @override
+  Future<bool> deleteUser(String id) async {
+    // Transfer packages to anonymous before deleting
+    await _conn.execute(
+      Sql.named('UPDATE packages SET owner_id = @anon WHERE owner_id = @id'),
+      parameters: {'id': id, 'anon': User.anonymousId},
+    );
+    // Transfer tokens to anonymous
+    await _conn.execute(
+      Sql.named('UPDATE auth_tokens SET user_id = @anon WHERE user_id = @id'),
+      parameters: {'id': id, 'anon': User.anonymousId},
+    );
+    // Delete user sessions
+    await _conn.execute(
+      Sql.named('DELETE FROM user_sessions WHERE user_id = @id'),
+      parameters: {'id': id},
+    );
+    // Delete user
+    final result = await _conn.execute(
+      Sql.named('DELETE FROM users WHERE id = @id'),
+      parameters: {'id': id},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<List<User>> listUsers({int page = 1, int limit = 20}) async {
+    final offset = (page - 1) * limit;
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, email, password_hash, name, is_active, created_at, last_login_at
+        FROM users ORDER BY created_at DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'limit': limit, 'offset': offset},
+    );
+    return result
+        .map((row) => User(
+              id: row[0] as String,
+              email: row[1] as String,
+              passwordHash: row[2] as String?,
+              name: row[3] as String?,
+              isActive: row[4] as bool,
+              createdAt: row[5] as DateTime,
+              lastLoginAt: row[6] as DateTime?,
+            ))
+        .toList();
+  }
+
+  // ============ Site Config ============
+
+  @override
+  Future<SiteConfig?> getConfig(String name) async {
+    final result = await _conn.execute(
+      Sql.named(
+          'SELECT name, value_type, value, description FROM site_config WHERE name = @name'),
+      parameters: {'name': name},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return SiteConfig(
+      name: row[0] as String,
+      valueType: ConfigValueType.values.firstWhere(
+        (t) => t.name == row[1],
+        orElse: () => ConfigValueType.string,
+      ),
+      value: row[2] as String,
+      description: row[3] as String?,
+    );
+  }
+
+  @override
+  Future<void> setConfig(String name, String value) async {
+    await _conn.execute(
+      Sql.named('''
+        UPDATE site_config SET value = @value WHERE name = @name
+      '''),
+      parameters: {'name': name, 'value': value},
+    );
+  }
+
+  @override
+  Future<List<SiteConfig>> getAllConfig() async {
+    final result = await _conn.execute(
+      'SELECT name, value_type, value, description FROM site_config ORDER BY name',
+    );
+    return result
+        .map((row) => SiteConfig(
+              name: row[0] as String,
+              valueType: ConfigValueType.values.firstWhere(
+                (t) => t.name == row[1],
+                orElse: () => ConfigValueType.string,
+              ),
+              value: row[2] as String,
+              description: row[3] as String?,
+            ))
+        .toList();
+  }
+
+  // ============ User Sessions ============
+
+  @override
+  Future<UserSession> createUserSession({
+    required String userId,
+    Duration ttl = const Duration(hours: 24),
+  }) async {
+    final sessionId = sha256
+        .convert(
+            utf8.encode(MetadataStore._uuid.v4() + MetadataStore._uuid.v4()))
+        .toString();
+    final now = DateTime.now();
+    final expiresAt = now.add(ttl);
+
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO user_sessions (session_id, user_id, created_at, expires_at)
+        VALUES (@sessionId, @userId, @createdAt, @expiresAt)
+      '''),
+      parameters: {
+        'sessionId': sessionId,
+        'userId': userId,
+        'createdAt': now,
+        'expiresAt': expiresAt,
+      },
+    );
+
+    return UserSession(
+      sessionId: sessionId,
+      userId: userId,
+      createdAt: now,
+      expiresAt: expiresAt,
+    );
+  }
+
+  @override
+  Future<UserSession?> getUserSession(String sessionId) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT session_id, user_id, created_at, expires_at
+        FROM user_sessions WHERE session_id = @sessionId
+      '''),
+      parameters: {'sessionId': sessionId},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return UserSession(
+      sessionId: row[0] as String,
+      userId: row[1] as String,
+      createdAt: row[2] as DateTime,
+      expiresAt: row[3] as DateTime,
+    );
+  }
+
+  @override
+  Future<bool> deleteUserSession(String sessionId) async {
+    final result = await _conn.execute(
+      Sql.named('DELETE FROM user_sessions WHERE session_id = @sessionId'),
+      parameters: {'sessionId': sessionId},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<int> cleanupExpiredUserSessions() async {
+    final result = await _conn.execute(
+      'DELETE FROM user_sessions WHERE expires_at < NOW()',
+    );
+    return result.affectedRows;
   }
 }
 
@@ -804,7 +1162,7 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<Package?> getPackage(String name) async {
     final result = _db.select('''
-      SELECT name, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
+      SELECT name, owner_id, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
       FROM packages WHERE name = ?
     ''', [name]);
 
@@ -813,6 +1171,7 @@ class SqliteMetadataStore extends MetadataStore {
     final row = result.first;
     return Package(
       name: row['name'] as String,
+      ownerId: row['owner_id'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String),
       updatedAt: DateTime.parse(row['updated_at'] as String),
       isDiscontinued: (row['is_discontinued'] as int) == 1,
@@ -889,16 +1248,17 @@ class SqliteMetadataStore extends MetadataStore {
     required String archiveKey,
     required String archiveSha256,
     bool isUpstreamCache = false,
+    String? ownerId,
   }) async {
     final now = DateTime.now().toIso8601String();
 
     _db.execute('BEGIN TRANSACTION');
     try {
       _db.execute('''
-        INSERT INTO packages (name, created_at, updated_at, is_upstream_cache)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO packages (name, owner_id, created_at, updated_at, is_upstream_cache)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT (name) DO UPDATE SET updated_at = ?
-      ''', [packageName, now, now, isUpstreamCache ? 1 : 0, now]);
+      ''', [packageName, ownerId, now, now, isUpstreamCache ? 1 : 0, now]);
 
       _db.execute('''
         INSERT INTO package_versions
@@ -933,7 +1293,8 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<PackageListResult> listPackages({int page = 1, int limit = 20}) async {
     // Get total count (only local packages, exclude cached)
-    final countResult = _db.select('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 0');
+    final countResult =
+        _db.select('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 0');
     final total = countResult.first.values.first as int;
 
     // Get packages for this page (only local packages)
@@ -963,7 +1324,8 @@ class SqliteMetadataStore extends MetadataStore {
   }
 
   @override
-  Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20}) async {
+  Future<PackageListResult> searchPackages(String query,
+      {int page = 1, int limit = 20}) async {
     final searchTerm = '%${query.toLowerCase()}%';
 
     // Get total count (only local packages, exclude cached, match name only)
@@ -1004,23 +1366,23 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<AuthToken?> getTokenByHash(String tokenHash) async {
     final result = _db.select('''
-      SELECT token_hash, label, scopes, created_at, last_used_at
+      SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
       FROM auth_tokens WHERE token_hash = ?
     ''', [tokenHash]);
 
     if (result.isEmpty) return null;
 
     final row = result.first;
-    final scopesJson = row['scopes'] as String;
-    final scopes = (jsonDecode(scopesJson) as List).cast<String>();
-
     return AuthToken(
       tokenHash: row['token_hash'] as String,
+      userId: row['user_id'] as String? ?? User.anonymousId,
       label: row['label'] as String,
-      scopes: scopes,
       createdAt: DateTime.parse(row['created_at'] as String),
       lastUsedAt: row['last_used_at'] != null
           ? DateTime.parse(row['last_used_at'] as String)
+          : null,
+      expiresAt: row['expires_at'] != null
+          ? DateTime.parse(row['expires_at'] as String)
           : null,
     );
   }
@@ -1036,36 +1398,49 @@ class SqliteMetadataStore extends MetadataStore {
 
   @override
   Future<String> createToken({
+    required String userId,
     required String label,
-    required List<String> scopes,
+    DateTime? expiresAt,
   }) async {
     final token = MetadataStore._uuid.v4() + MetadataStore._uuid.v4();
     final tokenHash = sha256.convert(utf8.encode(token)).toString();
     final now = DateTime.now().toIso8601String();
 
     _db.execute('''
-      INSERT INTO auth_tokens (token_hash, label, scopes, created_at)
-      VALUES (?, ?, ?, ?)
-    ''', [tokenHash, label, jsonEncode(scopes), now]);
+      INSERT INTO auth_tokens (token_hash, user_id, label, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    ''', [tokenHash, userId, label, now, expiresAt?.toIso8601String()]);
 
     return token;
   }
 
   @override
-  Future<List<Map<String, dynamic>>> listTokens() async {
-    final result = _db.select('''
-      SELECT label, scopes, created_at, last_used_at
-      FROM auth_tokens ORDER BY created_at DESC
-    ''');
+  Future<List<AuthToken>> listTokens({String? userId}) async {
+    final sql = userId != null
+        ? '''
+          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          FROM auth_tokens WHERE user_id = ? ORDER BY created_at DESC
+        '''
+        : '''
+          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          FROM auth_tokens ORDER BY created_at DESC
+        ''';
+
+    final result = _db.select(sql, userId != null ? [userId] : []);
 
     return result.map((row) {
-      final scopesJson = row['scopes'] as String;
-      return {
-        'label': row['label'] as String,
-        'scopes': (jsonDecode(scopesJson) as List).cast<String>(),
-        'created_at': row['created_at'] as String,
-        'last_used_at': row['last_used_at'] as String?,
-      };
+      return AuthToken(
+        tokenHash: row['token_hash'] as String,
+        userId: row['user_id'] as String? ?? User.anonymousId,
+        label: row['label'] as String,
+        createdAt: DateTime.parse(row['created_at'] as String),
+        lastUsedAt: row['last_used_at'] != null
+            ? DateTime.parse(row['last_used_at'] as String)
+            : null,
+        expiresAt: row['expires_at'] != null
+            ? DateTime.parse(row['expires_at'] as String)
+            : null,
+      );
     }).toList();
   }
 
@@ -1259,6 +1634,241 @@ class SqliteMetadataStore extends MetadataStore {
     if (result.isEmpty) return null;
     return result.first['archive_key'] as String;
   }
+
+  // ============ Users ============
+
+  @override
+  Future<String> createUser({
+    required String email,
+    String? passwordHash,
+    String? name,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    final now = DateTime.now().toIso8601String();
+    _db.execute('''
+      INSERT INTO users (id, email, password_hash, name, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    ''', [id, email, passwordHash, name, now]);
+    return id;
+  }
+
+  @override
+  Future<User?> getUser(String id) async {
+    final result = _db.select('''
+      SELECT id, email, password_hash, name, is_active, created_at, last_login_at
+      FROM users WHERE id = ?
+    ''', [id]);
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return User(
+      id: row['id'] as String,
+      email: row['email'] as String,
+      passwordHash: row['password_hash'] as String?,
+      name: row['name'] as String?,
+      isActive: (row['is_active'] as int) == 1,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      lastLoginAt: row['last_login_at'] != null
+          ? DateTime.parse(row['last_login_at'] as String)
+          : null,
+    );
+  }
+
+  @override
+  Future<User?> getUserByEmail(String email) async {
+    final result = _db.select('''
+      SELECT id, email, password_hash, name, is_active, created_at, last_login_at
+      FROM users WHERE email = ?
+    ''', [email]);
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return User(
+      id: row['id'] as String,
+      email: row['email'] as String,
+      passwordHash: row['password_hash'] as String?,
+      name: row['name'] as String?,
+      isActive: (row['is_active'] as int) == 1,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      lastLoginAt: row['last_login_at'] != null
+          ? DateTime.parse(row['last_login_at'] as String)
+          : null,
+    );
+  }
+
+  @override
+  Future<bool> updateUser(String id,
+      {String? name, String? passwordHash, bool? isActive}) async {
+    final updates = <String>[];
+    final params = <Object?>[];
+    if (name != null) {
+      updates.add('name = ?');
+      params.add(name);
+    }
+    if (passwordHash != null) {
+      updates.add('password_hash = ?');
+      params.add(passwordHash);
+    }
+    if (isActive != null) {
+      updates.add('is_active = ?');
+      params.add(isActive ? 1 : 0);
+    }
+    if (updates.isEmpty) return false;
+
+    params.add(id);
+    _db.execute('UPDATE users SET ${updates.join(', ')} WHERE id = ?', params);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<void> touchUserLogin(String id) async {
+    final now = DateTime.now().toIso8601String();
+    _db.execute('UPDATE users SET last_login_at = ? WHERE id = ?', [now, id]);
+  }
+
+  @override
+  Future<bool> deleteUser(String id) async {
+    // Transfer packages to anonymous before deleting
+    _db.execute('UPDATE packages SET owner_id = ? WHERE owner_id = ?',
+        [User.anonymousId, id]);
+    // Transfer tokens to anonymous
+    _db.execute('UPDATE auth_tokens SET user_id = ? WHERE user_id = ?',
+        [User.anonymousId, id]);
+    // Delete user sessions
+    _db.execute('DELETE FROM user_sessions WHERE user_id = ?', [id]);
+    // Delete user
+    _db.execute('DELETE FROM users WHERE id = ?', [id]);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<List<User>> listUsers({int page = 1, int limit = 20}) async {
+    final offset = (page - 1) * limit;
+    final result = _db.select('''
+      SELECT id, email, password_hash, name, is_active, created_at, last_login_at
+      FROM users ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    ''', [limit, offset]);
+    return result
+        .map((row) => User(
+              id: row['id'] as String,
+              email: row['email'] as String,
+              passwordHash: row['password_hash'] as String?,
+              name: row['name'] as String?,
+              isActive: (row['is_active'] as int) == 1,
+              createdAt: DateTime.parse(row['created_at'] as String),
+              lastLoginAt: row['last_login_at'] != null
+                  ? DateTime.parse(row['last_login_at'] as String)
+                  : null,
+            ))
+        .toList();
+  }
+
+  // ============ Site Config ============
+
+  @override
+  Future<SiteConfig?> getConfig(String name) async {
+    final result = _db.select(
+      'SELECT name, value_type, value, description FROM site_config WHERE name = ?',
+      [name],
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return SiteConfig(
+      name: row['name'] as String,
+      valueType: ConfigValueType.values.firstWhere(
+        (t) => t.name == row['value_type'],
+        orElse: () => ConfigValueType.string,
+      ),
+      value: row['value'] as String,
+      description: row['description'] as String?,
+    );
+  }
+
+  @override
+  Future<void> setConfig(String name, String value) async {
+    _db.execute(
+      'UPDATE site_config SET value = ? WHERE name = ?',
+      [value, name],
+    );
+  }
+
+  @override
+  Future<List<SiteConfig>> getAllConfig() async {
+    final result = _db.select(
+      'SELECT name, value_type, value, description FROM site_config ORDER BY name',
+    );
+    return result
+        .map((row) => SiteConfig(
+              name: row['name'] as String,
+              valueType: ConfigValueType.values.firstWhere(
+                (t) => t.name == row['value_type'],
+                orElse: () => ConfigValueType.string,
+              ),
+              value: row['value'] as String,
+              description: row['description'] as String?,
+            ))
+        .toList();
+  }
+
+  // ============ User Sessions ============
+
+  @override
+  Future<UserSession> createUserSession({
+    required String userId,
+    Duration ttl = const Duration(hours: 24),
+  }) async {
+    final sessionId = sha256
+        .convert(
+            utf8.encode(MetadataStore._uuid.v4() + MetadataStore._uuid.v4()))
+        .toString();
+    final now = DateTime.now();
+    final expiresAt = now.add(ttl);
+
+    _db.execute('''
+      INSERT INTO user_sessions (session_id, user_id, created_at, expires_at)
+      VALUES (?, ?, ?, ?)
+    ''', [
+      sessionId,
+      userId,
+      now.toIso8601String(),
+      expiresAt.toIso8601String()
+    ]);
+
+    return UserSession(
+      sessionId: sessionId,
+      userId: userId,
+      createdAt: now,
+      expiresAt: expiresAt,
+    );
+  }
+
+  @override
+  Future<UserSession?> getUserSession(String sessionId) async {
+    final result = _db.select('''
+      SELECT session_id, user_id, created_at, expires_at
+      FROM user_sessions WHERE session_id = ?
+    ''', [sessionId]);
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return UserSession(
+      sessionId: row['session_id'] as String,
+      userId: row['user_id'] as String,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      expiresAt: DateTime.parse(row['expires_at'] as String),
+    );
+  }
+
+  @override
+  Future<bool> deleteUserSession(String sessionId) async {
+    _db.execute('DELETE FROM user_sessions WHERE session_id = ?', [sessionId]);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<int> cleanupExpiredUserSessions() async {
+    final now = DateTime.now().toIso8601String();
+    _db.execute('DELETE FROM user_sessions WHERE expires_at < ?', [now]);
+    return _db.updatedRows;
+  }
 }
 
 // PostgreSQL migrations
@@ -1308,6 +1918,63 @@ const _postgresMigrations = <String, String>{
     ALTER TABLE packages ADD COLUMN is_upstream_cache BOOLEAN NOT NULL DEFAULT FALSE;
     CREATE INDEX IF NOT EXISTS idx_packages_upstream_cache ON packages(is_upstream_cache);
   ''',
+  '003_add_users_and_ownership': '''
+    -- User accounts table
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NULL,
+      name VARCHAR(255),
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_login_at TIMESTAMPTZ NULL
+    );
+
+    -- Insert anonymous user
+    INSERT INTO users (id, email, name, is_active, created_at) VALUES
+      ('00000000-0000-0000-0000-000000000000', 'anonymous@localhost', 'Anonymous', TRUE, NOW())
+      ON CONFLICT (id) DO NOTHING;
+
+    -- Site configuration table
+    CREATE TABLE IF NOT EXISTS site_config (
+      name VARCHAR(255) PRIMARY KEY,
+      value_type VARCHAR(50) NOT NULL,
+      value TEXT NOT NULL,
+      description TEXT
+    );
+
+    -- Insert default config values
+    INSERT INTO site_config (name, value_type, value, description) VALUES
+      ('allow_registration', 'boolean', 'true', 'Allow new user registration'),
+      ('require_email_verification', 'boolean', 'false', 'Require email verification for new users'),
+      ('allow_anonymous_publish', 'boolean', 'true', 'Allow publishing packages without authentication'),
+      ('session_ttl_hours', 'number', '24', 'Web session duration in hours'),
+      ('token_max_ttl_days', 'number', '0', 'Maximum token lifetime in days (0 = unlimited)')
+      ON CONFLICT (name) DO NOTHING;
+
+    -- User sessions table
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      session_id VARCHAR(64) PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
+
+    -- Add owner_id to packages
+    ALTER TABLE packages ADD COLUMN owner_id UUID REFERENCES users(id);
+    UPDATE packages SET owner_id = '00000000-0000-0000-0000-000000000000' WHERE owner_id IS NULL;
+
+    -- Add user_id and expires_at to auth_tokens
+    ALTER TABLE auth_tokens ADD COLUMN user_id UUID REFERENCES users(id);
+    ALTER TABLE auth_tokens ADD COLUMN expires_at TIMESTAMPTZ NULL;
+    UPDATE auth_tokens SET user_id = '00000000-0000-0000-0000-000000000000' WHERE user_id IS NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_packages_owner ON packages(owner_id);
+  ''',
 };
 
 // SQLite migrations
@@ -1356,6 +2023,63 @@ const _sqliteMigrations = <String, String>{
   '002_add_upstream_cache': '''
     ALTER TABLE packages ADD COLUMN is_upstream_cache INTEGER NOT NULL DEFAULT 0;
     CREATE INDEX IF NOT EXISTS idx_packages_upstream_cache ON packages(is_upstream_cache);
+  ''',
+  '003_add_users_and_ownership': '''
+    -- User accounts table
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NULL,
+      name TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at TEXT NULL
+    );
+
+    -- Insert anonymous user
+    INSERT OR IGNORE INTO users (id, email, name, is_active, created_at) VALUES
+      ('00000000-0000-0000-0000-000000000000', 'anonymous@localhost', 'Anonymous', 1, datetime('now'));
+
+    -- Site configuration table
+    CREATE TABLE IF NOT EXISTS site_config (
+      name TEXT PRIMARY KEY,
+      value_type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      description TEXT
+    );
+
+    -- Insert default config values
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('allow_registration', 'boolean', 'true', 'Allow new user registration');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('require_email_verification', 'boolean', 'false', 'Require email verification for new users');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('allow_anonymous_publish', 'boolean', 'true', 'Allow publishing packages without authentication');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('session_ttl_hours', 'number', '24', 'Web session duration in hours');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('token_max_ttl_days', 'number', '0', 'Maximum token lifetime in days (0 = unlimited)');
+
+    -- User sessions table
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      session_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
+
+    -- Add owner_id to packages
+    ALTER TABLE packages ADD COLUMN owner_id TEXT REFERENCES users(id);
+
+    -- Add user_id and expires_at to auth_tokens
+    ALTER TABLE auth_tokens ADD COLUMN user_id TEXT REFERENCES users(id);
+    ALTER TABLE auth_tokens ADD COLUMN expires_at TEXT NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_packages_owner ON packages(owner_id);
   ''',
 };
 

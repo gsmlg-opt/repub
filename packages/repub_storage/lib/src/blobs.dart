@@ -186,7 +186,9 @@ class FileBlobStore implements BlobStore {
     required String baseUrl,
     bool isCache = false,
   })  : _basePath = basePath,
-        _baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
+        _baseUrl = baseUrl.endsWith('/')
+            ? baseUrl.substring(0, baseUrl.length - 1)
+            : baseUrl,
         _isCache = isCache;
 
   @override
