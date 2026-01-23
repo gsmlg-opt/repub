@@ -321,7 +321,11 @@ dart pub global activate melos
 # Bootstrap workspace
 melos bootstrap
 
-# Run locally with SQLite + local storage (zero external dependencies!)
+# Start unified dev server on port 8080 (API + Web UI with hot reload)
+# This is the recommended way for development
+melos run dev
+
+# Or run API server only with SQLite + local storage
 export REPUB_DATABASE_URL="sqlite:./data/repub.db"
 export REPUB_STORAGE_PATH="./data/packages"
 dart run -C packages/repub_server repub_server
@@ -339,6 +343,15 @@ export REPUB_S3_SECRET_KEY="minioadmin"
 export REPUB_S3_BUCKET="repub"
 dart run -C packages/repub_server repub_server
 ```
+
+### Development Server
+
+The `melos run dev` command starts a unified development server on **port 8080** that includes:
+- **API server** - All API endpoints at `/api/*`, `/packages/*`, `/health`
+- **Web UI** - Admin panel and package browser with hot reload
+- **Single URL** - Access everything at `http://localhost:8080`
+
+The dev server internally proxies web UI requests to webdev (running on 8081) to provide instant hot reload when you modify frontend code.
 
 ## Package Dependencies
 

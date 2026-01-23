@@ -8,13 +8,7 @@ CRITICAL CONSTRAINTS (read these before every task):
 - Do not add any auth to the admin page, there is external auth module to manage this.
 - The client auth token are not mandatory, we are a self-hosted project, that only use by the package owner themself.
 - Do not add SSL support because this project will live after a reverse proxy server.
-
-# Project Constitution
-
-CRITICAL CONSTRAINTS (read these before every task):
-- Do not add any auth to the admin page, there is external auth module to manage this.
-- The client auth token are not mandatory, we are a self-hosted project, that only use by the package owner themself.
-- Do not add SSL support because this project will live after a reverse proxy server.
+- Do not change default listen address in development mode.
 
 ## Build & Development Commands
 
@@ -22,7 +16,8 @@ CRITICAL CONSTRAINTS (read these before every task):
 # Bootstrap workspace (run first)
 melos bootstrap
 
-# Development - single command starts API (8080) + web UI (8081) with hot reload
+# Development - unified server on port 8080 with hot reload
+# Access everything at http://localhost:8080 (API + web UI)
 melos run dev
 
 # Run API server only (SQLite + local storage, no external deps)
@@ -80,12 +75,21 @@ repub_auth ← repub_storage
 
 ### Key Entry Points
 
-- `packages/repub_server/bin/repub_server.dart` - Main server
+- `packages/repub_server/bin/repub_server.dart` - Production server
+- `packages/repub_server/bin/repub_dev_server.dart` - Development server (unified port)
 - `packages/repub_cli/bin/repub_cli.dart` - Admin CLI
 - `packages/repub_server/lib/src/handlers.dart` - API route handlers
 - `packages/repub_storage/lib/src/metadata.dart` - Database operations
 - `packages/repub_storage/lib/src/blobs.dart` - Blob storage operations
 - `packages/repub_web/lib/app.dart` - Web UI routes
+
+### Development Server
+
+The dev server (`repub_dev_server.dart`) provides a unified development experience on port 8080:
+- **API routes** (`/api/*`, `/packages/*`, `/health`) - Handled directly by the server
+- **Web UI** (all other routes) - Proxied to webdev on port 8081 for hot reload
+- Users only access `http://localhost:8080` for everything
+- Web changes reload instantly via webdev's hot reload mechanism
 
 ### Token Scopes
 

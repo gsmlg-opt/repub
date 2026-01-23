@@ -23,8 +23,9 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Repub Development Environment${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo -e "${YELLOW}API Server:${NC}  http://localhost:8080"
-echo -e "${YELLOW}Web UI:${NC}      http://localhost:8081"
+echo -e "${YELLOW}Unified Dev Server:${NC}  http://localhost:8080"
+echo -e "${YELLOW}  - API endpoints at /api/*${NC}"
+echo -e "${YELLOW}  - Web UI with hot reload${NC}"
 echo ""
 
 # Cleanup function
@@ -37,25 +38,29 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start API server in background
-echo -e "${BLUE}[API]${NC} Starting server..."
-REPUB_STORAGE_PATH=./data/packages \
-REPUB_DATABASE_URL=sqlite:./data/metadata/repub.db \
-dart run packages/repub_server/bin/repub_server.dart 2>&1 | sed "s/^/$(printf "${BLUE}[API]${NC} ")/" &
-SERVER_PID=$!
+# Start webdev server on 8081 (for hot reload) - run silently in background
+echo -e "${GREEN}[WEB]${NC} Starting webdev server for hot reload on port 8081..."
+cd packages/repub_web
+dart run webdev serve web:8081 --auto=refresh > /dev/null 2>&1 &
+WEB_PID=$!
+cd "$PROJECT_ROOT"
 
-# Wait for server to be ready
+# Wait for webdev to be ready
 sleep 3
 
-# Start web dev server using webdev
-echo -e "${GREEN}[WEB]${NC} Starting dev server with hot reload..."
-cd packages/repub_web
-dart run webdev serve web:8081 --auto=refresh 2>&1 | sed "s/^/$(printf "${GREEN}[WEB]${NC} ")/" &
-WEB_PID=$!
+# Start unified dev server on 8080 (proxies to webdev + handles API)
+echo -e "${BLUE}[DEV]${NC} Starting unified dev server on port 8080..."
+REPUB_STORAGE_PATH=./data/packages \
+REPUB_DATABASE_URL=sqlite:./data/metadata/repub.db \
+dart run packages/repub_server/bin/repub_dev_server.dart 2>&1 | sed "s/^/$(printf "${BLUE}[DEV]${NC} ")/" &
+SERVER_PID=$!
+
+# Wait a moment for the server to start
+sleep 2
 
 echo ""
-echo -e "${GREEN}Development environment ready!${NC}"
-echo -e "Open ${YELLOW}http://localhost:8081${NC} in your browser"
+echo -e "${GREEN}✓ Development environment ready!${NC}"
+echo -e "Open ${YELLOW}http://localhost:8080${NC} in your browser"
 echo -e "Press ${RED}Ctrl+C${NC} to stop all services"
 echo ""
 

@@ -61,7 +61,7 @@ melos:
         scope: repub_server
 
     dev:
-      description: Start API server and web UI with hot reload (single command)
+      description: Start unified dev server on port 8080 (API + web UI with hot reload)
       run: bash scripts/dev.sh
 
     build:
