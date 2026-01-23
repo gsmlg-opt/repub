@@ -13,6 +13,10 @@ class Config {
   /// Local file storage path. If set, local storage is used instead of S3.
   final String? storagePath;
 
+  /// Cache storage path for upstream packages.
+  /// If not set, defaults to `storagePath/cache` when using local storage.
+  final String? cachePath;
+
   /// S3 configuration (optional if storagePath is set).
   final String? s3Endpoint;
   final String? s3Region;
@@ -37,6 +41,7 @@ class Config {
     required this.baseUrl,
     required this.databaseUrl,
     this.storagePath,
+    this.cachePath,
     this.s3Endpoint,
     this.s3Region,
     this.s3AccessKey,
@@ -80,6 +85,10 @@ class Config {
       s3SecretKey != null &&
       s3Bucket != null;
 
+  /// Get the effective cache path for storing upstream packages.
+  /// Returns the configured cachePath (defaults to ./data/cache).
+  String get effectiveCachePath => cachePath!;
+
   /// Load configuration from environment variables.
   factory Config.fromEnv() {
     final listenAddrFull = _env('REPUB_LISTEN_ADDR', '0.0.0.0:8080');
@@ -96,6 +105,7 @@ class Config {
         'sqlite:./data/repub.db',
       ),
       storagePath: _envOptional('REPUB_STORAGE_PATH'),
+      cachePath: _env('REPUB_CACHE_PATH', './data/cache'),
       s3Endpoint: _envOptional('REPUB_S3_ENDPOINT'),
       s3Region: _envOptional('REPUB_S3_REGION'),
       s3AccessKey: _envOptional('REPUB_S3_ACCESS_KEY'),

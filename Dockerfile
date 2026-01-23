@@ -53,8 +53,8 @@ COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
 # Copy web UI build output
 COPY --from=build /app/packages/repub_web/build/web /app/web
 
-# Create data directories for SQLite and local storage
-RUN mkdir -p /data/metadata /data/packages
+# Create data directories for SQLite, local storage, and cache
+RUN mkdir -p /data/metadata /data/packages /data/cache
 
 # Create non-root user and set permissions
 RUN useradd -r -s /bin/false repub && \
@@ -68,6 +68,7 @@ USER repub
 # Default environment: SQLite database and local file storage
 ENV REPUB_DATABASE_URL=sqlite:/data/metadata/repub.db
 ENV REPUB_STORAGE_PATH=/data/packages
+ENV REPUB_CACHE_PATH=/data/cache
 
 EXPOSE 8080
 
