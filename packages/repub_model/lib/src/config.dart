@@ -21,6 +21,7 @@ class Config {
   final String? s3Bucket;
 
   final bool requireDownloadAuth;
+  final bool requirePublishAuth;
   final int signedUrlTtlSeconds;
 
   /// Upstream pub server URL for caching proxy mode.
@@ -42,6 +43,7 @@ class Config {
     this.s3SecretKey,
     this.s3Bucket,
     required this.requireDownloadAuth,
+    required this.requirePublishAuth,
     required this.signedUrlTtlSeconds,
     required this.upstreamUrl,
     required this.enableUpstreamProxy,
@@ -100,6 +102,7 @@ class Config {
       s3SecretKey: _envOptional('REPUB_S3_SECRET_KEY'),
       s3Bucket: _envOptional('REPUB_S3_BUCKET'),
       requireDownloadAuth: _envBool('REPUB_REQUIRE_DOWNLOAD_AUTH', false),
+      requirePublishAuth: _envBool('REPUB_REQUIRE_PUBLISH_AUTH', false),
       signedUrlTtlSeconds: _envInt('REPUB_SIGNED_URL_TTL_SECONDS', 3600),
       upstreamUrl: _env('REPUB_UPSTREAM_URL', 'https://pub.dev'),
       enableUpstreamProxy: _envBool('REPUB_ENABLE_UPSTREAM_PROXY', true),

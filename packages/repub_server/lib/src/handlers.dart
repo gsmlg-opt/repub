@@ -29,6 +29,10 @@ Router createRouter({
 
   // Search packages (for web UI)
   router.get('/api/packages/search', handlers.searchPackages);
+  router.get('/api/packages/search/upstream', handlers.searchPackagesUpstream);
+
+  // Upstream package info endpoint
+  router.get('/api/upstream/packages/<name>', handlers.getUpstreamPackage);
 
   // Package info endpoint
   router.get('/api/packages/<name>', handlers.getPackage);
@@ -215,6 +219,134 @@ class ApiHandlers {
     );
   }
 
+  /// GET `/api/packages/search/upstream`
+  /// Search packages from upstream registry (pub.dev)
+  Future<Response> searchPackagesUpstream(Request request) async {
+    if (upstream == null) {
+      return Response(
+        503,
+        body: jsonEncode({
+          'error': {'code': 'upstream_disabled', 'message': 'Upstream proxy is not enabled'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final query = request.url.queryParameters['q'] ?? '';
+    if (query.isEmpty) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {'code': 'missing_query', 'message': 'Search query is required'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    try {
+      final packageNames = await upstream!.searchPackages(query, page: page);
+
+      if (packageNames.isEmpty) {
+        return Response.ok(
+          jsonEncode({
+            'packages': [],
+            'total': 0,
+            'page': page,
+            'limit': limit,
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Fetch full package info for the first 'limit' results
+      final upstreamInfos = <PackageInfo>[];
+      for (final name in packageNames.take(limit.clamp(1, 100))) {
+        final upstreamPkg = await upstream!.getPackage(name);
+        if (upstreamPkg != null) {
+          upstreamInfos.add(PackageInfo(
+            package: Package(
+              name: upstreamPkg.name,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+              isDiscontinued: upstreamPkg.isDiscontinued,
+              replacedBy: upstreamPkg.replacedBy,
+            ),
+            versions: upstreamPkg.versions.map((v) {
+              return PackageVersion(
+                packageName: v.packageName,
+                version: v.version,
+                pubspec: v.pubspec,
+                archiveKey: v.archiveUrl,
+                archiveSha256: v.archiveSha256 ?? '',
+                publishedAt: v.published ?? DateTime.now(),
+              );
+            }).toList(),
+          ));
+        }
+      }
+
+      final upstreamResult = PackageListResult(
+        packages: upstreamInfos,
+        total: packageNames.length,
+        page: page,
+        limit: limit,
+      );
+
+      return Response.ok(
+        jsonEncode(upstreamResult.toJson(config.baseUrl)),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        500,
+        body: jsonEncode({
+          'error': {'code': 'upstream_error', 'message': 'Failed to search upstream: $e'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  /// GET `/api/upstream/packages/<name>`
+  /// Get package info from upstream registry (pub.dev)
+  Future<Response> getUpstreamPackage(Request request, String name) async {
+    if (upstream == null) {
+      return Response(
+        503,
+        body: jsonEncode({
+          'error': {'code': 'upstream_disabled', 'message': 'Upstream proxy is not enabled'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    try {
+      final upstreamPkg = await upstream!.getPackage(name);
+
+      if (upstreamPkg == null) {
+        return Response.notFound(
+          jsonEncode({
+            'error': {'code': 'not_found', 'message': 'Package not found on upstream'},
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      return _buildUpstreamPackageResponse(upstreamPkg);
+    } catch (e) {
+      return Response(
+        500,
+        body: jsonEncode({
+          'error': {'code': 'upstream_error', 'message': 'Failed to fetch upstream package: $e'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
   /// GET `/api/packages/<name>`
   Future<Response> getPackage(Request request, String name) async {
     // Check auth if required for downloads
@@ -341,14 +473,16 @@ class ApiHandlers {
 
   /// GET /api/packages/versions/new
   Future<Response> initiateUpload(Request request) async {
-    // Require authentication
-    final authResult = await authenticate(
-      request,
-      lookupToken: metadata.getTokenByHash,
-      touchToken: metadata.touchToken,
-    );
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
+    // Check auth if required for publishing
+    if (config.requirePublishAuth) {
+      final authResult = await authenticate(
+        request,
+        lookupToken: metadata.getTokenByHash,
+        touchToken: metadata.touchToken,
+      );
+      if (authResult is! AuthSuccess) {
+        return _authErrorResponse(authResult);
+      }
     }
 
     // Create upload session
@@ -368,14 +502,16 @@ class ApiHandlers {
 
   /// POST `/api/packages/versions/upload/<sessionId>`
   Future<Response> uploadPackage(Request request, String sessionId) async {
-    // Require authentication
-    final authResult = await authenticate(
-      request,
-      lookupToken: metadata.getTokenByHash,
-      touchToken: metadata.touchToken,
-    );
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
+    // Check auth if required for publishing
+    if (config.requirePublishAuth) {
+      final authResult = await authenticate(
+        request,
+        lookupToken: metadata.getTokenByHash,
+        touchToken: metadata.touchToken,
+      );
+      if (authResult is! AuthSuccess) {
+        return _authErrorResponse(authResult);
+      }
     }
 
     // Validate session
@@ -441,17 +577,19 @@ class ApiHandlers {
 
   /// GET `/api/packages/versions/finalize/<sessionId>`
   Future<Response> finalizeUpload(Request request, String sessionId) async {
-    // Require authentication
-    final authResult = await authenticate(
-      request,
-      lookupToken: metadata.getTokenByHash,
-      touchToken: metadata.touchToken,
-    );
-    if (authResult is! AuthSuccess) {
-      return _authErrorResponse(authResult);
+    // Check auth if required for publishing
+    AuthToken? token;
+    if (config.requirePublishAuth) {
+      final authResult = await authenticate(
+        request,
+        lookupToken: metadata.getTokenByHash,
+        touchToken: metadata.touchToken,
+      );
+      if (authResult is! AuthSuccess) {
+        return _authErrorResponse(authResult);
+      }
+      token = authResult.token;
     }
-
-    final token = authResult.token;
 
     // Get upload data
     final tarballBytes = _uploadData[sessionId];
@@ -500,8 +638,8 @@ class ApiHandlers {
 
     final success = result as PublishSuccess;
 
-    // Check publish permission
-    if (!token.canPublish(success.packageName)) {
+    // Check publish permission (only if auth is required)
+    if (token != null && !token.canPublish(success.packageName)) {
       _uploadData.remove(sessionId);
       return forbidden(
           'Not authorized to publish package: ${success.packageName}');
