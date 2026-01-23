@@ -1,13 +1,48 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
+import '../services/auth_api_client.dart';
+
 // Layout updated: 2026-01-23
 
 /// Main layout wrapper with header and footer
-class Layout extends StatelessComponent {
+@client
+class Layout extends StatefulComponent {
   final List<Component> children;
 
   const Layout({required this.children, super.key});
+
+  @override
+  State<Layout> createState() => _LayoutState();
+}
+
+class _LayoutState extends State<Layout> {
+  bool _checkingAuth = true;
+  UserData? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final client = AuthApiClient();
+    try {
+      final user = await client.getCurrentUser();
+      setState(() {
+        _user = user;
+        _checkingAuth = false;
+      });
+    } catch (_) {
+      setState(() {
+        _user = null;
+        _checkingAuth = false;
+      });
+    } finally {
+      client.dispose();
+    }
+  }
 
   @override
   Component build(BuildContext context) {
@@ -21,7 +56,7 @@ class Layout extends StatelessComponent {
         // Main content
         main_(
           classes: 'flex-1 container mx-auto px-4 py-8 max-w-6xl',
-          children,
+          component.children,
         ),
         // Footer
         _buildFooter(),
@@ -45,7 +80,8 @@ class Layout extends StatelessComponent {
                   classes: 'flex items-center space-x-3',
                   [
                     div(
-                      classes: 'w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center',
+                      classes:
+                          'w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center',
                       [
                         span(
                           classes: 'text-white font-bold text-xl',
@@ -78,6 +114,26 @@ class Layout extends StatelessComponent {
                       classes: 'text-gray-600 hover:text-gray-900 font-medium',
                       [Component.text('Documentation')],
                     ),
+                    // Auth links
+                    if (_checkingAuth)
+                      span(
+                        classes: 'text-gray-400',
+                        [Component.text('...')],
+                      )
+                    else if (_user != null)
+                      a(
+                        href: '/account',
+                        classes:
+                            'text-blue-600 hover:text-blue-800 font-medium',
+                        [Component.text('Account')],
+                      )
+                    else
+                      a(
+                        href: '/login',
+                        classes:
+                            'text-blue-600 hover:text-blue-800 font-medium',
+                        [Component.text('Sign In')],
+                      ),
                   ],
                 ),
               ],
@@ -96,7 +152,8 @@ class Layout extends StatelessComponent {
           classes: 'container mx-auto px-4 py-6 max-w-6xl',
           [
             div(
-              classes: 'flex items-center justify-between text-sm text-gray-500',
+              classes:
+                  'flex items-center justify-between text-sm text-gray-500',
               [
                 span([Component.text('Repub - Private Dart Package Registry')]),
                 span([Component.text('Powered by Jaspr')]),

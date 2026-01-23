@@ -1,9 +1,13 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr_router/jaspr_router.dart';
 
+import 'pages/account/account_page.dart';
+import 'pages/account/tokens_page.dart';
 import 'pages/admin/admin_cached_packages.dart';
 import 'pages/admin/admin_local_packages.dart';
 import 'pages/admin/admin_page.dart';
+import 'pages/auth/login_page.dart';
+import 'pages/auth/register_page.dart';
 import 'pages/docs_page.dart';
 import 'pages/home_page.dart';
 import 'pages/package_page.dart';
@@ -48,6 +52,28 @@ class App extends StatelessComponent {
           path: '/docs',
           title: 'Documentation - Repub',
           builder: (context, state) => const DocsPage(),
+        ),
+        // Auth routes
+        Route(
+          path: '/login',
+          title: 'Sign In - Repub',
+          builder: (context, state) => const LoginPage(),
+        ),
+        Route(
+          path: '/register',
+          title: 'Register - Repub',
+          builder: (context, state) => const RegisterPage(),
+        ),
+        // Account routes
+        Route(
+          path: '/account',
+          title: 'Account - Repub',
+          builder: (context, state) => const AccountPage(),
+        ),
+        Route(
+          path: '/account/tokens',
+          title: 'API Tokens - Repub',
+          builder: (context, state) => const TokensPage(),
         ),
         // Admin routes
         Route(
