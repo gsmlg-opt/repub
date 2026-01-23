@@ -3,3 +3,5 @@ library;
 
 export 'src/auth.dart';
 export 'src/auth_result.dart';
+export 'src/password.dart';
+export 'src/session.dart';
