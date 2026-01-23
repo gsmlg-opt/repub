@@ -9,6 +9,13 @@ CRITICAL CONSTRAINTS (read these before every task):
 - The client auth token are not mandatory, we are a self-hosted project, that only use by the package owner themself.
 - Do not add SSL support because this project will live after a reverse proxy server.
 
+# Project Constitution
+
+CRITICAL CONSTRAINTS (read these before every task):
+- Do not add any auth to the admin page, there is external auth module to manage this.
+- The client auth token are not mandatory, we are a self-hosted project, that only use by the package owner themself.
+- Do not add SSL support because this project will live after a reverse proxy server.
+
 ## Build & Development Commands
 
 ```bash
