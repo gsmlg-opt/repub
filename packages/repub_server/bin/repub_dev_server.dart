@@ -78,9 +78,12 @@ Future<void> main(List<String> args) async {
     try {
       // API routes - handle directly
       // /api/* - API endpoints
+      // /admin/api/* - Admin API endpoints
       // /packages/<name>/versions/<version>.tar.gz - Package downloads
       // /health - Health check
-      if (path.startsWith('api/') || path == 'health') {
+      if (path.startsWith('api/') ||
+          path.startsWith('admin/api/') ||
+          path == 'health') {
         return await apiRouter(request);
       }
 
@@ -89,8 +92,42 @@ Future<void> main(List<String> args) async {
         return await apiRouter(request);
       }
 
+      // Webdev SSE handler - proxy to webdev for hot reload
+      if (path.startsWith(r'$dwdsSseHandler') ||
+          path.startsWith(r'$requireDigestsPath')) {
+        return await webdevProxy(request);
+      }
+
       // Everything else - proxy to webdev
-      final response = await webdevProxy(request);
+      var response = await webdevProxy(request);
+
+      // Inject script to fix hot reload when accessing from remote IP
+      // This patches EventSource to redirect localhost:8081 to current origin
+      if ((path == '' || path == '/' || path == 'index.html') &&
+          response.statusCode == 200) {
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('text/html')) {
+          final body = await response.readAsString();
+          const patchScript = '''
+<script>
+// Patch EventSource to redirect webdev hot reload to current origin
+(function() {
+  const OriginalEventSource = window.EventSource;
+  window.EventSource = function(url, config) {
+    if (url && url.includes('localhost:8081')) {
+      url = url.replace('http://localhost:8081', location.origin);
+    }
+    return new OriginalEventSource(url, config);
+  };
+  window.EventSource.prototype = OriginalEventSource.prototype;
+})();
+</script>
+''';
+          // Inject before </head>
+          final patched = body.replaceFirst('</head>', '$patchScript</head>');
+          response = response.change(body: patched);
+        }
+      }
 
       // SPA fallback: if webdev returns 404 for a non-asset route,
       // serve index.html instead (for client-side routing)
@@ -106,7 +143,8 @@ Future<void> main(List<String> args) async {
     } catch (e, stack) {
       // Check if it's a connection refused to webdev (expected during startup)
       final errorStr = e.toString();
-      if (errorStr.contains('Connection refused') && errorStr.contains('8081')) {
+      if (errorStr.contains('Connection refused') &&
+          errorStr.contains('8081')) {
         // Webdev not ready yet - return a friendly message without stack trace
         return Response(
           503,
