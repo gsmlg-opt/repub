@@ -3,5 +3,7 @@ library;
 
 export 'src/config.dart';
 export 'src/package.dart';
+export 'src/site_config.dart';
 export 'src/token.dart';
 export 'src/upload_session.dart';
+export 'src/user.dart';
