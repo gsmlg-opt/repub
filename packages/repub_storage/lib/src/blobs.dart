@@ -7,7 +7,7 @@ import 'package:repub_model/repub_model.dart';
 
 /// Abstract blob storage interface.
 abstract class BlobStore {
-  /// Create a blob store from config.
+  /// Create a blob store from config for local packages.
   /// Uses local file storage if REPUB_STORAGE_PATH is set,
   /// otherwise uses S3-compatible storage.
   factory BlobStore.fromConfig(Config config) {
@@ -27,6 +27,18 @@ abstract class BlobStore {
     }
 
     return S3BlobStore.fromConfig(config);
+  }
+
+  /// Create a blob store for cached upstream packages.
+  /// Uses effectiveCachePath for local storage (defaults to ./data/cache),
+  /// or S3 with 'cache/' prefix if S3 is configured and no local path set.
+  factory BlobStore.cacheFromConfig(Config config) {
+    // Always use local file storage for cache (has default ./data/cache)
+    return FileBlobStore(
+      basePath: config.effectiveCachePath,
+      baseUrl: config.baseUrl,
+      isCache: true,
+    );
   }
 
   /// Ensure storage is ready (bucket exists, directory created, etc).
@@ -62,17 +74,20 @@ class S3BlobStore implements BlobStore {
   final Minio _minio;
   final String _bucket;
   final int _signedUrlTtl;
+  final String _keyPrefix;
 
   S3BlobStore._({
     required Minio minio,
     required String bucket,
     required int signedUrlTtl,
+    String keyPrefix = '',
   })  : _minio = minio,
         _bucket = bucket,
-        _signedUrlTtl = signedUrlTtl;
+        _signedUrlTtl = signedUrlTtl,
+        _keyPrefix = keyPrefix;
 
   /// Create a blob store from config.
-  factory S3BlobStore.fromConfig(Config config) {
+  factory S3BlobStore.fromConfig(Config config, {String keyPrefix = ''}) {
     final endpoint = Uri.parse(config.s3Endpoint!);
 
     final minio = Minio(
@@ -90,8 +105,11 @@ class S3BlobStore implements BlobStore {
       minio: minio,
       bucket: config.s3Bucket!,
       signedUrlTtl: config.signedUrlTtlSeconds,
+      keyPrefix: keyPrefix,
     );
   }
+
+  String _prefixedKey(String key) => '$_keyPrefix$key';
 
   @override
   Future<void> ensureReady() async {
@@ -115,7 +133,7 @@ class S3BlobStore implements BlobStore {
   }) async {
     await _minio.putObject(
       _bucket,
-      key,
+      _prefixedKey(key),
       Stream.value(data),
       size: data.length,
       metadata: {'content-type': contentType},
@@ -126,14 +144,14 @@ class S3BlobStore implements BlobStore {
   Future<String> getDownloadUrl(String key) async {
     return await _minio.presignedGetObject(
       _bucket,
-      key,
+      _prefixedKey(key),
       expires: _signedUrlTtl,
     );
   }
 
   @override
   Future<Uint8List> getArchive(String key) async {
-    final stream = await _minio.getObject(_bucket, key);
+    final stream = await _minio.getObject(_bucket, _prefixedKey(key));
     final chunks = <int>[];
     await for (final chunk in stream) {
       chunks.addAll(chunk);
@@ -144,7 +162,7 @@ class S3BlobStore implements BlobStore {
   @override
   Future<bool> exists(String key) async {
     try {
-      await _minio.statObject(_bucket, key);
+      await _minio.statObject(_bucket, _prefixedKey(key));
       return true;
     } catch (_) {
       return false;
@@ -153,7 +171,7 @@ class S3BlobStore implements BlobStore {
 
   @override
   Future<void> delete(String key) async {
-    await _minio.removeObject(_bucket, key);
+    await _minio.removeObject(_bucket, _prefixedKey(key));
   }
 }
 
@@ -161,19 +179,23 @@ class S3BlobStore implements BlobStore {
 class FileBlobStore implements BlobStore {
   final String _basePath;
   final String _baseUrl;
+  final bool _isCache;
 
   FileBlobStore({
     required String basePath,
     required String baseUrl,
+    bool isCache = false,
   })  : _basePath = basePath,
-        _baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+        _baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
+        _isCache = isCache;
 
   @override
   Future<void> ensureReady() async {
     final dir = Directory(_basePath);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
-      print('Created storage directory: $_basePath');
+      final storageType = _isCache ? 'cache' : 'storage';
+      print('Created $storageType directory: $_basePath');
     }
   }
 
