@@ -24,8 +24,8 @@ Router createRouter({
   bool serveStaticFiles = true,
 }) {
   final router = Router();
-  final handlers =
-      ApiHandlers(config: config, metadata: metadata, blobs: blobs, cacheBlobs: cacheBlobs);
+  final handlers = ApiHandlers(
+      config: config, metadata: metadata, blobs: blobs, cacheBlobs: cacheBlobs);
 
   // List all packages (for web UI)
   router.get('/api/packages', handlers.listPackages);
@@ -60,16 +60,31 @@ Router createRouter({
         headers: {'content-type': 'application/json'});
   });
 
-  // Admin endpoints (require admin scope)
-  router.get('/api/admin/stats', handlers.adminGetStats);
-  router.get('/api/admin/packages/local', handlers.adminListLocalPackages);
-  router.get('/api/admin/packages/cached', handlers.adminListCachedPackages);
-  router.delete('/api/admin/packages/<name>', handlers.adminDeletePackage);
-  router.delete('/api/admin/packages/<name>/versions/<version>',
+  // Admin endpoints (external ACL protected)
+  router.get('/admin/api/stats', handlers.adminGetStats);
+  router.get('/admin/api/packages/local', handlers.adminListLocalPackages);
+  router.get('/admin/api/packages/cached', handlers.adminListCachedPackages);
+  router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
+  router.delete('/admin/api/packages/<name>/versions/<version>',
       handlers.adminDeletePackageVersion);
-  router.post('/api/admin/packages/<name>/discontinue',
+  router.post('/admin/api/packages/<name>/discontinue',
       handlers.adminDiscontinuePackage);
-  router.delete('/api/admin/cache', handlers.adminClearCache);
+  router.delete('/admin/api/cache', handlers.adminClearCache);
+  router.get('/admin/api/users', handlers.adminListUsers);
+  router.get('/admin/api/config', handlers.adminGetAllConfig);
+  router.put('/admin/api/config/<name>', handlers.adminSetConfig);
+
+  // Auth endpoints (user authentication)
+  router.post('/api/auth/register', handlers.authRegister);
+  router.post('/api/auth/login', handlers.authLogin);
+  router.post('/api/auth/logout', handlers.authLogout);
+  router.get('/api/auth/me', handlers.authMe);
+  router.put('/api/auth/me', handlers.authUpdateMe);
+
+  // Token management (session-authenticated)
+  router.get('/api/tokens', handlers.listUserTokens);
+  router.post('/api/tokens', handlers.createUserToken);
+  router.delete('/api/tokens/<label>', handlers.deleteUserToken);
 
   // Web UI static files - serve from web build directory (skip in dev mode)
   if (serveStaticFiles) {
@@ -171,7 +186,6 @@ class ApiHandlers {
         request,
         lookupToken: metadata.getTokenByHash,
         touchToken: metadata.touchToken,
-        requiredScope: 'read:all',
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
@@ -179,9 +193,11 @@ class ApiHandlers {
     }
 
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
-    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
-    final result = await metadata.listPackages(page: page, limit: limit.clamp(1, 100));
+    final result =
+        await metadata.listPackages(page: page, limit: limit.clamp(1, 100));
 
     return Response.ok(
       jsonEncode(result.toJson(config.baseUrl)),
@@ -197,7 +213,6 @@ class ApiHandlers {
         request,
         lookupToken: metadata.getTokenByHash,
         touchToken: metadata.touchToken,
-        requiredScope: 'read:all',
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
@@ -209,16 +224,21 @@ class ApiHandlers {
       return Response(
         400,
         body: jsonEncode({
-          'error': {'code': 'missing_query', 'message': 'Search query is required'},
+          'error': {
+            'code': 'missing_query',
+            'message': 'Search query is required'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
     }
 
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
-    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
-    final result = await metadata.searchPackages(query, page: page, limit: limit.clamp(1, 100));
+    final result = await metadata.searchPackages(query,
+        page: page, limit: limit.clamp(1, 100));
 
     return Response.ok(
       jsonEncode(result.toJson(config.baseUrl)),
@@ -233,7 +253,10 @@ class ApiHandlers {
       return Response(
         503,
         body: jsonEncode({
-          'error': {'code': 'upstream_disabled', 'message': 'Upstream proxy is not enabled'},
+          'error': {
+            'code': 'upstream_disabled',
+            'message': 'Upstream proxy is not enabled'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -244,14 +267,18 @@ class ApiHandlers {
       return Response(
         400,
         body: jsonEncode({
-          'error': {'code': 'missing_query', 'message': 'Search query is required'},
+          'error': {
+            'code': 'missing_query',
+            'message': 'Search query is required'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
     }
 
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
-    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
     try {
       final packageNames = await upstream!.searchPackages(query, page: page);
@@ -309,7 +336,10 @@ class ApiHandlers {
       return Response(
         500,
         body: jsonEncode({
-          'error': {'code': 'upstream_error', 'message': 'Failed to search upstream: $e'},
+          'error': {
+            'code': 'upstream_error',
+            'message': 'Failed to search upstream: $e'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -323,7 +353,10 @@ class ApiHandlers {
       return Response(
         503,
         body: jsonEncode({
-          'error': {'code': 'upstream_disabled', 'message': 'Upstream proxy is not enabled'},
+          'error': {
+            'code': 'upstream_disabled',
+            'message': 'Upstream proxy is not enabled'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -335,7 +368,10 @@ class ApiHandlers {
       if (upstreamPkg == null) {
         return Response.notFound(
           jsonEncode({
-            'error': {'code': 'not_found', 'message': 'Package not found on upstream'},
+            'error': {
+              'code': 'not_found',
+              'message': 'Package not found on upstream'
+            },
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -346,7 +382,10 @@ class ApiHandlers {
       return Response(
         500,
         body: jsonEncode({
-          'error': {'code': 'upstream_error', 'message': 'Failed to fetch upstream package: $e'},
+          'error': {
+            'code': 'upstream_error',
+            'message': 'Failed to fetch upstream package: $e'
+          },
         }),
         headers: {'content-type': 'application/json'},
       );
@@ -361,7 +400,6 @@ class ApiHandlers {
         request,
         lookupToken: metadata.getTokenByHash,
         touchToken: metadata.touchToken,
-        requiredScope: 'read:all',
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
@@ -425,7 +463,6 @@ class ApiHandlers {
         request,
         lookupToken: metadata.getTokenByHash,
         touchToken: metadata.touchToken,
-        requiredScope: 'read:all',
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
@@ -644,8 +681,12 @@ class ApiHandlers {
 
     final success = result as PublishSuccess;
 
-    // Check publish permission (only if auth is required)
-    if (token != null && !token.canPublish(success.packageName)) {
+    // Determine the user ID for ownership
+    final userId = token?.userId ?? User.anonymousId;
+
+    // Check publish permission based on package ownership
+    final existingPackage = await metadata.getPackage(success.packageName);
+    if (existingPackage != null && !existingPackage.canPublish(userId)) {
       _uploadData.remove(sessionId);
       return forbidden(
           'Not authorized to publish package: ${success.packageName}');
@@ -675,13 +716,14 @@ class ApiHandlers {
     );
     await blobs.putArchive(key: archiveKey, data: success.tarballBytes);
 
-    // Store metadata
+    // Store metadata (set ownerId only for new packages)
     await metadata.upsertPackageVersion(
       packageName: success.packageName,
       version: success.version,
       pubspec: success.pubspec,
       archiveKey: archiveKey,
       archiveSha256: success.sha256Hash,
+      ownerId: existingPackage == null ? userId : null,
     );
 
     // Mark session complete
@@ -713,7 +755,6 @@ class ApiHandlers {
         request,
         lookupToken: metadata.getTokenByHash,
         touchToken: metadata.touchToken,
-        requiredScope: 'read:all',
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
@@ -749,8 +790,10 @@ class ApiHandlers {
     if (upstream != null) {
       final upstreamVersion = await upstream!.getVersion(name, version);
       if (upstreamVersion != null && upstreamVersion.archiveUrl.isNotEmpty) {
-        print('Fetching $name@$version from upstream: ${upstreamVersion.archiveUrl}');
-        final archiveBytes = await upstream!.downloadArchive(upstreamVersion.archiveUrl);
+        print(
+            'Fetching $name@$version from upstream: ${upstreamVersion.archiveUrl}');
+        final archiveBytes =
+            await upstream!.downloadArchive(upstreamVersion.archiveUrl);
 
         if (archiveBytes != null) {
           // Cache the archive in cache storage
@@ -831,8 +874,10 @@ class ApiHandlers {
         'version': latest.version,
         'pubspec': latest.pubspec,
         'archive_url': latestArchiveUrl,
-        if (latest.archiveSha256 != null) 'archive_sha256': latest.archiveSha256,
-        if (latest.published != null) 'published': latest.published!.toIso8601String(),
+        if (latest.archiveSha256 != null)
+          'archive_sha256': latest.archiveSha256,
+        if (latest.published != null)
+          'published': latest.published!.toIso8601String(),
       };
     }
 
@@ -947,7 +992,8 @@ class ApiHandlers {
   /// GET `/api/admin/packages/local`
   Future<Response> adminListLocalPackages(Request request) async {
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
-    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
     final result = await metadata.listPackagesByType(
       isUpstreamCache: false,
@@ -964,7 +1010,8 @@ class ApiHandlers {
   /// GET `/api/admin/packages/cached`
   Future<Response> adminListCachedPackages(Request request) async {
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
-    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
 
     final result = await metadata.listPackagesByType(
       isUpstreamCache: true,
@@ -1082,7 +1129,8 @@ class ApiHandlers {
       // Ignore body parsing errors
     }
 
-    final success = await metadata.discontinuePackage(name, replacedBy: replacedBy);
+    final success =
+        await metadata.discontinuePackage(name, replacedBy: replacedBy);
 
     if (!success) {
       return Response.notFound(
@@ -1140,6 +1188,552 @@ class ApiHandlers {
           'packagesDeleted': packageCount,
           'blobsDeleted': blobsDeleted,
         },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/users`
+  Future<Response> adminListUsers(Request request) async {
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    final users =
+        await metadata.listUsers(page: page, limit: limit.clamp(1, 100));
+
+    return Response.ok(
+      jsonEncode({
+        'users': users.map((u) => u.toJson()).toList(),
+        'page': page,
+        'limit': limit,
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/config`
+  Future<Response> adminGetAllConfig(Request request) async {
+    final configs = await metadata.getAllConfig();
+
+    return Response.ok(
+      jsonEncode({
+        'config': configs.map((c) => c.toJson()).toList(),
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// PUT `/admin/api/config/<name>`
+  Future<Response> adminSetConfig(Request request, String name) async {
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+      final value = body['value']?.toString();
+
+      if (value == null) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {'code': 'missing_value', 'message': 'Value is required'},
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      await metadata.setConfig(name, value);
+
+      return Response.ok(
+        jsonEncode({
+          'success': {'message': 'Config updated'}
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  // ============ Auth Handlers ============
+
+  /// POST `/api/auth/register`
+  Future<Response> authRegister(Request request) async {
+    // Check if registration is allowed
+    final allowReg = await metadata.getConfig('allow_registration');
+    if (allowReg?.boolValue == false) {
+      return Response(
+        403,
+        body: jsonEncode({
+          'error': {
+            'code': 'registration_disabled',
+            'message': 'Registration is disabled'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final email = body['email'] as String?;
+      final password = body['password'] as String?;
+      final name = body['name'] as String?;
+
+      if (email == null || email.isEmpty) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {'code': 'missing_email', 'message': 'Email is required'},
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      if (password == null || password.length < 8) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'weak_password',
+              'message': 'Password must be at least 8 characters'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Check if email already exists
+      final existing = await metadata.getUserByEmail(email);
+      if (existing != null) {
+        return Response(
+          409,
+          body: jsonEncode({
+            'error': {
+              'code': 'email_exists',
+              'message': 'Email already registered'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Hash password and create user
+      final passwordHash = hashPassword(password);
+      final userId = await metadata.createUser(
+        email: email,
+        passwordHash: passwordHash,
+        name: name,
+      );
+
+      // Create session
+      final sessionTtl = await metadata.getConfig('session_ttl_hours');
+      final ttlHours = sessionTtl?.intValue ?? 24;
+      final session = await metadata.createUserSession(
+        userId: userId,
+        ttl: Duration(hours: ttlHours),
+      );
+
+      // Get user
+      final user = await metadata.getUser(userId);
+
+      return Response.ok(
+        jsonEncode({
+          'user': user?.toJson(),
+        }),
+        headers: {
+          'content-type': 'application/json',
+          'set-cookie': createSessionCookie(session.sessionId,
+              maxAge: Duration(hours: ttlHours)),
+        },
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  /// POST `/api/auth/login`
+  Future<Response> authLogin(Request request) async {
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final email = body['email'] as String?;
+      final password = body['password'] as String?;
+
+      if (email == null || password == null) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'missing_credentials',
+              'message': 'Email and password are required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Look up user
+      final user = await metadata.getUserByEmail(email);
+      if (user == null || user.passwordHash == null) {
+        return Response(
+          401,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_credentials',
+              'message': 'Invalid email or password'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Verify password
+      if (!verifyPassword(password, user.passwordHash!)) {
+        return Response(
+          401,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_credentials',
+              'message': 'Invalid email or password'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        return Response(
+          403,
+          body: jsonEncode({
+            'error': {
+              'code': 'user_disabled',
+              'message': 'User account is disabled'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Update last login
+      await metadata.touchUserLogin(user.id);
+
+      // Create session
+      final sessionTtl = await metadata.getConfig('session_ttl_hours');
+      final ttlHours = sessionTtl?.intValue ?? 24;
+      final session = await metadata.createUserSession(
+        userId: user.id,
+        ttl: Duration(hours: ttlHours),
+      );
+
+      return Response.ok(
+        jsonEncode({
+          'user': user.toJson(),
+        }),
+        headers: {
+          'content-type': 'application/json',
+          'set-cookie': createSessionCookie(session.sessionId,
+              maxAge: Duration(hours: ttlHours)),
+        },
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  /// POST `/api/auth/logout`
+  Future<Response> authLogout(Request request) async {
+    final sessionResult = await getSession(
+      request,
+      lookupSession: metadata.getUserSession,
+    );
+
+    if (sessionResult is SessionValid) {
+      await metadata.deleteUserSession(sessionResult.session.sessionId);
+    }
+
+    return Response.ok(
+      jsonEncode({
+        'success': {'message': 'Logged out'}
+      }),
+      headers: {
+        'content-type': 'application/json',
+        'set-cookie': clearSessionCookie(),
+      },
+    );
+  }
+
+  /// GET `/api/auth/me`
+  /// Returns current user or null if not authenticated (never 401)
+  Future<Response> authMe(Request request) async {
+    final sessionResult = await getSession(
+      request,
+      lookupSession: metadata.getUserSession,
+    );
+
+    // Return null user instead of 401 for unauthenticated requests
+    // This prevents console errors on public pages
+    if (sessionResult is! SessionValid) {
+      return Response.ok(
+        jsonEncode({'user': null}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final user = await metadata.getUser(sessionResult.session.userId);
+    if (user == null) {
+      return Response.ok(
+        jsonEncode({'user': null}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    return Response.ok(
+      jsonEncode({'user': user.toJson()}),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// PUT `/api/auth/me`
+  Future<Response> authUpdateMe(Request request) async {
+    final sessionResult = await getSession(
+      request,
+      lookupSession: metadata.getUserSession,
+    );
+
+    if (sessionResult is! SessionValid) {
+      return sessionErrorResponse(sessionResult);
+    }
+
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final name = body['name'] as String?;
+      final password = body['password'] as String?;
+      final currentPassword = body['currentPassword'] as String?;
+
+      // If changing password, verify current password first
+      String? passwordHash;
+      if (password != null) {
+        if (currentPassword == null) {
+          return Response(
+            400,
+            body: jsonEncode({
+              'error': {
+                'code': 'missing_current_password',
+                'message': 'Current password is required'
+              },
+            }),
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        final user = await metadata.getUser(sessionResult.session.userId);
+        if (user?.passwordHash == null ||
+            !verifyPassword(currentPassword, user!.passwordHash!)) {
+          return Response(
+            401,
+            body: jsonEncode({
+              'error': {
+                'code': 'invalid_password',
+                'message': 'Current password is incorrect'
+              },
+            }),
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        if (password.length < 8) {
+          return Response(
+            400,
+            body: jsonEncode({
+              'error': {
+                'code': 'weak_password',
+                'message': 'Password must be at least 8 characters'
+              },
+            }),
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        passwordHash = hashPassword(password);
+      }
+
+      await metadata.updateUser(
+        sessionResult.session.userId,
+        name: name,
+        passwordHash: passwordHash,
+      );
+
+      final user = await metadata.getUser(sessionResult.session.userId);
+
+      return Response.ok(
+        jsonEncode({'user': user?.toJson()}),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  // ============ Token Management Handlers ============
+
+  /// GET `/api/tokens`
+  Future<Response> listUserTokens(Request request) async {
+    final sessionResult = await getSession(
+      request,
+      lookupSession: metadata.getUserSession,
+    );
+
+    if (sessionResult is! SessionValid) {
+      return sessionErrorResponse(sessionResult);
+    }
+
+    final tokens =
+        await metadata.listTokens(userId: sessionResult.session.userId);
+
+    return Response.ok(
+      jsonEncode({
+        'tokens': tokens.map((t) => t.toJson()).toList(),
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// POST `/api/tokens`
+  Future<Response> createUserToken(Request request) async {
+    final sessionResult = await getSession(
+      request,
+      lookupSession: metadata.getUserSession,
+    );
+
+    if (sessionResult is! SessionValid) {
+      return sessionErrorResponse(sessionResult);
+    }
+
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final label = body['label'] as String?;
+      final expiresInDays = body['expiresInDays'] as int?;
+
+      if (label == null || label.isEmpty) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'missing_label',
+              'message': 'Token label is required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      DateTime? expiresAt;
+      if (expiresInDays != null && expiresInDays > 0) {
+        expiresAt = DateTime.now().add(Duration(days: expiresInDays));
+      }
+
+      final token = await metadata.createToken(
+        userId: sessionResult.session.userId,
+        label: label,
+        expiresAt: expiresAt,
+      );
+
+      return Response.ok(
+        jsonEncode({
+          'token': token,
+          'message':
+              'Token created. Save this token - it will not be shown again.',
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  /// DELETE `/api/tokens/<label>`
+  Future<Response> deleteUserToken(Request request, String label) async {
+    final sessionResult = await getSession(
+      request,
+      lookupSession: metadata.getUserSession,
+    );
+
+    if (sessionResult is! SessionValid) {
+      return sessionErrorResponse(sessionResult);
+    }
+
+    // Get all user's tokens to verify ownership
+    final tokens =
+        await metadata.listTokens(userId: sessionResult.session.userId);
+    final token = tokens.where((t) => t.label == label).firstOrNull;
+
+    if (token == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Token not found'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    await metadata.deleteToken(label);
+
+    return Response.ok(
+      jsonEncode({
+        'success': {'message': 'Token deleted'}
       }),
       headers: {'content-type': 'application/json'},
     );
