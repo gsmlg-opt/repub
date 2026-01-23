@@ -66,16 +66,15 @@ Future<void> runMigrate() async {
 Future<void> runTokenCommand(List<String> args) async {
   if (args.isEmpty) {
     print('Usage:');
-    print('  dart run repub_cli token create <label> [scopes...]');
-    print('  dart run repub_cli token list');
+    print('  dart run repub_cli token create <label> [user_id]');
+    print('  dart run repub_cli token list [user_id]');
     print('  dart run repub_cli token delete <label>');
     print('');
-    print('Scopes:');
-    print('  admin         - Full access');
-    print('  publish:all   - Publish any package');
-    print('  publish:pkg:NAME - Publish specific package');
-    print(
-        '  read:all      - Read/download packages (needed if REQUIRE_DOWNLOAD_AUTH=true)');
+    print('Notes:');
+    print('  - Tokens authenticate users for publishing');
+    print('  - If user_id is not specified, anonymous user is used');
+    print('  - Users can only publish to packages they own');
+    print('  - First publisher of a package becomes its owner');
     exit(1);
   }
 
@@ -89,15 +88,15 @@ Future<void> runTokenCommand(List<String> args) async {
     switch (args[0]) {
       case 'create':
         if (args.length < 2) {
-          print('Usage: dart run repub_cli token create <label> [scopes...]');
-          print(
-              'Example: dart run repub_cli token create ci-publish publish:all');
+          print('Usage: dart run repub_cli token create <label> [user_id]');
+          print('Example: dart run repub_cli token create ci-publish');
+          print('Example: dart run repub_cli token create my-token user-uuid');
           exit(1);
         }
         final label = args[1];
-        final scopes = args.length > 2 ? args.sublist(2) : ['publish:all'];
+        final userId = args.length > 2 ? args[2] : User.anonymousId;
 
-        final token = await metadata.createToken(label: label, scopes: scopes);
+        final token = await metadata.createToken(label: label, userId: userId);
         print('Created token: $token');
         print('');
         print('Use this token with:');
@@ -105,16 +104,20 @@ Future<void> runTokenCommand(List<String> args) async {
         print('  (paste the token when prompted)');
 
       case 'list':
-        final tokens = await metadata.listTokens();
+        final userId = args.length > 1 ? args[1] : null;
+        final tokens = await metadata.listTokens(userId: userId);
         if (tokens.isEmpty) {
           print('No tokens found');
         } else {
           print('Tokens:');
           for (final t in tokens) {
-            print('  ${t['label']}');
-            print('    Scopes: ${(t['scopes'] as List).join(', ')}');
-            print('    Created: ${t['created_at']}');
-            print('    Last used: ${t['last_used_at'] ?? 'never'}');
+            print('  ${t.label}');
+            print('    User: ${t.userId}');
+            print('    Created: ${t.createdAt}');
+            print('    Last used: ${t.lastUsedAt ?? 'never'}');
+            if (t.expiresAt != null) {
+              print('    Expires: ${t.expiresAt}');
+            }
           }
         }
 
