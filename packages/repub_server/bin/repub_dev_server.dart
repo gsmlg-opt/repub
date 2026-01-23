@@ -50,8 +50,9 @@ Future<void> main(List<String> args) async {
     serveStaticFiles: false,
   );
 
-  // Create proxy handler for web dev server
-  final webdevProxy = proxyHandler('http://localhost:8081');
+  // Create proxy handlers for web dev servers
+  final webdevProxy = proxyHandler('http://localhost:8081'); // Jaspr web UI
+  final adminProxy = proxyHandler('http://localhost:8082'); // Flutter admin
 
   // Check if path looks like a static asset
   bool isAssetPath(String path) {
@@ -71,7 +72,7 @@ Future<void> main(List<String> args) async {
         path.endsWith('.eot');
   }
 
-  // Combined handler: API routes first, then proxy to webdev
+  // Combined handler: API routes first, then proxy to appropriate dev server
   Future<Response> combinedHandler(Request request) async {
     final path = request.url.path;
 
@@ -92,13 +93,55 @@ Future<void> main(List<String> args) async {
         return await apiRouter(request);
       }
 
+      // Admin routes - proxy to Flutter admin on port 8082
+      // In dev mode, Flutter runs with base href "/" so we need to rewrite the HTML
+      if (path.startsWith('admin')) {
+        // Strip /admin prefix: /admin -> /, /admin/packages/local -> /packages/local
+        final strippedPath = path == 'admin' ? '/' : path.substring(5); // Remove 'admin'
+        final newUri = request.requestedUri.replace(path: strippedPath);
+        final newRequest = Request(
+          request.method,
+          newUri,
+          context: request.context,
+          headers: request.headers,
+        );
+
+        var response = await adminProxy(newRequest);
+
+        // SPA fallback: Flutter dev server returns 500 for client-side routes
+        // If we get an error and it's not an asset, serve index.html instead
+        if (response.statusCode >= 400 && !isAssetPath(strippedPath)) {
+          // Request index.html from Flutter dev server
+          final indexUri = request.requestedUri.replace(path: '/', query: '');
+          final indexReq = Request('GET', indexUri,
+              context: request.context, headers: request.headers);
+          response = await adminProxy(indexReq);
+        }
+
+        // Rewrite base href in HTML for Flutter admin
+        // This is needed for all HTML responses because Flutter dev server runs with <base href="/">
+        // but we need <base href="/admin/"> for assets to load correctly
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('text/html') && response.statusCode == 200) {
+          final body = await response.readAsString();
+          // Replace <base href="/"> with <base href="/admin/">
+          final rewritten = body.replaceFirst(
+            '<base href="/">',
+            '<base href="/admin/">',
+          );
+          return response.change(body: rewritten);
+        }
+
+        return response;
+      }
+
       // Webdev SSE handler - proxy to webdev for hot reload
       if (path.startsWith(r'$dwdsSseHandler') ||
           path.startsWith(r'$requireDigestsPath')) {
         return await webdevProxy(request);
       }
 
-      // Everything else - proxy to webdev
+      // Everything else - proxy to Jaspr webdev on port 8081
       var response = await webdevProxy(request);
 
       // Inject script to fix hot reload when accessing from remote IP
@@ -141,14 +184,14 @@ Future<void> main(List<String> args) async {
 
       return response;
     } catch (e, stack) {
-      // Check if it's a connection refused to webdev (expected during startup)
+      // Check if it's a connection refused to dev servers (expected during startup)
       final errorStr = e.toString();
       if (errorStr.contains('Connection refused') &&
-          errorStr.contains('8081')) {
-        // Webdev not ready yet - return a friendly message without stack trace
+          (errorStr.contains('8081') || errorStr.contains('8082'))) {
+        // Dev server not ready yet - return a friendly message without stack trace
         return Response(
           503,
-          body: 'Webdev server starting... Please refresh in a moment.',
+          body: 'Dev servers starting... Please refresh in a moment.',
           headers: {'content-type': 'text/plain', 'retry-after': '2'},
         );
       }
@@ -177,7 +220,8 @@ Future<void> main(List<String> args) async {
   print('\n🚀 Development server ready!');
   print('   Access everything at: http://localhost:8080');
   print('   API endpoints: http://localhost:8080/api/*');
-  print('   Web UI: http://localhost:8080/ (with hot reload)');
+  print('   Web UI: http://localhost:8080/ (Jaspr, with hot reload)');
+  print('   Admin UI: http://localhost:8080/admin (Flutter, with hot reload)');
   print('\nPress Ctrl+C to stop');
 
   // Handle shutdown
