@@ -13,11 +13,12 @@ typedef TokenLookup = Future<AuthToken?> Function(String tokenHash);
 typedef TokenTouch = Future<void> Function(String tokenHash);
 
 /// Authenticate a request from the Authorization header.
+/// Returns AuthSuccess with the token if valid, or an error result.
+/// Permissions are checked by the handlers based on package ownership.
 Future<AuthResult> authenticate(
   Request request, {
   required TokenLookup lookupToken,
   required TokenTouch touchToken,
-  String? requiredScope,
 }) async {
   final authHeader = request.headers['authorization'];
 
@@ -40,13 +41,13 @@ Future<AuthResult> authenticate(
     return AuthInvalid('Invalid token');
   }
 
+  // Check if token is expired
+  if (authToken.isExpired) {
+    return AuthInvalid('Token has expired');
+  }
+
   // Update last used
   await touchToken(tokenHash);
-
-  // Check scope if required
-  if (requiredScope != null && !authToken.hasScope(requiredScope)) {
-    return AuthForbidden('Insufficient permissions for scope: $requiredScope');
-  }
 
   return AuthSuccess(authToken);
 }
@@ -79,4 +80,11 @@ Response forbidden(String message) {
 /// Get the authenticated token from request context.
 AuthToken? getAuthToken(Request request) {
   return request.context['auth_token'] as AuthToken?;
+}
+
+/// Get the authenticated user ID from request context.
+/// Returns anonymous user ID if not authenticated.
+String getAuthUserId(Request request) {
+  final token = getAuthToken(request);
+  return token?.userId ?? User.anonymousId;
 }

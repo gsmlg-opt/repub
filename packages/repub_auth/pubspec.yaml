@@ -10,6 +10,7 @@ environment:
 dependencies:
   repub_model:
     path: ../repub_model
+  bcrypt: ^1.1.3
   crypto: ^3.0.6
   shelf: ^1.4.2
 
