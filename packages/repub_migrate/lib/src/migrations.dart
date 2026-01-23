@@ -54,7 +54,6 @@ const migrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_upload_sessions_expires
       ON upload_sessions(expires_at);
   ''',
-
   '002_upstream_cache': '''
     -- Add upstream cache flag to packages
     -- This marks packages that were cached from upstream (e.g., pub.dev)
