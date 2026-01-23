@@ -352,15 +352,16 @@ class PostgresMetadataStore extends MetadataStore {
 
   @override
   Future<PackageListResult> listPackages({int page = 1, int limit = 20}) async {
-    // Get total count
-    final countResult = await _conn.execute('SELECT COUNT(*) FROM packages');
+    // Get total count (only local packages, exclude cached)
+    final countResult = await _conn.execute('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = false');
     final total = countResult.first[0] as int;
 
-    // Get packages for this page
+    // Get packages for this page (only local packages)
     final offset = (page - 1) * limit;
     final result = await _conn.execute(
       Sql.named('''
         SELECT name FROM packages
+        WHERE is_upstream_cache = false
         ORDER BY updated_at DESC
         LIMIT @limit OFFSET @offset
       '''),
@@ -388,27 +389,25 @@ class PostgresMetadataStore extends MetadataStore {
   Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20}) async {
     final searchTerm = '%${query.toLowerCase()}%';
 
-    // Get total count
+    // Get total count (only local packages, exclude cached, match name only)
     final countResult = await _conn.execute(
       Sql.named('''
-        SELECT COUNT(DISTINCT p.name) FROM packages p
-        LEFT JOIN package_versions pv ON p.name = pv.package_name
-        WHERE LOWER(p.name) LIKE @search
-           OR LOWER(pv.pubspec_json::text) LIKE @search
+        SELECT COUNT(*) FROM packages
+        WHERE is_upstream_cache = false
+          AND LOWER(name) LIKE @search
       '''),
       parameters: {'search': searchTerm},
     );
     final total = countResult.first[0] as int;
 
-    // Get packages for this page
+    // Get packages for this page (only local packages, match name only)
     final offset = (page - 1) * limit;
     final result = await _conn.execute(
       Sql.named('''
-        SELECT DISTINCT p.name FROM packages p
-        LEFT JOIN package_versions pv ON p.name = pv.package_name
-        WHERE LOWER(p.name) LIKE @search
-           OR LOWER(pv.pubspec_json::text) LIKE @search
-        ORDER BY p.name
+        SELECT name FROM packages
+        WHERE is_upstream_cache = false
+          AND LOWER(name) LIKE @search
+        ORDER BY name
         LIMIT @limit OFFSET @offset
       '''),
       parameters: {'search': searchTerm, 'limit': limit, 'offset': offset},
@@ -931,14 +930,15 @@ class SqliteMetadataStore extends MetadataStore {
 
   @override
   Future<PackageListResult> listPackages({int page = 1, int limit = 20}) async {
-    // Get total count
-    final countResult = _db.select('SELECT COUNT(*) FROM packages');
+    // Get total count (only local packages, exclude cached)
+    final countResult = _db.select('SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 0');
     final total = countResult.first.values.first as int;
 
-    // Get packages for this page
+    // Get packages for this page (only local packages)
     final offset = (page - 1) * limit;
     final result = _db.select('''
       SELECT name FROM packages
+      WHERE is_upstream_cache = 0
       ORDER BY updated_at DESC
       LIMIT ? OFFSET ?
     ''', [limit, offset]);
@@ -964,25 +964,23 @@ class SqliteMetadataStore extends MetadataStore {
   Future<PackageListResult> searchPackages(String query, {int page = 1, int limit = 20}) async {
     final searchTerm = '%${query.toLowerCase()}%';
 
-    // Get total count
+    // Get total count (only local packages, exclude cached, match name only)
     final countResult = _db.select('''
-      SELECT COUNT(DISTINCT p.name) FROM packages p
-      LEFT JOIN package_versions pv ON p.name = pv.package_name
-      WHERE LOWER(p.name) LIKE ?
-         OR LOWER(pv.pubspec_json) LIKE ?
-    ''', [searchTerm, searchTerm]);
+      SELECT COUNT(*) FROM packages
+      WHERE is_upstream_cache = 0
+        AND LOWER(name) LIKE ?
+    ''', [searchTerm]);
     final total = countResult.first.values.first as int;
 
-    // Get packages for this page
+    // Get packages for this page (only local packages, match name only)
     final offset = (page - 1) * limit;
     final result = _db.select('''
-      SELECT DISTINCT p.name FROM packages p
-      LEFT JOIN package_versions pv ON p.name = pv.package_name
-      WHERE LOWER(p.name) LIKE ?
-         OR LOWER(pv.pubspec_json) LIKE ?
-      ORDER BY p.name
+      SELECT name FROM packages
+      WHERE is_upstream_cache = 0
+        AND LOWER(name) LIKE ?
+      ORDER BY name
       LIMIT ? OFFSET ?
-    ''', [searchTerm, searchTerm, limit, offset]);
+    ''', [searchTerm, limit, offset]);
 
     final packages = <PackageInfo>[];
     for (final row in result) {
