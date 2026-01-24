@@ -7,6 +7,8 @@ A self-hosted Dart/Flutter package registry implementing the [Hosted Pub Reposit
 - **Publish packages**: Full support for `dart pub publish`
 - **Install packages**: Works with `dart pub get` using hosted URLs
 - **Bearer token auth**: Secure publish with scoped tokens
+- **Admin UI**: Web-based admin dashboard for package and user management
+- **Admin users**: Separate admin authentication with login history tracking
 - **Flexible storage**: Package archives stored locally or in S3-compatible storage (MinIO, AWS S3)
 - **Flexible database**: SQLite (default) or PostgreSQL for metadata
 - **Zero external dependencies**: Docker image uses SQLite + local storage by default
@@ -57,6 +59,9 @@ docker run -d \
 
 # Create an auth token
 docker exec <container_id> /app/bin/repub_cli token create my-token publish:all
+
+# Create an admin user (for accessing /admin UI)
+docker exec <container_id> /app/bin/repub_cli admin create admin password123 "Admin User"
 ```
 
 Data is stored in `/data`:
@@ -97,6 +102,12 @@ docker compose exec repub /app/bin/repub_cli token create my-token publish:all
 ```
 
 Save the token output - you'll need it for publishing.
+
+Optionally, create an admin user to access the admin UI at `/admin`:
+
+```bash
+docker compose exec repub /app/bin/repub_cli admin create admin password123 "Admin User"
+```
 
 ### 5. Add the token to dart pub
 
@@ -300,6 +311,14 @@ dart run -C packages/repub_cli repub_cli token create <label> [scopes...]
 dart run -C packages/repub_cli repub_cli token list
 dart run -C packages/repub_cli repub_cli token delete <label>
 
+# Admin user management (CLI-only for security)
+dart run -C packages/repub_cli repub_cli admin create <username> <password> [name]
+dart run -C packages/repub_cli repub_cli admin list
+dart run -C packages/repub_cli repub_cli admin reset-password <username> <new-password>
+dart run -C packages/repub_cli repub_cli admin activate <username>
+dart run -C packages/repub_cli repub_cli admin deactivate <username>
+dart run -C packages/repub_cli repub_cli admin delete <username>
+
 # Or directly with repub_server
 dart run -C packages/repub_server repub_server
 ```
@@ -359,6 +378,63 @@ The dev server internally proxies:
 - Admin UI requests to Flutter dev server (running on 8082)
 
 This provides instant hot reload when you modify any frontend code.
+
+## Admin UI
+
+The admin dashboard is accessible at `/admin` and provides:
+
+### Features
+
+- **Dashboard**: Overview stats (total packages, local/cached packages, versions)
+- **Package Management**: View, delete, and discontinue packages
+- **User Management**: Create and manage regular users
+- **Admin Users**: View admin users and their login history
+- **Site Configuration**: Configure registry settings
+- **Cache Management**: Clear upstream package cache
+
+### Admin User Management
+
+Admin users are managed **exclusively via CLI** for security:
+
+```bash
+# Create an admin user
+dart run repub_cli admin create myusername mypassword "My Name"
+
+# List all admin users
+dart run repub_cli admin list
+
+# Reset password
+dart run repub_cli admin reset-password myusername newpassword
+
+# Deactivate/activate admin user
+dart run repub_cli admin deactivate myusername
+dart run repub_cli admin activate myusername
+
+# Delete admin user
+dart run repub_cli admin delete myusername
+```
+
+### Admin Login History
+
+All admin login attempts are tracked with:
+- Timestamp
+- IP address (from `X-Forwarded-For` or `X-Real-IP` headers)
+- User agent
+- Success/failure status
+
+View login history in the Admin UI at `/admin/admin-users` → select user → view detailed login history.
+
+Failed login attempts are highlighted in red for easy identification of potential security issues.
+
+### Admin Authentication
+
+- Admin users have separate authentication from regular users
+- Admin sessions use a separate `admin_session` cookie with stricter security:
+  - Path restricted to `/admin`
+  - `SameSite=Strict`
+  - 8-hour session TTL (shorter than regular users)
+- All `/admin/api/*` endpoints require admin authentication
+- Admin users cannot be created through the web UI
 
 ## Package Dependencies
 
