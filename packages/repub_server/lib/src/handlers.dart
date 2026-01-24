@@ -60,7 +60,18 @@ Router createRouter({
         headers: {'content-type': 'application/json'});
   });
 
-  // Admin endpoints (external ACL protected)
+  // Admin authentication endpoints (public)
+  router.post('/admin/api/auth/login', handlers.adminLogin);
+  router.post('/admin/api/auth/logout', handlers.adminLogout);
+  router.get('/admin/api/auth/me', handlers.adminMe);
+
+  // Admin user management endpoints
+  router.get('/admin/api/admin-users', handlers.adminListAdminUsers);
+  router.get('/admin/api/admin-users/<id>', handlers.adminGetAdminUser);
+  router.get('/admin/api/admin-users/<id>/login-history',
+      handlers.adminGetLoginHistory);
+
+  // Admin endpoints (protected - each handler verifies admin session)
   router.get('/admin/api/stats', handlers.adminGetStats);
   router.get('/admin/api/packages/local', handlers.adminListLocalPackages);
   router.get('/admin/api/packages/cached', handlers.adminListCachedPackages);
@@ -174,6 +185,36 @@ class ApiHandlers {
     required this.blobs,
     required this.cacheBlobs,
   });
+
+  /// Verify admin session. Returns error Response if invalid, null if valid.
+  Future<Response?> _requireAdminAuth(Request request) async {
+    final result = await getAdminSession(
+      request,
+      lookupSession: metadata.getAdminSession,
+    );
+
+    if (result is! AdminSessionValid) {
+      return adminSessionErrorResponse(result);
+    }
+
+    final session = result.session;
+    final adminUser = await metadata.getAdminUser(session.userId);
+
+    if (adminUser == null || !adminUser.isActive) {
+      return Response(
+        401,
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({
+          'error': {
+            'code': 'admin_inactive',
+            'message': 'Admin user is inactive or not found'
+          },
+        }),
+      );
+    }
+
+    return null; // Success - no error
+  }
 
   /// Get the upstream client (lazy initialization).
   UpstreamClient? get upstream {
@@ -984,6 +1025,9 @@ class ApiHandlers {
 
   /// GET `/api/admin/stats`
   Future<Response> adminGetStats(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final stats = await metadata.getAdminStats();
 
     return Response.ok(
@@ -994,6 +1038,9 @@ class ApiHandlers {
 
   /// GET `/api/admin/packages/local`
   Future<Response> adminListLocalPackages(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
     final limit =
         int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
@@ -1012,6 +1059,9 @@ class ApiHandlers {
 
   /// GET `/api/admin/packages/cached`
   Future<Response> adminListCachedPackages(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
     final limit =
         int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
@@ -1030,6 +1080,9 @@ class ApiHandlers {
 
   /// DELETE `/api/admin/packages/<name>`
   Future<Response> adminDeletePackage(Request request, String name) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     // Check if this is a cached package before deleting
     final pkgInfo = await metadata.getPackageInfo(name);
     final isCache = pkgInfo?.package.isUpstreamCache ?? false;
@@ -1076,6 +1129,9 @@ class ApiHandlers {
     String name,
     String version,
   ) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     // Check if this is a cached package before deleting
     final pkgInfo = await metadata.getPackageInfo(name);
     final isCache = pkgInfo?.package.isUpstreamCache ?? false;
@@ -1120,6 +1176,9 @@ class ApiHandlers {
 
   /// POST `/api/admin/packages/<name>/discontinue`
   Future<Response> adminDiscontinuePackage(Request request, String name) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     // Parse body for optional replacedBy
     String? replacedBy;
     try {
@@ -1157,6 +1216,9 @@ class ApiHandlers {
 
   /// DELETE `/api/admin/cache`
   Future<Response> adminClearCache(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     // Get all archive keys for cached packages before deleting
     final cachedResult = await metadata.listPackagesByType(
       isUpstreamCache: true,
@@ -1198,6 +1260,9 @@ class ApiHandlers {
 
   /// GET `/admin/api/users`
   Future<Response> adminListUsers(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
     final limit =
         int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
@@ -1217,6 +1282,9 @@ class ApiHandlers {
 
   /// POST `/admin/api/users`
   Future<Response> adminCreateUser(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final body = await request.readAsString();
     final json = jsonDecode(body) as Map<String, dynamic>;
 
@@ -1265,6 +1333,9 @@ class ApiHandlers {
 
   /// PUT `/admin/api/users/<id>`
   Future<Response> adminUpdateUser(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final body = await request.readAsString();
     final json = jsonDecode(body) as Map<String, dynamic>;
 
@@ -1300,6 +1371,9 @@ class ApiHandlers {
 
   /// DELETE `/admin/api/users/<id>`
   Future<Response> adminDeleteUser(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     // Prevent deleting anonymous user
     if (id == User.anonymousId) {
       return Response(400,
@@ -1316,13 +1390,18 @@ class ApiHandlers {
     }
 
     return Response.ok(
-      jsonEncode({'success': {'message': 'User deleted successfully'}}),
+      jsonEncode({
+        'success': {'message': 'User deleted successfully'}
+      }),
       headers: {'content-type': 'application/json'},
     );
   }
 
   /// GET `/admin/api/config`
   Future<Response> adminGetAllConfig(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     final configs = await metadata.getAllConfig();
 
     return Response.ok(
@@ -1335,6 +1414,9 @@ class ApiHandlers {
 
   /// PUT `/admin/api/config/<name>`
   Future<Response> adminSetConfig(Request request, String name) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
     try {
       final bodyBytes = await request.read().expand((x) => x).toList();
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
@@ -1843,6 +1925,284 @@ class ApiHandlers {
     return Response.ok(
       jsonEncode({
         'success': {'message': 'Token deleted'}
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  // ============ Admin Authentication ============
+
+  /// POST `/admin/api/auth/login` - Admin login
+  Future<Response> adminLogin(Request request) async {
+    // Extract IP address and user agent for logging
+    final ipAddress =
+        request.headers['x-forwarded-for']?.split(',').first.trim() ??
+            request.headers['x-real-ip'] ??
+            'unknown';
+    final userAgent = request.headers['user-agent'];
+
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final username = body['username'] as String?;
+      final password = body['password'] as String?;
+
+      if (username == null || password == null) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'missing_credentials',
+              'message': 'Username and password are required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Look up admin user
+      final adminUser = await metadata.getAdminUserByUsername(username);
+      if (adminUser == null || adminUser.passwordHash == null) {
+        // Log failed login attempt (if user exists)
+        if (adminUser != null) {
+          await metadata.logAdminLogin(
+            adminUserId: adminUser.id,
+            ipAddress: ipAddress,
+            userAgent: userAgent,
+            success: false,
+          );
+        }
+        return Response(
+          401,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_credentials',
+              'message': 'Invalid username or password'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Verify password
+      if (!verifyPassword(password, adminUser.passwordHash!)) {
+        // Log failed login attempt
+        await metadata.logAdminLogin(
+          adminUserId: adminUser.id,
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+          success: false,
+        );
+        return Response(
+          401,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_credentials',
+              'message': 'Invalid username or password'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Check if admin is active
+      if (!adminUser.isActive) {
+        // Log failed login attempt (inactive account)
+        await metadata.logAdminLogin(
+          adminUserId: adminUser.id,
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+          success: false,
+        );
+        return Response(
+          403,
+          body: jsonEncode({
+            'error': {
+              'code': 'admin_disabled',
+              'message': 'Admin account is disabled'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Update last login
+      await metadata.touchAdminLogin(adminUser.id);
+
+      // Log successful login
+      await metadata.logAdminLogin(
+        adminUserId: adminUser.id,
+        ipAddress: ipAddress,
+        userAgent: userAgent,
+        success: true,
+      );
+
+      // Create admin session (8-hour TTL)
+      final session = await metadata.createAdminSession(
+        adminUserId: adminUser.id,
+        ttl: const Duration(hours: 8),
+      );
+
+      return Response.ok(
+        jsonEncode({
+          'admin': adminUser.toJson(),
+        }),
+        headers: {
+          'content-type': 'application/json',
+          'set-cookie': createAdminSessionCookie(session.sessionId,
+              maxAge: const Duration(hours: 8)),
+        },
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  /// POST `/admin/api/auth/logout` - Admin logout
+  Future<Response> adminLogout(Request request) async {
+    final result = await getAdminSession(
+      request,
+      lookupSession: metadata.getAdminSession,
+    );
+
+    // Even if session is invalid/expired, clear the cookie
+    if (result is AdminSessionValid) {
+      await metadata.deleteAdminSession(result.session.sessionId);
+    }
+
+    return Response.ok(
+      jsonEncode({
+        'success': {'message': 'Logged out'}
+      }),
+      headers: {
+        'content-type': 'application/json',
+        'set-cookie': clearAdminSessionCookie(),
+      },
+    );
+  }
+
+  /// GET `/admin/api/auth/me` - Get current admin user
+  Future<Response> adminMe(Request request) async {
+    final result = await getAdminSession(
+      request,
+      lookupSession: metadata.getAdminSession,
+    );
+
+    if (result is! AdminSessionValid) {
+      return adminSessionErrorResponse(result);
+    }
+
+    // Get admin user
+    final adminUser = await metadata.getAdminUser(result.session.userId);
+    if (adminUser == null) {
+      return Response(
+        401,
+        body: jsonEncode({
+          'error': {
+            'code': 'admin_not_found',
+            'message': 'Admin user not found'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    return Response.ok(
+      jsonEncode({'admin': adminUser.toJson()}),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  // ============ Admin User Management ============
+
+  /// GET `/admin/api/admin-users` - List all admin users
+  Future<Response> adminListAdminUsers(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+
+    final adminUsers =
+        await metadata.listAdminUsers(page: page, limit: limit.clamp(1, 100));
+
+    return Response.ok(
+      jsonEncode({
+        'adminUsers': adminUsers.map((u) => u.toJson()).toList(),
+        'page': page,
+        'limit': limit,
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/admin-users/<id>` - Get specific admin user with summary
+  Future<Response> adminGetAdminUser(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final adminUser = await metadata.getAdminUser(id);
+    if (adminUser == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Admin user not found'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Get recent login history (last 10 entries)
+    final recentLogins =
+        await metadata.getAdminLoginHistory(adminUserId: id, limit: 10);
+
+    return Response.ok(
+      jsonEncode({
+        'adminUser': adminUser.toJson(),
+        'recentLogins': recentLogins.map((l) => l.toJson()).toList(),
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/admin-users/<id>/login-history` - Get login history for admin user
+  Future<Response> adminGetLoginHistory(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    // Verify admin user exists
+    final adminUser = await metadata.getAdminUser(id);
+    if (adminUser == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Admin user not found'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '50') ?? 50;
+
+    final loginHistory = await metadata.getAdminLoginHistory(
+      adminUserId: id,
+      limit: limit.clamp(1, 200),
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'adminUser': adminUser.toJson(),
+        'loginHistory': loginHistory.map((l) => l.toJson()).toList(),
       }),
       headers: {'content-type': 'application/json'},
     );

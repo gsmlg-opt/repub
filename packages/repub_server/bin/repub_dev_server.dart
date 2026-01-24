@@ -97,7 +97,8 @@ Future<void> main(List<String> args) async {
       // In dev mode, Flutter runs with base href "/" so we need to rewrite the HTML
       if (path.startsWith('admin')) {
         // Strip /admin prefix: /admin -> /, /admin/packages/local -> /packages/local
-        final strippedPath = path == 'admin' ? '/' : path.substring(5); // Remove 'admin'
+        final strippedPath =
+            path == 'admin' ? '/' : path.substring(5); // Remove 'admin'
         final newUri = request.requestedUri.replace(path: strippedPath);
         final newRequest = Request(
           request.method,
