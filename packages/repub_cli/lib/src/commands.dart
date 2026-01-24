@@ -4,6 +4,8 @@ import 'package:repub_model/repub_model.dart';
 import 'package:repub_server/repub_server.dart';
 import 'package:repub_storage/repub_storage.dart';
 
+import 'admin_commands.dart';
+
 /// Print usage information.
 void printUsage() {
   print('''
@@ -18,6 +20,7 @@ Commands:
   token create    Create a new auth token
   token list      List all tokens
   token delete    Delete a token
+  admin <cmd>     Admin user management (create, list, reset-password, etc.)
   help            Show this help message
 
 Environment Variables:
@@ -142,4 +145,17 @@ Future<void> runTokenCommand(List<String> args) async {
   } finally {
     await metadata.close();
   }
+}
+
+/// Handle admin commands.
+Future<void> runAdminCommand(List<String> args) async {
+  final config = Config.fromEnv();
+
+  // Ensure migrations are run
+  final metadata = await MetadataStore.create(config);
+  await metadata.runMigrations();
+  await metadata.close();
+
+  // Run admin commands
+  await adminCommands(args, config);
 }

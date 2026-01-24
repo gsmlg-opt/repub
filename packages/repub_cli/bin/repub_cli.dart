@@ -18,6 +18,8 @@ void main(List<String> args) async {
       await runMigrate();
     case 'token':
       await runTokenCommand(subArgs);
+    case 'admin':
+      await runAdminCommand(subArgs);
     case 'help':
     case '--help':
     case '-h':
