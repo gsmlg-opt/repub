@@ -8,6 +8,8 @@ import 'screens/local_packages_screen.dart';
 import 'screens/cached_packages_screen.dart';
 import 'screens/site_config_screen.dart';
 import 'screens/users_screen.dart';
+import 'screens/admin_users_screen.dart';
+import 'screens/admin_user_detail_screen.dart';
 
 void main() {
   usePathUrlStrategy(); // Use HTML5 path-based routing instead of hash
@@ -53,6 +55,17 @@ final _router = GoRouter(
     GoRoute(
       path: '/users',
       builder: (context, state) => const UsersScreen(),
+    ),
+    GoRoute(
+      path: '/admin-users',
+      builder: (context, state) => const AdminUsersScreen(),
+    ),
+    GoRoute(
+      path: '/admin-users/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return AdminUserDetailScreen(adminUserId: id);
+      },
     ),
   ],
 );

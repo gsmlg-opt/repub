@@ -450,7 +450,85 @@ class AdminApiClient {
     }
   }
 
+  Future<List<AdminUser>> listAdminUsers() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/admin-users'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to list admin users: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final adminUsers = (json['adminUsers'] as List<dynamic>?)
+            ?.map((u) => AdminUser.fromJson(u as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return adminUsers;
+  }
+
+  Future<AdminUserDetail> getAdminUser(String id) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/admin-users/$id'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch admin user: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final adminUser =
+        AdminUser.fromJson(json['adminUser'] as Map<String, dynamic>);
+    final recentLogins = (json['recentLogins'] as List<dynamic>?)
+            ?.map((l) => AdminLoginHistory.fromJson(l as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return AdminUserDetail(adminUser: adminUser, recentLogins: recentLogins);
+  }
+
+  Future<List<AdminLoginHistory>> getAdminLoginHistory(String id) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/admin-users/$id/login-history'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch login history: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final loginHistory = (json['loginHistory'] as List<dynamic>?)
+            ?.map((l) => AdminLoginHistory.fromJson(l as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return loginHistory;
+  }
+
   void dispose() {
     _client.close();
   }
+}
+
+class AdminUserDetail {
+  final AdminUser adminUser;
+  final List<AdminLoginHistory> recentLogins;
+
+  const AdminUserDetail({
+    required this.adminUser,
+    required this.recentLogins,
+  });
 }

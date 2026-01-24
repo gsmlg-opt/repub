@@ -48,7 +48,8 @@ class AdminLayout extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, {required bool showMenuButton}) {
+  PreferredSizeWidget _buildAppBar(BuildContext context,
+      {required bool showMenuButton}) {
     return AppBar(
       leading: showMenuButton ? null : const SizedBox.shrink(),
       automaticallyImplyLeading: showMenuButton,
@@ -123,6 +124,13 @@ class AdminLayout extends StatelessWidget {
             icon: Icons.people,
             title: 'User Management',
             path: '/users',
+            isPermanent: isPermanent,
+          ),
+          _buildNavItem(
+            context,
+            icon: Icons.admin_panel_settings,
+            title: 'Admin Users',
+            path: '/admin-users',
             isPermanent: isPermanent,
           ),
           _buildNavItem(
