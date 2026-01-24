@@ -216,6 +216,69 @@ abstract class MetadataStore {
 
   /// Clean up expired user sessions.
   Future<int> cleanupExpiredUserSessions();
+
+  // ============ Admin Users ============
+
+  /// Create a new admin user, returns the user ID.
+  Future<String> createAdminUser({
+    required String username,
+    required String passwordHash,
+    String? name,
+  });
+
+  /// Get an admin user by ID.
+  Future<AdminUser?> getAdminUser(String id);
+
+  /// Get an admin user by username.
+  Future<AdminUser?> getAdminUserByUsername(String username);
+
+  /// Update an admin user's profile.
+  Future<bool> updateAdminUser(String id,
+      {String? name, String? passwordHash, bool? isActive});
+
+  /// Update admin's last login timestamp.
+  Future<void> touchAdminLogin(String id);
+
+  /// Delete an admin user.
+  Future<bool> deleteAdminUser(String id);
+
+  /// List all admin users with pagination.
+  Future<List<AdminUser>> listAdminUsers({int page = 1, int limit = 20});
+
+  // ============ Admin Sessions ============
+
+  /// Create an admin session, returns the session object with ID.
+  Future<UserSession> createAdminSession({
+    required String adminUserId,
+    Duration ttl = const Duration(hours: 8),
+  });
+
+  /// Get an admin session by ID.
+  Future<UserSession?> getAdminSession(String sessionId);
+
+  /// Delete an admin session.
+  Future<bool> deleteAdminSession(String sessionId);
+
+  // ============ Admin Login History ============
+
+  /// Log an admin login attempt.
+  Future<String> logAdminLogin({
+    required String adminUserId,
+    String? ipAddress,
+    String? userAgent,
+    bool success = true,
+  });
+
+  /// Get login history for a specific admin user.
+  Future<List<AdminLoginHistory>> getAdminLoginHistory({
+    required String adminUserId,
+    int limit = 50,
+  });
+
+  /// Get recent login history across all admin users.
+  Future<List<AdminLoginHistory>> getRecentAdminLogins({
+    int limit = 100,
+  });
 }
 
 /// Metadata storage backed by PostgreSQL.
@@ -1035,8 +1098,8 @@ class PostgresMetadataStore extends MetadataStore {
 
     await _conn.execute(
       Sql.named('''
-        INSERT INTO user_sessions (session_id, user_id, created_at, expires_at)
-        VALUES (@sessionId, @userId, @createdAt, @expiresAt)
+        INSERT INTO user_sessions (session_id, user_id, created_at, expires_at, session_type)
+        VALUES (@sessionId, @userId, @createdAt, @expiresAt, 'user')
       '''),
       parameters: {
         'sessionId': sessionId,
@@ -1051,6 +1114,7 @@ class PostgresMetadataStore extends MetadataStore {
       userId: userId,
       createdAt: now,
       expiresAt: expiresAt,
+      type: SessionType.user,
     );
   }
 
@@ -1058,7 +1122,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<UserSession?> getUserSession(String sessionId) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT session_id, user_id, created_at, expires_at
+        SELECT session_id, user_id, created_at, expires_at, session_type
         FROM user_sessions WHERE session_id = @sessionId
       '''),
       parameters: {'sessionId': sessionId},
@@ -1070,6 +1134,7 @@ class PostgresMetadataStore extends MetadataStore {
       userId: row[1] as String,
       createdAt: row[2] as DateTime,
       expiresAt: row[3] as DateTime,
+      type: SessionType.fromString(row[4] as String),
     );
   }
 
@@ -1088,6 +1153,294 @@ class PostgresMetadataStore extends MetadataStore {
       'DELETE FROM user_sessions WHERE expires_at < NOW()',
     );
     return result.affectedRows;
+  }
+
+  // ============ Admin Users ============
+
+  @override
+  Future<String> createAdminUser({
+    required String username,
+    required String passwordHash,
+    String? name,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO admin_users (id, username, password_hash, name)
+        VALUES (@id, @username, @passwordHash, @name)
+      '''),
+      parameters: {
+        'id': id,
+        'username': username,
+        'passwordHash': passwordHash,
+        'name': name,
+      },
+    );
+    return id;
+  }
+
+  @override
+  Future<AdminUser?> getAdminUser(String id) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+        FROM admin_users WHERE id = @id
+      '''),
+      parameters: {'id': id},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return AdminUser(
+      id: row[0] as String,
+      username: row[1] as String,
+      passwordHash: row[2] as String?,
+      name: row[3] as String?,
+      isActive: row[4] as bool,
+      createdAt: row[5] as DateTime,
+      lastLoginAt: row[6] as DateTime?,
+    );
+  }
+
+  @override
+  Future<AdminUser?> getAdminUserByUsername(String username) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+        FROM admin_users WHERE username = @username
+      '''),
+      parameters: {'username': username},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return AdminUser(
+      id: row[0] as String,
+      username: row[1] as String,
+      passwordHash: row[2] as String?,
+      name: row[3] as String?,
+      isActive: row[4] as bool,
+      createdAt: row[5] as DateTime,
+      lastLoginAt: row[6] as DateTime?,
+    );
+  }
+
+  @override
+  Future<bool> updateAdminUser(String id,
+      {String? name, String? passwordHash, bool? isActive}) async {
+    final updates = <String>[];
+    final params = <String, Object?>{'id': id};
+    if (name != null) {
+      updates.add('name = @name');
+      params['name'] = name;
+    }
+    if (passwordHash != null) {
+      updates.add('password_hash = @passwordHash');
+      params['passwordHash'] = passwordHash;
+    }
+    if (isActive != null) {
+      updates.add('is_active = @isActive');
+      params['isActive'] = isActive;
+    }
+    if (updates.isEmpty) return false;
+
+    final result = await _conn.execute(
+      Sql.named('UPDATE admin_users SET ${updates.join(', ')} WHERE id = @id'),
+      parameters: params,
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<void> touchAdminLogin(String id) async {
+    await _conn.execute(
+      Sql.named('UPDATE admin_users SET last_login_at = NOW() WHERE id = @id'),
+      parameters: {'id': id},
+    );
+  }
+
+  @override
+  Future<bool> deleteAdminUser(String id) async {
+    // Delete admin sessions
+    await _conn.execute(
+      Sql.named(
+          "DELETE FROM user_sessions WHERE user_id = @id AND session_type = 'admin'"),
+      parameters: {'id': id},
+    );
+    // Delete admin user
+    final result = await _conn.execute(
+      Sql.named('DELETE FROM admin_users WHERE id = @id'),
+      parameters: {'id': id},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<List<AdminUser>> listAdminUsers({int page = 1, int limit = 20}) async {
+    final offset = (page - 1) * limit;
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+        FROM admin_users ORDER BY created_at DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'limit': limit, 'offset': offset},
+    );
+    return result
+        .map((row) => AdminUser(
+              id: row[0] as String,
+              username: row[1] as String,
+              passwordHash: row[2] as String?,
+              name: row[3] as String?,
+              isActive: row[4] as bool,
+              createdAt: row[5] as DateTime,
+              lastLoginAt: row[6] as DateTime?,
+            ))
+        .toList();
+  }
+
+  // ============ Admin Sessions ============
+
+  @override
+  Future<UserSession> createAdminSession({
+    required String adminUserId,
+    Duration ttl = const Duration(hours: 8),
+  }) async {
+    final sessionId = sha256
+        .convert(
+            utf8.encode(MetadataStore._uuid.v4() + MetadataStore._uuid.v4()))
+        .toString();
+    final now = DateTime.now();
+    final expiresAt = now.add(ttl);
+
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO user_sessions (session_id, user_id, created_at, expires_at, session_type)
+        VALUES (@sessionId, @userId, @createdAt, @expiresAt, 'admin')
+      '''),
+      parameters: {
+        'sessionId': sessionId,
+        'userId': adminUserId,
+        'createdAt': now,
+        'expiresAt': expiresAt,
+      },
+    );
+
+    return UserSession(
+      sessionId: sessionId,
+      userId: adminUserId,
+      createdAt: now,
+      expiresAt: expiresAt,
+      type: SessionType.admin,
+    );
+  }
+
+  @override
+  Future<UserSession?> getAdminSession(String sessionId) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT session_id, user_id, created_at, expires_at, session_type
+        FROM user_sessions WHERE session_id = @sessionId AND session_type = 'admin'
+      '''),
+      parameters: {'sessionId': sessionId},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return UserSession(
+      sessionId: row[0] as String,
+      userId: row[1] as String,
+      createdAt: row[2] as DateTime,
+      expiresAt: row[3] as DateTime,
+      type: SessionType.fromString(row[4] as String),
+    );
+  }
+
+  @override
+  Future<bool> deleteAdminSession(String sessionId) async {
+    final result = await _conn.execute(
+      Sql.named(
+          "DELETE FROM user_sessions WHERE session_id = @sessionId AND session_type = 'admin'"),
+      parameters: {'sessionId': sessionId},
+    );
+    return result.affectedRows > 0;
+  }
+
+  // ============ Admin Login History ============
+
+  @override
+  Future<String> logAdminLogin({
+    required String adminUserId,
+    String? ipAddress,
+    String? userAgent,
+    bool success = true,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO admin_login_history (id, admin_user_id, ip_address, user_agent, success)
+        VALUES (@id, @adminUserId, @ipAddress, @userAgent, @success)
+      '''),
+      parameters: {
+        'id': id,
+        'adminUserId': adminUserId,
+        'ipAddress': ipAddress,
+        'userAgent': userAgent,
+        'success': success,
+      },
+    );
+    return id;
+  }
+
+  @override
+  Future<List<AdminLoginHistory>> getAdminLoginHistory({
+    required String adminUserId,
+    int limit = 50,
+  }) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, admin_user_id, login_at, ip_address, user_agent, success
+        FROM admin_login_history
+        WHERE admin_user_id = @adminUserId
+        ORDER BY login_at DESC
+        LIMIT @limit
+      '''),
+      parameters: {'adminUserId': adminUserId, 'limit': limit},
+    );
+
+    return result
+        .map((row) => AdminLoginHistory(
+              id: row[0] as String,
+              adminUserId: row[1] as String,
+              loginAt: row[2] as DateTime,
+              ipAddress: row[3] as String?,
+              userAgent: row[4] as String?,
+              success: row[5] as bool,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<List<AdminLoginHistory>> getRecentAdminLogins({
+    int limit = 100,
+  }) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT id, admin_user_id, login_at, ip_address, user_agent, success
+        FROM admin_login_history
+        ORDER BY login_at DESC
+        LIMIT @limit
+      '''),
+      parameters: {'limit': limit},
+    );
+
+    return result
+        .map((row) => AdminLoginHistory(
+              id: row[0] as String,
+              adminUserId: row[1] as String,
+              loginAt: row[2] as DateTime,
+              ipAddress: row[3] as String?,
+              userAgent: row[4] as String?,
+              success: row[5] as bool,
+            ))
+        .toList();
   }
 }
 
@@ -1824,8 +2177,8 @@ class SqliteMetadataStore extends MetadataStore {
     final expiresAt = now.add(ttl);
 
     _db.execute('''
-      INSERT INTO user_sessions (session_id, user_id, created_at, expires_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO user_sessions (session_id, user_id, created_at, expires_at, session_type)
+      VALUES (?, ?, ?, ?, 'user')
     ''', [
       sessionId,
       userId,
@@ -1838,13 +2191,14 @@ class SqliteMetadataStore extends MetadataStore {
       userId: userId,
       createdAt: now,
       expiresAt: expiresAt,
+      type: SessionType.user,
     );
   }
 
   @override
   Future<UserSession?> getUserSession(String sessionId) async {
     final result = _db.select('''
-      SELECT session_id, user_id, created_at, expires_at
+      SELECT session_id, user_id, created_at, expires_at, session_type
       FROM user_sessions WHERE session_id = ?
     ''', [sessionId]);
     if (result.isEmpty) return null;
@@ -1854,6 +2208,7 @@ class SqliteMetadataStore extends MetadataStore {
       userId: row['user_id'] as String,
       createdAt: DateTime.parse(row['created_at'] as String),
       expiresAt: DateTime.parse(row['expires_at'] as String),
+      type: SessionType.fromString(row['session_type'] as String),
     );
   }
 
@@ -1868,6 +2223,255 @@ class SqliteMetadataStore extends MetadataStore {
     final now = DateTime.now().toIso8601String();
     _db.execute('DELETE FROM user_sessions WHERE expires_at < ?', [now]);
     return _db.updatedRows;
+  }
+
+  // ============ Admin Users ============
+
+  @override
+  Future<String> createAdminUser({
+    required String username,
+    required String passwordHash,
+    String? name,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    final now = DateTime.now().toIso8601String();
+    _db.execute('''
+      INSERT INTO admin_users (id, username, password_hash, name, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    ''', [id, username, passwordHash, name, now]);
+    return id;
+  }
+
+  @override
+  Future<AdminUser?> getAdminUser(String id) async {
+    final result = _db.select('''
+      SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+      FROM admin_users WHERE id = ?
+    ''', [id]);
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return AdminUser(
+      id: row['id'] as String,
+      username: row['username'] as String,
+      passwordHash: row['password_hash'] as String?,
+      name: row['name'] as String?,
+      isActive: (row['is_active'] as int) == 1,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      lastLoginAt: row['last_login_at'] != null
+          ? DateTime.parse(row['last_login_at'] as String)
+          : null,
+    );
+  }
+
+  @override
+  Future<AdminUser?> getAdminUserByUsername(String username) async {
+    final result = _db.select('''
+      SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+      FROM admin_users WHERE username = ?
+    ''', [username]);
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return AdminUser(
+      id: row['id'] as String,
+      username: row['username'] as String,
+      passwordHash: row['password_hash'] as String?,
+      name: row['name'] as String?,
+      isActive: (row['is_active'] as int) == 1,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      lastLoginAt: row['last_login_at'] != null
+          ? DateTime.parse(row['last_login_at'] as String)
+          : null,
+    );
+  }
+
+  @override
+  Future<bool> updateAdminUser(String id,
+      {String? name, String? passwordHash, bool? isActive}) async {
+    final updates = <String>[];
+    final params = <Object?>[];
+    if (name != null) {
+      updates.add('name = ?');
+      params.add(name);
+    }
+    if (passwordHash != null) {
+      updates.add('password_hash = ?');
+      params.add(passwordHash);
+    }
+    if (isActive != null) {
+      updates.add('is_active = ?');
+      params.add(isActive ? 1 : 0);
+    }
+    if (updates.isEmpty) return false;
+
+    params.add(id);
+    _db.execute(
+        'UPDATE admin_users SET ${updates.join(', ')} WHERE id = ?', params);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<void> touchAdminLogin(String id) async {
+    final now = DateTime.now().toIso8601String();
+    _db.execute(
+        'UPDATE admin_users SET last_login_at = ? WHERE id = ?', [now, id]);
+  }
+
+  @override
+  Future<bool> deleteAdminUser(String id) async {
+    // Delete admin sessions
+    _db.execute(
+        "DELETE FROM user_sessions WHERE user_id = ? AND session_type = 'admin'",
+        [id]);
+    // Delete admin user
+    _db.execute('DELETE FROM admin_users WHERE id = ?', [id]);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<List<AdminUser>> listAdminUsers({int page = 1, int limit = 20}) async {
+    final offset = (page - 1) * limit;
+    final result = _db.select('''
+      SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+      FROM admin_users ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    ''', [limit, offset]);
+    return result
+        .map((row) => AdminUser(
+              id: row['id'] as String,
+              username: row['username'] as String,
+              passwordHash: row['password_hash'] as String?,
+              name: row['name'] as String?,
+              isActive: (row['is_active'] as int) == 1,
+              createdAt: DateTime.parse(row['created_at'] as String),
+              lastLoginAt: row['last_login_at'] != null
+                  ? DateTime.parse(row['last_login_at'] as String)
+                  : null,
+            ))
+        .toList();
+  }
+
+  // ============ Admin Sessions ============
+
+  @override
+  Future<UserSession> createAdminSession({
+    required String adminUserId,
+    Duration ttl = const Duration(hours: 8),
+  }) async {
+    final sessionId = sha256
+        .convert(
+            utf8.encode(MetadataStore._uuid.v4() + MetadataStore._uuid.v4()))
+        .toString();
+    final now = DateTime.now();
+    final expiresAt = now.add(ttl);
+
+    _db.execute('''
+      INSERT INTO user_sessions (session_id, user_id, created_at, expires_at, session_type)
+      VALUES (?, ?, ?, ?, 'admin')
+    ''', [
+      sessionId,
+      adminUserId,
+      now.toIso8601String(),
+      expiresAt.toIso8601String()
+    ]);
+
+    return UserSession(
+      sessionId: sessionId,
+      userId: adminUserId,
+      createdAt: now,
+      expiresAt: expiresAt,
+      type: SessionType.admin,
+    );
+  }
+
+  @override
+  Future<UserSession?> getAdminSession(String sessionId) async {
+    final result = _db.select('''
+      SELECT session_id, user_id, created_at, expires_at, session_type
+      FROM user_sessions WHERE session_id = ? AND session_type = 'admin'
+    ''', [sessionId]);
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return UserSession(
+      sessionId: row['session_id'] as String,
+      userId: row['user_id'] as String,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      expiresAt: DateTime.parse(row['expires_at'] as String),
+      type: SessionType.fromString(row['session_type'] as String),
+    );
+  }
+
+  @override
+  Future<bool> deleteAdminSession(String sessionId) async {
+    _db.execute(
+        "DELETE FROM user_sessions WHERE session_id = ? AND session_type = 'admin'",
+        [sessionId]);
+    return _db.updatedRows > 0;
+  }
+
+  // ============ Admin Login History ============
+
+  @override
+  Future<String> logAdminLogin({
+    required String adminUserId,
+    String? ipAddress,
+    String? userAgent,
+    bool success = true,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    final now = DateTime.now().toIso8601String();
+    _db.execute('''
+      INSERT INTO admin_login_history (id, admin_user_id, login_at, ip_address, user_agent, success)
+      VALUES (?, ?, ?, ?, ?, ?)
+    ''', [id, adminUserId, now, ipAddress, userAgent, success ? 1 : 0]);
+    return id;
+  }
+
+  @override
+  Future<List<AdminLoginHistory>> getAdminLoginHistory({
+    required String adminUserId,
+    int limit = 50,
+  }) async {
+    final result = _db.select('''
+      SELECT id, admin_user_id, login_at, ip_address, user_agent, success
+      FROM admin_login_history
+      WHERE admin_user_id = ?
+      ORDER BY login_at DESC
+      LIMIT ?
+    ''', [adminUserId, limit]);
+
+    return result
+        .map((row) => AdminLoginHistory(
+              id: row['id'] as String,
+              adminUserId: row['admin_user_id'] as String,
+              loginAt: DateTime.parse(row['login_at'] as String),
+              ipAddress: row['ip_address'] as String?,
+              userAgent: row['user_agent'] as String?,
+              success: (row['success'] as int) == 1,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<List<AdminLoginHistory>> getRecentAdminLogins({
+    int limit = 100,
+  }) async {
+    final result = _db.select('''
+      SELECT id, admin_user_id, login_at, ip_address, user_agent, success
+      FROM admin_login_history
+      ORDER BY login_at DESC
+      LIMIT ?
+    ''', [limit]);
+
+    return result
+        .map((row) => AdminLoginHistory(
+              id: row['id'] as String,
+              adminUserId: row['admin_user_id'] as String,
+              loginAt: DateTime.parse(row['login_at'] as String),
+              ipAddress: row['ip_address'] as String?,
+              userAgent: row['user_agent'] as String?,
+              success: (row['success'] as int) == 1,
+            ))
+        .toList();
   }
 }
 
@@ -1975,6 +2579,38 @@ const _postgresMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
     CREATE INDEX IF NOT EXISTS idx_packages_owner ON packages(owner_id);
   ''',
+  '004_admin_authentication': '''
+    -- Admin users table (separate from regular users)
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      username VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(255),
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_login_at TIMESTAMPTZ NULL
+    );
+
+    -- Add session type discriminator to user_sessions
+    ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS session_type VARCHAR(50) NOT NULL DEFAULT 'user';
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_type ON user_sessions(session_type);
+  ''',
+  '005_admin_login_history': '''
+    -- Admin login history table
+    CREATE TABLE IF NOT EXISTS admin_login_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      admin_user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+      login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      success BOOLEAN NOT NULL DEFAULT TRUE
+    );
+
+    -- Index for faster lookups by admin user
+    CREATE INDEX IF NOT EXISTS idx_admin_login_history_user ON admin_login_history(admin_user_id);
+    -- Index for time-based queries
+    CREATE INDEX IF NOT EXISTS idx_admin_login_history_time ON admin_login_history(login_at DESC);
+  ''',
 };
 
 // SQLite migrations
@@ -2080,6 +2716,38 @@ const _sqliteMigrations = <String, String>{
 
     CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
     CREATE INDEX IF NOT EXISTS idx_packages_owner ON packages(owner_id);
+  ''',
+  '004_admin_authentication': '''
+    -- Admin users table (separate from regular users)
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at TEXT NULL
+    );
+
+    -- Add session type discriminator to user_sessions
+    ALTER TABLE user_sessions ADD COLUMN session_type TEXT NOT NULL DEFAULT 'user';
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_type ON user_sessions(session_type);
+  ''',
+  '005_admin_login_history': '''
+    -- Admin login history table
+    CREATE TABLE IF NOT EXISTS admin_login_history (
+      id TEXT PRIMARY KEY,
+      admin_user_id TEXT NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+      login_at TEXT NOT NULL DEFAULT (datetime('now')),
+      ip_address TEXT,
+      user_agent TEXT,
+      success INTEGER NOT NULL DEFAULT 1
+    );
+
+    -- Index for faster lookups by admin user
+    CREATE INDEX IF NOT EXISTS idx_admin_login_history_user ON admin_login_history(admin_user_id);
+    -- Index for time-based queries
+    CREATE INDEX IF NOT EXISTS idx_admin_login_history_time ON admin_login_history(login_at DESC);
   ''',
 };
 
