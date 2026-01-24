@@ -57,19 +57,37 @@ class User {
       );
 }
 
+/// Session type discriminator for user sessions.
+enum SessionType {
+  user,
+  admin;
+
+  String get value => name;
+
+  static SessionType fromString(String value) {
+    return SessionType.values.firstWhere(
+      (type) => type.name == value,
+      orElse: () => SessionType.user,
+    );
+  }
+}
+
 /// User session for web authentication.
 class UserSession {
   final String sessionId;
   final String userId;
   final DateTime createdAt;
   final DateTime expiresAt;
+  final SessionType type;
 
   const UserSession({
     required this.sessionId,
     required this.userId,
     required this.createdAt,
     required this.expiresAt,
+    this.type = SessionType.user,
   });
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
+  bool get isAdmin => type == SessionType.admin;
 }
