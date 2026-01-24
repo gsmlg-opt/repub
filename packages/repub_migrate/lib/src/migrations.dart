@@ -63,6 +63,38 @@ const migrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_packages_upstream_cache
       ON packages(is_upstream_cache);
   ''',
+  '003_admin_authentication': '''
+    -- Admin users table (separate from regular users)
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      username VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(255),
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_login_at TIMESTAMPTZ NULL
+    );
+
+    -- Add session type discriminator to user_sessions
+    ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS session_type VARCHAR(50) NOT NULL DEFAULT 'user';
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_type ON user_sessions(session_type);
+  ''',
+  '004_admin_login_history': '''
+    -- Admin login history table
+    CREATE TABLE IF NOT EXISTS admin_login_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      admin_user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+      login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      success BOOLEAN NOT NULL DEFAULT TRUE
+    );
+
+    -- Index for faster lookups by admin user
+    CREATE INDEX IF NOT EXISTS idx_admin_login_history_user ON admin_login_history(admin_user_id);
+    -- Index for time-based queries
+    CREATE INDEX IF NOT EXISTS idx_admin_login_history_time ON admin_login_history(login_at DESC);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.
