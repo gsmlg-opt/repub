@@ -26,3 +26,7 @@ coverage/
 
 # Local data
 /data/
+
+!.claude/commands
+!.claude/skills
+

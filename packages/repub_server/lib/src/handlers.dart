@@ -71,6 +71,9 @@ Router createRouter({
       handlers.adminDiscontinuePackage);
   router.delete('/admin/api/cache', handlers.adminClearCache);
   router.get('/admin/api/users', handlers.adminListUsers);
+  router.post('/admin/api/users', handlers.adminCreateUser);
+  router.put('/admin/api/users/<id>', handlers.adminUpdateUser);
+  router.delete('/admin/api/users/<id>', handlers.adminDeleteUser);
   router.get('/admin/api/config', handlers.adminGetAllConfig);
   router.put('/admin/api/config/<name>', handlers.adminSetConfig);
 
@@ -1208,6 +1211,112 @@ class ApiHandlers {
         'page': page,
         'limit': limit,
       }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// POST `/admin/api/users`
+  Future<Response> adminCreateUser(Request request) async {
+    final body = await request.readAsString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+
+    final email = json['email'] as String?;
+    final password = json['password'] as String?;
+    final name = json['name'] as String?;
+
+    if (email == null || email.isEmpty) {
+      return Response(400,
+          body: jsonEncode({'error': 'Email is required'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    // Check if user already exists
+    final existing = await metadata.getUserByEmail(email);
+    if (existing != null) {
+      return Response(409,
+          body: jsonEncode({'error': 'User with this email already exists'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    // Hash password if provided
+    String? passwordHash;
+    if (password != null && password.isNotEmpty) {
+      passwordHash = hashPassword(password);
+    }
+
+    final userId = await metadata.createUser(
+      email: email,
+      passwordHash: passwordHash,
+      name: name,
+    );
+
+    final user = await metadata.getUser(userId);
+    if (user == null) {
+      return Response(500,
+          body: jsonEncode({'error': 'Failed to create user'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    return Response.ok(
+      jsonEncode({'user': user.toJson()}),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// PUT `/admin/api/users/<id>`
+  Future<Response> adminUpdateUser(Request request, String id) async {
+    final body = await request.readAsString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+
+    final name = json['name'] as String?;
+    final password = json['password'] as String?;
+    final isActive = json['isActive'] as bool?;
+
+    // Hash password if provided
+    String? passwordHash;
+    if (password != null && password.isNotEmpty) {
+      passwordHash = hashPassword(password);
+    }
+
+    final success = await metadata.updateUser(
+      id,
+      name: name,
+      passwordHash: passwordHash,
+      isActive: isActive,
+    );
+
+    if (!success) {
+      return Response(404,
+          body: jsonEncode({'error': 'User not found'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    final user = await metadata.getUser(id);
+    return Response.ok(
+      jsonEncode({'user': user?.toJson()}),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// DELETE `/admin/api/users/<id>`
+  Future<Response> adminDeleteUser(Request request, String id) async {
+    // Prevent deleting anonymous user
+    if (id == User.anonymousId) {
+      return Response(400,
+          body: jsonEncode({'error': 'Cannot delete anonymous user'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    final success = await metadata.deleteUser(id);
+
+    if (!success) {
+      return Response(404,
+          body: jsonEncode({'error': 'User not found'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    return Response.ok(
+      jsonEncode({'success': {'message': 'User deleted successfully'}}),
       headers: {'content-type': 'application/json'},
     );
   }

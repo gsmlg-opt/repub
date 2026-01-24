@@ -120,6 +120,13 @@ class AdminLayout extends StatelessWidget {
           const Divider(),
           _buildNavItem(
             context,
+            icon: Icons.people,
+            title: 'User Management',
+            path: '/users',
+            isPermanent: isPermanent,
+          ),
+          _buildNavItem(
+            context,
             icon: Icons.settings,
             title: 'Site Configuration',
             path: '/config',

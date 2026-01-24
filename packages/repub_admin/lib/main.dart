@@ -7,6 +7,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/local_packages_screen.dart';
 import 'screens/cached_packages_screen.dart';
 import 'screens/site_config_screen.dart';
+import 'screens/users_screen.dart';
 
 void main() {
   usePathUrlStrategy(); // Use HTML5 path-based routing instead of hash
@@ -48,6 +49,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/config',
       builder: (context, state) => const SiteConfigScreen(),
+    ),
+    GoRoute(
+      path: '/users',
+      builder: (context, state) => const UsersScreen(),
     ),
   ],
 );

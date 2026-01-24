@@ -61,6 +61,24 @@ class ClearCacheResult {
   });
 }
 
+class UserListResponse {
+  final List<User> users;
+  final int total;
+  final int page;
+  final int limit;
+
+  int get totalPages => (total / limit).ceil();
+  bool get hasPrevPage => page > 1;
+  bool get hasNextPage => page < totalPages;
+
+  const UserListResponse({
+    required this.users,
+    required this.total,
+    required this.page,
+    required this.limit,
+  });
+}
+
 class AdminApiException implements Exception {
   final int statusCode;
   final String message;
@@ -331,6 +349,103 @@ class AdminApiClient {
       throw AdminApiException(
         statusCode: response.statusCode,
         message: 'Failed to update config: ${response.body}',
+      );
+    }
+  }
+
+  Future<UserListResponse> listUsers({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/users?page=$page&limit=$limit'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to list users: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final users = (json['users'] as List<dynamic>?)
+            ?.map((u) => User.fromJson(u as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return UserListResponse(
+      users: users,
+      total: json['total'] as int? ?? users.length,
+      page: json['page'] as int? ?? page,
+      limit: json['limit'] as int? ?? limit,
+    );
+  }
+
+  Future<User> createUser({
+    required String email,
+    required String password,
+    String? name,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/admin/api/users'),
+      headers: _headers,
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        if (name != null) 'name': name,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to create user: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return User.fromJson(json['user'] as Map<String, dynamic>);
+  }
+
+  Future<User> updateUser(
+    String id, {
+    String? name,
+    String? password,
+    bool? isActive,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$baseUrl/admin/api/users/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        if (name != null) 'name': name,
+        if (password != null) 'password': password,
+        if (isActive != null) 'isActive': isActive,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to update user: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return User.fromJson(json['user'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteUser(String id) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/admin/api/users/$id'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to delete user: ${response.body}',
       );
     }
   }
