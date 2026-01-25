@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../services/auth_service.dart';
 
 class AdminLayout extends StatelessWidget {
   final Widget child;
@@ -55,6 +57,15 @@ class AdminLayout extends StatelessWidget {
       automaticallyImplyLeading: showMenuButton,
       title: const Text('Repub Admin'),
       backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: () {
+            context.read<AuthBloc>().add(AuthLogoutRequested());
+          },
+          tooltip: 'Logout',
+        ),
+      ],
     );
   }
 

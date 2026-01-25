@@ -1,30 +1,59 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../services/admin_api_client.dart';
 import '../widgets/admin_layout.dart';
 
-final adminApiClientProvider = Provider((ref) => AdminApiClient());
-
-final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
-  final client = ref.watch(adminApiClientProvider);
-  return client.getStats();
-});
-
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final statsAsync = ref.watch(adminStatsProvider);
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
 
+class _DashboardScreenState extends State<DashboardScreen> {
+  final _apiClient = AdminApiClient();
+  late Future<AdminStats> _statsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statsFuture = _apiClient.getStats();
+  }
+
+  @override
+  void dispose() {
+    _apiClient.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    setState(() {
+      _statsFuture = _apiClient.getStats();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AdminLayout(
       currentPath: '/',
-      child: statsAsync.when(
-        data: (stats) => _buildDashboard(context, stats),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => _buildError(context, error.toString(), ref),
+      child: FutureBuilder<AdminStats>(
+        future: _statsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return _buildError(context, snapshot.error.toString());
+          }
+
+          if (!snapshot.hasData) {
+            return _buildError(context, 'No data available');
+          }
+
+          return _buildDashboard(context, snapshot.data!);
+        },
       ),
     );
   }
@@ -213,7 +242,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildError(BuildContext context, String error, WidgetRef ref) {
+  Widget _buildError(BuildContext context, String error) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -236,7 +265,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () => ref.refresh(adminStatsProvider),
+              onPressed: _refresh,
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
             ),
