@@ -167,8 +167,59 @@ Future<void> main(List<String> args) async {
 })();
 </script>
 ''';
-          // Inject before </head>
-          final patched = body.replaceFirst('</head>', '$patchScript</head>');
+
+          // Inject the auto-run script at the end of body (after defer scripts have registered)
+          const autoRunScript = '''
+<script>
+// Auto-run Dart main function after modules are loaded
+// This fixes an issue where defer scripts don't auto-execute through the proxy
+(function() {
+  function tryRunMain() {
+    // Check if require.js is loaded
+    if (typeof require !== 'undefined' && require.s && require.s.contexts) {
+      var app = document.querySelector('#app');
+      // Check if main module is defined but app hasn't rendered
+      if (app && !app.hasChildNodes()) {
+        // Check if main is already defined
+        var ctx = require.s.contexts._;
+        if (ctx.defined && ctx.defined['web/main']) {
+          // Main module is loaded, trigger it via \$dartRunMain
+          if (window.\$dartRunMain) {
+            window.\$dartRunMain();
+            return true;
+          }
+        } else {
+          // Main module not loaded yet, manually trigger require
+          try {
+            require(['web/main']);
+            return true;
+          } catch (e) {
+            // Module not ready yet
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  // Set up interval checking
+  var attempts = 0;
+  var checkInterval = setInterval(function() {
+    attempts++;
+    if (tryRunMain() || attempts > 200) {  // Stop after 10 seconds (200 * 50ms)
+      clearInterval(checkInterval);
+    }
+  }, 50);
+})();
+</script>
+''';
+
+          // Fix defer attribute issue: remove defer from main.dart.js to ensure it executes
+          var patched = body.replaceAll('<script defer src="main.dart.js">', '<script src="main.dart.js">');
+
+          // Inject patch script before </head> and auto-run script before </body>
+          patched = patched.replaceFirst('</head>', '$patchScript</head>');
+          patched = patched.replaceFirst('</body>', '$autoRunScript</body>');
           response = response.change(body: patched);
         }
       }
