@@ -52,7 +52,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               Row(
                 children: [
                   FilledButton.icon(
-                    onPressed: () => ref.invalidate(usersProvider(_currentPage)),
+                    onPressed: () =>
+                        ref.invalidate(usersProvider(_currentPage)),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Refresh'),
                   ),

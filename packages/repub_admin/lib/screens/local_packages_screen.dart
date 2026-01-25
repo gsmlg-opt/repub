@@ -166,8 +166,7 @@ class _LocalPackagesScreenState extends ConsumerState<LocalPackagesScreen> {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () =>
-                  ref.refresh(localPackagesProvider(_currentPage)),
+              onPressed: () => ref.refresh(localPackagesProvider(_currentPage)),
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
             ),
