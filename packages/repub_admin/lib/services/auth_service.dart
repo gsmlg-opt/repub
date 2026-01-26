@@ -42,11 +42,11 @@ class AuthAuthenticated extends AuthState {
 }
 
 class AuthUnauthenticated extends AuthState {
-  const AuthUnauthenticated({String? error}) : super(error: error);
+  const AuthUnauthenticated({super.error});
 }
 
 class AuthLoading extends AuthState {
-  const AuthLoading({AdminUser? user}) : super(user: user, isLoading: true);
+  const AuthLoading({super.user}) : super(isLoading: true);
 }
 
 class AuthError extends AuthState {

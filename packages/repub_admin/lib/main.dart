@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -118,7 +120,7 @@ class GoRouterRefreshNotifier extends ChangeNotifier {
     });
   }
 
-  late final _subscription;
+  late final StreamSubscription<AuthState> _subscription;
 
   @override
   void dispose() {
