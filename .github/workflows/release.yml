@@ -3,187 +3,149 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g., 1.0.0)'
+      version_bump:
+        description: 'Version bump type'
         required: true
-      prerelease:
-        description: 'Mark as pre-release'
-        required: false
-        type: boolean
-        default: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
 
 jobs:
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: repub
-          POSTGRES_PASSWORD: repub
-          POSTGRES_DB: repub
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U repub"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: stable
-
-      - name: Install Melos
-        run: dart pub global activate melos
-
-      - name: Bootstrap workspace
-        run: melos bootstrap
-
-      - name: Analyze
-        run: melos run analyze
-
-      - name: Start MinIO
-        run: |
-          docker run -d --name minio \
-            -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin \
-            -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
-
-          sleep 5
-
-          docker run --rm --network host \
-            --entrypoint /bin/sh minio/mc:latest -c "
-              mc alias set local http://localhost:9000 minioadmin minioadmin &&
-              mc mb local/repub
-            "
-
-      - name: Run unit tests
-        run: melos run test
-
-      - name: Run integration tests
-        env:
-          REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
-          REPUB_S3_ENDPOINT: http://localhost:9000
-          REPUB_S3_ACCESS_KEY: minioadmin
-          REPUB_S3_SECRET_KEY: minioadmin
-          REPUB_S3_BUCKET: repub
-          REPUB_S3_REGION: us-east-1
-        run: |
-          cd packages/repub_cli
-          dart run repub_cli migrate
-          cd ../repub_server
-          if [ -d "integration_test" ]; then
-            dart test integration_test/
-          else
-            echo "No integration tests found, skipping"
-          fi
-
-  build:
-    name: Build Release Binaries
-    needs: test
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: stable
-
-      - name: Install Melos
-        run: dart pub global activate melos
-
-      - name: Bootstrap workspace
-        run: melos bootstrap
-
-      - name: Compile server binary
-        run: |
-          dart compile exe packages/repub_server/bin/repub_server.dart \
-            -o repub_server-linux-x64
-
-      - name: Compile CLI binary
-        run: |
-          dart compile exe packages/repub_cli/bin/repub_cli.dart \
-            -o repub_cli-linux-x64
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: binaries-linux-x64
-          path: |
-            repub_server-linux-x64
-            repub_cli-linux-x64
-
   release:
     name: Create Release
-    needs: build
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+          # Remove 'v' prefix for version manipulation
+          VERSION=${LATEST_TAG#v}
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        id: bump_version
+        run: |
+          VERSION="${{ steps.get_tag.outputs.current_version }}"
+          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+
+          MAJOR="${VERSION_PARTS[0]}"
+          MINOR="${VERSION_PARTS[1]}"
+          PATCH="${VERSION_PARTS[2]}"
+
+          case "${{ github.event.inputs.version_bump }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          NEW_TAG="v$NEW_VERSION"
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          PREVIOUS_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          NEW_TAG="${{ steps.bump_version.outputs.new_tag }}"
+
+          # Get commits since last tag
+          COMMITS=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+
+          # Categorize commits
+          FEATURES=$(echo "$COMMITS" | grep -i "^- feat" || true)
+          FIXES=$(echo "$COMMITS" | grep -i "^- fix" || true)
+          DOCS=$(echo "$COMMITS" | grep -i "^- docs" || true)
+          CHORES=$(echo "$COMMITS" | grep -i "^- chore\|^- ci\|^- style" || true)
+
+          # Build release notes
+          cat > release_notes.md << 'EOFNOTES'
+          ## Changes in $NEW_TAG
+
+          EOFNOTES
+
+          if [ -n "$FEATURES" ]; then
+            cat >> release_notes.md << 'EOFNOTES'
+          ### Features
+          $FEATURES
+
+          EOFNOTES
+          fi
+
+          if [ -n "$FIXES" ]; then
+            cat >> release_notes.md << 'EOFNOTES'
+          ### Bug Fixes
+          $FIXES
+
+          EOFNOTES
+          fi
+
+          if [ -n "$DOCS" ]; then
+            cat >> release_notes.md << 'EOFNOTES'
+          ### Documentation
+          $DOCS
+
+          EOFNOTES
+          fi
+
+          if [ -n "$CHORES" ]; then
+            cat >> release_notes.md << 'EOFNOTES'
+          ### Maintenance
+          $CHORES
+
+          EOFNOTES
+          fi
+
+          cat >> release_notes.md << 'EOFNOTES'
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${NEW_TAG}
+          EOFNOTES
+
+          # Replace variables in notes
+          sed -i "s|\$NEW_TAG|$NEW_TAG|g" release_notes.md
+          sed -i "s|\$FEATURES|$FEATURES|g" release_notes.md
+          sed -i "s|\$FIXES|$FIXES|g" release_notes.md
+          sed -i "s|\$DOCS|$DOCS|g" release_notes.md
+          sed -i "s|\$CHORES|$CHORES|g" release_notes.md
+          sed -i "s|\${PREVIOUS_TAG}|$PREVIOUS_TAG|g" release_notes.md
+
+          cat release_notes.md
 
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release files
-        run: |
-          mkdir -p release
-          find artifacts -type f -exec mv {} release/ \;
-          cd release
-          for file in *; do
-            sha256sum "$file" >> checksums.txt
-          done
+          git tag -a ${{ steps.bump_version.outputs.new_tag }} -m "Release ${{ steps.bump_version.outputs.new_tag }}"
+          git push origin ${{ steps.bump_version.outputs.new_tag }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
-          files: release/*
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ inputs.prerelease }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  docker:
-    name: Trigger Docker Build
-    needs: release
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Trigger Docker workflow
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'docker.yml',
-              ref: 'main',
-              inputs: {
-                tag: 'v${{ inputs.version }}',
-                'git-ref': 'v${{ inputs.version }}',
-                test: 'false'
-              }
-            });
-            // Docker workflow auto-tags latest when tag is not 'latest'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ steps.bump_version.outputs.new_tag }} \
+            --title "${{ steps.bump_version.outputs.new_tag }}" \
+            --notes-file release_notes.md
