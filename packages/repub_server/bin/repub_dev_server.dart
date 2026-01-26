@@ -215,7 +215,8 @@ Future<void> main(List<String> args) async {
 ''';
 
           // Fix defer attribute issue: remove defer from main.dart.js to ensure it executes
-          var patched = body.replaceAll('<script defer src="main.dart.js">', '<script src="main.dart.js">');
+          var patched = body.replaceAll('<script defer src="main.dart.js">',
+              '<script src="main.dart.js">');
 
           // Inject patch script before </head> and auto-run script before </body>
           patched = patched.replaceFirst('</head>', '$patchScript</head>');

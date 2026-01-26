@@ -14,9 +14,11 @@ class LocalPackagesScreen extends StatelessWidget {
           children: [
             Icon(Icons.inventory, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text('Local Packages', style: Theme.of(context).textTheme.headlineMedium),
+            Text('Local Packages',
+                style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            Text('Feature in development', style: TextStyle(color: Colors.grey[600])),
+            Text('Feature in development',
+                style: TextStyle(color: Colors.grey[600])),
           ],
         ),
       ),
