@@ -224,6 +224,7 @@ abstract class MetadataStore {
     required String username,
     required String passwordHash,
     String? name,
+    bool mustChangePassword = false,
   });
 
   /// Get an admin user by ID.
@@ -234,7 +235,7 @@ abstract class MetadataStore {
 
   /// Update an admin user's profile.
   Future<bool> updateAdminUser(String id,
-      {String? name, String? passwordHash, bool? isActive});
+      {String? name, String? passwordHash, bool? isActive, bool? mustChangePassword});
 
   /// Update admin's last login timestamp.
   Future<void> touchAdminLogin(String id);
@@ -244,6 +245,11 @@ abstract class MetadataStore {
 
   /// List all admin users with pagination.
   Future<List<AdminUser>> listAdminUsers({int page = 1, int limit = 20});
+
+  /// Ensure a default admin user exists (username: admin, password: admin).
+  /// Creates the user with mustChangePassword=true if no admin users exist.
+  /// Returns true if a default admin was created.
+  Future<bool> ensureDefaultAdminUser(String Function(String) hashPassword);
 
   // ============ Admin Sessions ============
 
@@ -1162,18 +1168,20 @@ class PostgresMetadataStore extends MetadataStore {
     required String username,
     required String passwordHash,
     String? name,
+    bool mustChangePassword = false,
   }) async {
     final id = MetadataStore._uuid.v4();
     await _conn.execute(
       Sql.named('''
-        INSERT INTO admin_users (id, username, password_hash, name)
-        VALUES (@id, @username, @passwordHash, @name)
+        INSERT INTO admin_users (id, username, password_hash, name, must_change_password)
+        VALUES (@id, @username, @passwordHash, @name, @mustChangePassword)
       '''),
       parameters: {
         'id': id,
         'username': username,
         'passwordHash': passwordHash,
         'name': name,
+        'mustChangePassword': mustChangePassword,
       },
     );
     return id;
@@ -1183,7 +1191,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<AdminUser?> getAdminUser(String id) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+        SELECT id, username, password_hash, name, is_active, must_change_password, created_at, last_login_at
         FROM admin_users WHERE id = @id
       '''),
       parameters: {'id': id},
@@ -1196,8 +1204,9 @@ class PostgresMetadataStore extends MetadataStore {
       passwordHash: row[2] as String?,
       name: row[3] as String?,
       isActive: row[4] as bool,
-      createdAt: row[5] as DateTime,
-      lastLoginAt: row[6] as DateTime?,
+      mustChangePassword: row[5] as bool? ?? false,
+      createdAt: row[6] as DateTime,
+      lastLoginAt: row[7] as DateTime?,
     );
   }
 
@@ -1205,7 +1214,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<AdminUser?> getAdminUserByUsername(String username) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+        SELECT id, username, password_hash, name, is_active, must_change_password, created_at, last_login_at
         FROM admin_users WHERE username = @username
       '''),
       parameters: {'username': username},
@@ -1218,14 +1227,18 @@ class PostgresMetadataStore extends MetadataStore {
       passwordHash: row[2] as String?,
       name: row[3] as String?,
       isActive: row[4] as bool,
-      createdAt: row[5] as DateTime,
-      lastLoginAt: row[6] as DateTime?,
+      mustChangePassword: row[5] as bool? ?? false,
+      createdAt: row[6] as DateTime,
+      lastLoginAt: row[7] as DateTime?,
     );
   }
 
   @override
   Future<bool> updateAdminUser(String id,
-      {String? name, String? passwordHash, bool? isActive}) async {
+      {String? name,
+      String? passwordHash,
+      bool? isActive,
+      bool? mustChangePassword}) async {
     final updates = <String>[];
     final params = <String, Object?>{'id': id};
     if (name != null) {
@@ -1239,6 +1252,10 @@ class PostgresMetadataStore extends MetadataStore {
     if (isActive != null) {
       updates.add('is_active = @isActive');
       params['isActive'] = isActive;
+    }
+    if (mustChangePassword != null) {
+      updates.add('must_change_password = @mustChangePassword');
+      params['mustChangePassword'] = mustChangePassword;
     }
     if (updates.isEmpty) return false;
 
@@ -1278,7 +1295,7 @@ class PostgresMetadataStore extends MetadataStore {
     final offset = (page - 1) * limit;
     final result = await _conn.execute(
       Sql.named('''
-        SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+        SELECT id, username, password_hash, name, is_active, must_change_password, created_at, last_login_at
         FROM admin_users ORDER BY created_at DESC
         LIMIT @limit OFFSET @offset
       '''),
@@ -1291,10 +1308,31 @@ class PostgresMetadataStore extends MetadataStore {
               passwordHash: row[2] as String?,
               name: row[3] as String?,
               isActive: row[4] as bool,
-              createdAt: row[5] as DateTime,
-              lastLoginAt: row[6] as DateTime?,
+              mustChangePassword: row[5] as bool? ?? false,
+              createdAt: row[6] as DateTime,
+              lastLoginAt: row[7] as DateTime?,
             ))
         .toList();
+  }
+
+  @override
+  Future<bool> ensureDefaultAdminUser(
+      String Function(String) hashPassword) async {
+    // Check if any admin users exist
+    final result = await _conn.execute(
+      Sql.named('SELECT COUNT(*) FROM admin_users'),
+    );
+    final count = result.first[0] as int;
+    if (count > 0) return false;
+
+    // Create default admin user with must_change_password=true
+    await createAdminUser(
+      username: 'admin',
+      passwordHash: hashPassword('admin'),
+      name: 'Default Admin',
+      mustChangePassword: true,
+    );
+    return true;
   }
 
   // ============ Admin Sessions ============
@@ -2232,20 +2270,21 @@ class SqliteMetadataStore extends MetadataStore {
     required String username,
     required String passwordHash,
     String? name,
+    bool mustChangePassword = false,
   }) async {
     final id = MetadataStore._uuid.v4();
     final now = DateTime.now().toIso8601String();
     _db.execute('''
-      INSERT INTO admin_users (id, username, password_hash, name, created_at)
-      VALUES (?, ?, ?, ?, ?)
-    ''', [id, username, passwordHash, name, now]);
+      INSERT INTO admin_users (id, username, password_hash, name, must_change_password, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    ''', [id, username, passwordHash, name, mustChangePassword ? 1 : 0, now]);
     return id;
   }
 
   @override
   Future<AdminUser?> getAdminUser(String id) async {
     final result = _db.select('''
-      SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+      SELECT id, username, password_hash, name, is_active, must_change_password, created_at, last_login_at
       FROM admin_users WHERE id = ?
     ''', [id]);
     if (result.isEmpty) return null;
@@ -2256,6 +2295,7 @@ class SqliteMetadataStore extends MetadataStore {
       passwordHash: row['password_hash'] as String?,
       name: row['name'] as String?,
       isActive: (row['is_active'] as int) == 1,
+      mustChangePassword: (row['must_change_password'] as int?) == 1,
       createdAt: DateTime.parse(row['created_at'] as String),
       lastLoginAt: row['last_login_at'] != null
           ? DateTime.parse(row['last_login_at'] as String)
@@ -2266,7 +2306,7 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<AdminUser?> getAdminUserByUsername(String username) async {
     final result = _db.select('''
-      SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+      SELECT id, username, password_hash, name, is_active, must_change_password, created_at, last_login_at
       FROM admin_users WHERE username = ?
     ''', [username]);
     if (result.isEmpty) return null;
@@ -2277,6 +2317,7 @@ class SqliteMetadataStore extends MetadataStore {
       passwordHash: row['password_hash'] as String?,
       name: row['name'] as String?,
       isActive: (row['is_active'] as int) == 1,
+      mustChangePassword: (row['must_change_password'] as int?) == 1,
       createdAt: DateTime.parse(row['created_at'] as String),
       lastLoginAt: row['last_login_at'] != null
           ? DateTime.parse(row['last_login_at'] as String)
@@ -2286,7 +2327,10 @@ class SqliteMetadataStore extends MetadataStore {
 
   @override
   Future<bool> updateAdminUser(String id,
-      {String? name, String? passwordHash, bool? isActive}) async {
+      {String? name,
+      String? passwordHash,
+      bool? isActive,
+      bool? mustChangePassword}) async {
     final updates = <String>[];
     final params = <Object?>[];
     if (name != null) {
@@ -2300,6 +2344,10 @@ class SqliteMetadataStore extends MetadataStore {
     if (isActive != null) {
       updates.add('is_active = ?');
       params.add(isActive ? 1 : 0);
+    }
+    if (mustChangePassword != null) {
+      updates.add('must_change_password = ?');
+      params.add(mustChangePassword ? 1 : 0);
     }
     if (updates.isEmpty) return false;
 
@@ -2331,7 +2379,7 @@ class SqliteMetadataStore extends MetadataStore {
   Future<List<AdminUser>> listAdminUsers({int page = 1, int limit = 20}) async {
     final offset = (page - 1) * limit;
     final result = _db.select('''
-      SELECT id, username, password_hash, name, is_active, created_at, last_login_at
+      SELECT id, username, password_hash, name, is_active, must_change_password, created_at, last_login_at
       FROM admin_users ORDER BY created_at DESC
       LIMIT ? OFFSET ?
     ''', [limit, offset]);
@@ -2342,12 +2390,31 @@ class SqliteMetadataStore extends MetadataStore {
               passwordHash: row['password_hash'] as String?,
               name: row['name'] as String?,
               isActive: (row['is_active'] as int) == 1,
+              mustChangePassword: (row['must_change_password'] as int?) == 1,
               createdAt: DateTime.parse(row['created_at'] as String),
               lastLoginAt: row['last_login_at'] != null
                   ? DateTime.parse(row['last_login_at'] as String)
                   : null,
             ))
         .toList();
+  }
+
+  @override
+  Future<bool> ensureDefaultAdminUser(
+      String Function(String) hashPassword) async {
+    // Check if any admin users exist
+    final result = _db.select('SELECT COUNT(*) as count FROM admin_users');
+    final count = result.first['count'] as int;
+    if (count > 0) return false;
+
+    // Create default admin user with must_change_password=true
+    await createAdminUser(
+      username: 'admin',
+      passwordHash: hashPassword('admin'),
+      name: 'Default Admin',
+      mustChangePassword: true,
+    );
+    return true;
   }
 
   // ============ Admin Sessions ============
@@ -2611,6 +2678,10 @@ const _postgresMigrations = <String, String>{
     -- Index for time-based queries
     CREATE INDEX IF NOT EXISTS idx_admin_login_history_time ON admin_login_history(login_at DESC);
   ''',
+  '006_admin_must_change_password': '''
+    -- Add must_change_password flag for forcing password change on first login
+    ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+  ''',
 };
 
 // SQLite migrations
@@ -2748,6 +2819,10 @@ const _sqliteMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_admin_login_history_user ON admin_login_history(admin_user_id);
     -- Index for time-based queries
     CREATE INDEX IF NOT EXISTS idx_admin_login_history_time ON admin_login_history(login_at DESC);
+  ''',
+  '006_admin_must_change_password': '''
+    -- Add must_change_password flag for forcing password change on first login
+    ALTER TABLE admin_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0;
   ''',
 };
 
