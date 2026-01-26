@@ -6,6 +6,7 @@ class AdminUser {
   final String? passwordHash;
   final String? name;
   final bool isActive;
+  final bool mustChangePassword;
   final DateTime createdAt;
   final DateTime? lastLoginAt;
 
@@ -15,6 +16,7 @@ class AdminUser {
     this.passwordHash,
     this.name,
     this.isActive = true,
+    this.mustChangePassword = false,
     required this.createdAt,
     this.lastLoginAt,
   });
@@ -25,6 +27,7 @@ class AdminUser {
         'username': username,
         'name': name,
         'isActive': isActive,
+        'mustChangePassword': mustChangePassword,
         'createdAt': createdAt.toUtc().toIso8601String(),
         if (lastLoginAt != null)
           'lastLoginAt': lastLoginAt!.toUtc().toIso8601String(),
@@ -36,6 +39,7 @@ class AdminUser {
         username: json['username'] as String,
         name: json['name'] as String?,
         isActive: json['isActive'] as bool? ?? true,
+        mustChangePassword: json['mustChangePassword'] as bool? ?? false,
         createdAt: DateTime.parse(json['createdAt'] as String),
         lastLoginAt: json['lastLoginAt'] != null
             ? DateTime.parse(json['lastLoginAt'] as String)
