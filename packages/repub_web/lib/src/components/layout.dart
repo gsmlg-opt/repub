@@ -6,7 +6,6 @@ import '../services/auth_api_client.dart';
 // Layout updated: 2026-01-23
 
 /// Main layout wrapper with header and footer
-@client
 class Layout extends StatefulComponent {
   final List<Component> children;
 
