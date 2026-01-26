@@ -1,7 +1,17 @@
 # Build stage
-FROM dart:stable AS build
+FROM debian:bookworm-slim AS build
 
 WORKDIR /app
+
+# Install dependencies for both Dart and Flutter
+RUN apt-get update && \
+    apt-get install -y curl git unzip xz-utils zip libglu1-mesa && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Flutter (includes Dart)
+RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 /flutter
+ENV PATH="/flutter/bin:$PATH"
+RUN flutter doctor -v
 
 # Install melos globally
 RUN dart pub global activate melos
@@ -17,6 +27,7 @@ COPY packages/repub_migrate/pubspec.yaml packages/repub_migrate/
 COPY packages/repub_server/pubspec.yaml packages/repub_server/
 COPY packages/repub_cli/pubspec.yaml packages/repub_cli/
 COPY packages/repub_web/pubspec.yaml packages/repub_web/
+COPY packages/repub_admin/pubspec.yaml packages/repub_admin/
 
 # Bootstrap melos workspace
 RUN dart pub global run melos bootstrap
@@ -26,6 +37,9 @@ COPY packages/ packages/
 
 # Build web UI
 RUN cd packages/repub_web && dart run build_runner build --release --output build
+
+# Build Flutter admin UI
+RUN cd packages/repub_admin && flutter build web --release
 
 # Create output directory and compile executables
 RUN mkdir -p bin
@@ -52,6 +66,9 @@ COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
 
 # Copy web UI build output
 COPY --from=build /app/packages/repub_web/build/web /app/web
+
+# Copy Flutter admin UI build output
+COPY --from=build /app/packages/repub_admin/build/web /app/admin
 
 # Create data directories for SQLite, local storage, and cache
 RUN mkdir -p /data/metadata /data/packages /data/cache
