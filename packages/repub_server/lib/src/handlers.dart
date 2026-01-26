@@ -100,6 +100,56 @@ Router createRouter({
   router.post('/api/tokens', handlers.createUserToken);
   router.delete('/api/tokens/<label>', handlers.deleteUserToken);
 
+  // Admin UI static files - serve from admin build directory (skip in dev mode)
+  // Note: /admin/api/* routes are already registered above
+  if (serveStaticFiles) {
+    final adminDir = _findAdminDir();
+    if (adminDir != null) {
+      final adminStaticHandler = createStaticHandler(
+        adminDir,
+        defaultDocument: 'index.html',
+      );
+
+      // Serve admin UI at /admin (redirect to /admin/)
+      router.get('/admin', (Request req) {
+        return Response.movedPermanently('/admin/');
+      });
+
+      // Serve admin UI at /admin/
+      router.get('/admin/', (Request req) async {
+        final indexUri = req.requestedUri.replace(path: '/index.html');
+        final indexReq = Request('GET', indexUri,
+            context: req.context, headers: req.headers);
+        return adminStaticHandler(indexReq);
+      });
+
+      // Serve admin static assets at /admin/<path>
+      router.all('/admin/<path|.*>', (Request req, String path) async {
+        // Skip API routes - they're handled above
+        if (path.startsWith('api/')) {
+          return Response.notFound('Not found');
+        }
+
+        // Rewrite request path to strip /admin prefix for static handler
+        final assetUri = req.requestedUri.replace(path: '/$path');
+        final assetReq = Request(req.method, assetUri,
+            context: req.context, headers: req.headers);
+
+        // Try to serve static file
+        final response = await adminStaticHandler(assetReq);
+        if (response.statusCode != 404) {
+          return response;
+        }
+
+        // For SPA routes, serve index.html
+        final indexUri = req.requestedUri.replace(path: '/index.html');
+        final indexReq = Request('GET', indexUri,
+            context: req.context, headers: req.headers);
+        return adminStaticHandler(indexReq);
+      });
+    }
+  }
+
   // Web UI static files - serve from web build directory (skip in dev mode)
   if (serveStaticFiles) {
     final webDir = _findWebDir();
@@ -163,6 +213,33 @@ String? _findWebDir() {
   }
 
   print('Web UI not found - run "melos run build:web" to build it');
+  return null;
+}
+
+/// Find the admin UI build directory.
+String? _findAdminDir() {
+  // Check common locations for the admin build
+  final candidates = [
+    // When running from workspace root
+    'packages/repub_admin/build/web',
+    // When running from server package
+    '../repub_admin/build/web',
+    // Docker/production location
+    '/app/admin',
+    // Environment variable override
+    Platform.environment['REPUB_ADMIN_DIR'],
+  ];
+
+  for (final path in candidates) {
+    if (path == null) continue;
+    final dir = Directory(path);
+    if (dir.existsSync() && File(p.join(path, 'index.html')).existsSync()) {
+      print('Serving admin UI from: ${dir.absolute.path}');
+      return path;
+    }
+  }
+
+  print('Admin UI not found - run "melos run build:admin" to build it');
   return null;
 }
 
