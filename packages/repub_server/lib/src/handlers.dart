@@ -64,6 +64,7 @@ Router createRouter({
   router.post('/admin/api/auth/login', handlers.adminLogin);
   router.post('/admin/api/auth/logout', handlers.adminLogout);
   router.get('/admin/api/auth/me', handlers.adminMe);
+  router.post('/admin/api/auth/change-password', handlers.adminChangePassword);
 
   // Admin user management endpoints
   router.get('/admin/api/admin-users', handlers.adminListAdminUsers);
@@ -2198,6 +2199,111 @@ class ApiHandlers {
       jsonEncode({'admin': adminUser.toJson()}),
       headers: {'content-type': 'application/json'},
     );
+  }
+
+  /// POST `/admin/api/auth/change-password` - Change admin password
+  Future<Response> adminChangePassword(Request request) async {
+    final result = await getAdminSession(
+      request,
+      lookupSession: metadata.getAdminSession,
+    );
+
+    if (result is! AdminSessionValid) {
+      return adminSessionErrorResponse(result);
+    }
+
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final currentPassword = body['currentPassword'] as String?;
+      final newPassword = body['newPassword'] as String?;
+
+      if (currentPassword == null || currentPassword.isEmpty) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'missing_current_password',
+              'message': 'Current password is required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      if (newPassword == null || newPassword.length < 8) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'weak_password',
+              'message': 'New password must be at least 8 characters'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Get admin user
+      final adminUser = await metadata.getAdminUser(result.session.userId);
+      if (adminUser == null || adminUser.passwordHash == null) {
+        return Response(
+          401,
+          body: jsonEncode({
+            'error': {
+              'code': 'admin_not_found',
+              'message': 'Admin user not found'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Verify current password
+      if (!verifyPassword(currentPassword, adminUser.passwordHash!)) {
+        return Response(
+          401,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_password',
+              'message': 'Current password is incorrect'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Update password and clear mustChangePassword flag
+      final newPasswordHash = hashPassword(newPassword);
+      await metadata.updateAdminUser(
+        adminUser.id,
+        passwordHash: newPasswordHash,
+        mustChangePassword: false,
+      );
+
+      // Get updated admin user
+      final updatedAdmin = await metadata.getAdminUser(adminUser.id);
+
+      return Response.ok(
+        jsonEncode({
+          'success': {'message': 'Password changed successfully'},
+          'admin': updatedAdmin?.toJson(),
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
   }
 
   // ============ Admin User Management ============

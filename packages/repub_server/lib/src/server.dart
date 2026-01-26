@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:repub_auth/repub_auth.dart';
 import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:shelf/shelf.dart';
@@ -29,6 +30,13 @@ Future<void> startServer({Config? config}) async {
   final migrated = await metadata.runMigrations();
   if (migrated > 0) {
     print('Applied $migrated migration(s)');
+  }
+
+  // Ensure default admin user exists
+  final createdAdmin = await metadata.ensureDefaultAdminUser(hashPassword);
+  if (createdAdmin) {
+    print('Created default admin user (username: admin, password: admin)');
+    print('  ⚠️  Please change the password on first login!');
   }
 
   // Create blob storage for local packages
