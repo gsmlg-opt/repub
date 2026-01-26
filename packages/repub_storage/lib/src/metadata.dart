@@ -235,7 +235,10 @@ abstract class MetadataStore {
 
   /// Update an admin user's profile.
   Future<bool> updateAdminUser(String id,
-      {String? name, String? passwordHash, bool? isActive, bool? mustChangePassword});
+      {String? name,
+      String? passwordHash,
+      bool? isActive,
+      bool? mustChangePassword});
 
   /// Update admin's last login timestamp.
   Future<void> touchAdminLogin(String id);
