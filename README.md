@@ -7,12 +7,14 @@ A self-hosted Dart/Flutter package registry implementing the [Hosted Pub Reposit
 - **Publish packages**: Full support for `dart pub publish`
 - **Install packages**: Works with `dart pub get` using hosted URLs
 - **Bearer token auth**: Secure publish with scoped tokens
-- **Admin UI**: Web-based admin dashboard for package and user management
+- **Public web UI**: Package browsing and documentation (built with Jaspr)
+- **Admin UI**: Web-based admin dashboard for package and user management (built with Flutter)
 - **Admin users**: Separate admin authentication with login history tracking
 - **Flexible storage**: Package archives stored locally or in S3-compatible storage (MinIO, AWS S3)
 - **Flexible database**: SQLite (default) or PostgreSQL for metadata
 - **Zero external dependencies**: Docker image uses SQLite + local storage by default
 - **Melos monorepo**: Modular architecture with clear package boundaries
+- **Automated releases**: CI/CD with automatic Docker image building
 
 ## Non-goals
 
@@ -67,6 +69,12 @@ docker exec <container_id> /app/bin/repub_cli admin create admin password123 "Ad
 Data is stored in `/data`:
 - SQLite database: `/data/metadata/repub.db`
 - Package archives: `/data/packages/`
+- Cache: `/data/cache/`
+
+The Docker image includes:
+- Repub server (compiled native executable)
+- Public web UI (Jaspr, served at `/`)
+- Admin UI (Flutter, served at `/admin`)
 
 ### Option B: Docker Compose (PostgreSQL + MinIO)
 
@@ -157,17 +165,27 @@ dart pub get
 # Bootstrap all packages
 melos bootstrap
 
-# Analyze all packages
-melos run analyze
+# Development - unified server on port 8080 (API + web UI + admin UI with hot reload)
+melos run dev
 
-# Run tests in all packages
-melos run test
+# Run individual dev servers
+melos run dev:web          # Jaspr web UI on port 8081
+melos run dev:admin        # Flutter admin UI on port 8082
+melos run server           # API server only
 
-# Format all packages
-melos run format
+# Build
+melos run build            # Build production binaries
+melos run build:web        # Build Jaspr web UI for production
+melos run build:admin      # Build Flutter admin UI for production
 
-# Check formatting
-melos run format:check
+# Quality checks
+melos run analyze          # Analyze all packages with fatal-infos
+melos run test             # Run tests in all packages
+melos run format           # Format all Dart files
+melos run format:check     # Check formatting without changes
+
+# Database
+melos run migrate          # Run database migrations
 ```
 
 ## Configuration
@@ -379,9 +397,21 @@ The dev server internally proxies:
 
 This provides instant hot reload when you modify any frontend code.
 
+**Accessing the UIs in development:**
+- Public UI: `http://localhost:8080`
+- Admin UI: `http://localhost:8080/admin` (requires admin user - see Admin UI section)
+- API: `http://localhost:8080/api/*`
+
+You'll need to create an admin user first to access the admin UI:
+```bash
+# Create admin user for development
+export REPUB_DATABASE_URL="sqlite:./data/repub.db"
+dart run -C packages/repub_cli repub_cli admin create admin password123 "Admin User"
+```
+
 ## Admin UI
 
-The admin dashboard is accessible at `/admin` and provides:
+The admin dashboard is a Flutter web application accessible at `/admin`. It uses BLoC pattern for state management and provides:
 
 ### Features
 
@@ -435,6 +465,36 @@ Failed login attempts are highlighted in red for easy identification of potentia
   - 8-hour session TTL (shorter than regular users)
 - All `/admin/api/*` endpoints require admin authentication
 - Admin users cannot be created through the web UI
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and automated releases:
+
+### Continuous Integration
+- **Dependency check**: Validates all dependencies resolve correctly
+- **Analyze**: Runs `dart analyze` with fatal-infos on all packages
+- **Format check**: Ensures code is properly formatted
+- **Tests**: Runs all package tests
+
+All checks use Flutter SDK to support both Dart and Flutter packages.
+
+### Automated Releases
+
+Releases are automated via GitHub Actions workflow:
+
+1. **Trigger**: Run "Release" workflow from GitHub Actions tab
+2. **Version bump**: Choose patch, minor, or major version bump
+3. **Release notes**: Automatically categorized by commit type (feat, fix, docs, chore)
+4. **Git tag**: Creates and pushes version tag (e.g., `v1.6.4`)
+5. **GitHub release**: Creates release with categorized changelog
+6. **Docker image**: Automatically builds and pushes multi-arch image to `ghcr.io/gsmlg-dev/repub`
+
+Docker images are tagged with:
+- `vX.Y.Z` (e.g., `v1.6.4`)
+- `X.Y.Z` (e.g., `1.6.4`)
+- `latest`
+
+All images are built for `linux/amd64` and `linux/arm64` platforms.
 
 ## Package Dependencies
 
