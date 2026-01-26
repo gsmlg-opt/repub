@@ -95,6 +95,10 @@ const migrations = <String, String>{
     -- Index for time-based queries
     CREATE INDEX IF NOT EXISTS idx_admin_login_history_time ON admin_login_history(login_at DESC);
   ''',
+  '005_admin_must_change_password': '''
+    -- Add must_change_password flag for forcing password change on first login
+    ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.
