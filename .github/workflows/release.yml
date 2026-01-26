@@ -132,6 +132,7 @@ jobs:
           sed -i "s|\$DOCS|$DOCS|g" release_notes.md
           sed -i "s|\$CHORES|$CHORES|g" release_notes.md
           sed -i "s|\${PREVIOUS_TAG}|$PREVIOUS_TAG|g" release_notes.md
+          sed -i "s|\${NEW_TAG}|$NEW_TAG|g" release_notes.md
 
           cat release_notes.md
 
