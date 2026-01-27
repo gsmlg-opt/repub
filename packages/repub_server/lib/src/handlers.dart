@@ -11,6 +11,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
+import 'email_service.dart';
 import 'feed.dart';
 import 'logger.dart';
 import 'publish.dart';
@@ -318,6 +319,9 @@ class ApiHandlers {
   // Webhook service for triggering events
   WebhookService? _webhookService;
 
+  // Email service for sending notifications
+  EmailService? _emailService;
+
   ApiHandlers({
     required this.config,
     required this.metadata,
@@ -327,6 +331,9 @@ class ApiHandlers {
 
   /// Get the webhook service (lazy initialization).
   WebhookService get webhooks => _webhookService ??= WebhookService(metadata: metadata);
+
+  /// Get the email service (lazy initialization).
+  EmailService get emails => _emailService ??= EmailService(metadata: metadata);
 
   /// Verify admin session. Returns error Response if invalid, null if valid.
   Future<Response?> _requireAdminAuth(Request request) async {
@@ -953,6 +960,23 @@ class ApiHandlers {
       ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
           request.headers['x-real-ip'],
     );
+
+    // Trigger webhook
+    webhooks.onPackagePublished(
+      packageName: success.packageName,
+      version: success.version,
+      publisherEmail: user?.email,
+    );
+
+    // Send email notification (fire-and-forget)
+    if (user?.email != null) {
+      emails.onPackagePublished(
+        packageName: success.packageName,
+        version: success.version,
+        publisherEmail: user!.email,
+        baseUrl: config.baseUrl,
+      );
+    }
 
     // Clean up
     _uploadData.remove(sessionId);
@@ -2297,6 +2321,16 @@ class ApiHandlers {
         targetId: userId,
         ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
             request.headers['x-real-ip'],
+      );
+
+      // Trigger webhook
+      webhooks.onUserRegistered(email: email);
+
+      // Send welcome email (fire-and-forget)
+      emails.onUserRegistered(
+        email: email,
+        name: name ?? '',
+        baseUrl: config.baseUrl,
       );
 
       // Create session

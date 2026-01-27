@@ -114,6 +114,77 @@ class SiteConfigDefaults {
     description: 'Google OAuth client secret',
   );
 
+  // SMTP Email Configuration
+  static const smtpHost = SiteConfig(
+    name: 'smtp_host',
+    valueType: ConfigValueType.string,
+    value: '',
+    description: 'SMTP server hostname',
+  );
+
+  static const smtpPort = SiteConfig(
+    name: 'smtp_port',
+    valueType: ConfigValueType.number,
+    value: '587',
+    description: 'SMTP server port (25, 465, 587)',
+  );
+
+  static const smtpUsername = SiteConfig(
+    name: 'smtp_username',
+    valueType: ConfigValueType.string,
+    value: '',
+    description: 'SMTP authentication username',
+  );
+
+  static const smtpPassword = SiteConfig(
+    name: 'smtp_password',
+    valueType: ConfigValueType.string,
+    value: '',
+    description: 'SMTP authentication password',
+  );
+
+  static const smtpFromAddress = SiteConfig(
+    name: 'smtp_from_address',
+    valueType: ConfigValueType.string,
+    value: '',
+    description: 'Email sender address (e.g., noreply@example.com)',
+  );
+
+  static const smtpFromName = SiteConfig(
+    name: 'smtp_from_name',
+    valueType: ConfigValueType.string,
+    value: 'Repub Package Registry',
+    description: 'Email sender name',
+  );
+
+  static const smtpSsl = SiteConfig(
+    name: 'smtp_ssl',
+    valueType: ConfigValueType.boolean,
+    value: 'false',
+    description: 'Use SSL/TLS for SMTP connection',
+  );
+
+  static const emailNotificationsEnabled = SiteConfig(
+    name: 'email_notifications_enabled',
+    valueType: ConfigValueType.boolean,
+    value: 'false',
+    description: 'Enable email notifications',
+  );
+
+  static const emailOnPackagePublished = SiteConfig(
+    name: 'email_on_package_published',
+    valueType: ConfigValueType.boolean,
+    value: 'true',
+    description: 'Send email when a package is published',
+  );
+
+  static const emailOnUserRegistered = SiteConfig(
+    name: 'email_on_user_registered',
+    valueType: ConfigValueType.boolean,
+    value: 'true',
+    description: 'Send email when a new user registers',
+  );
+
   /// All default configurations.
   static const all = [
     allowRegistration,
@@ -125,5 +196,15 @@ class SiteConfigDefaults {
     oauthGithubClientSecret,
     oauthGoogleClientId,
     oauthGoogleClientSecret,
+    smtpHost,
+    smtpPort,
+    smtpUsername,
+    smtpPassword,
+    smtpFromAddress,
+    smtpFromName,
+    smtpSsl,
+    emailNotificationsEnabled,
+    emailOnPackagePublished,
+    emailOnUserRegistered,
   ];
 }
