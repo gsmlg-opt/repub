@@ -8,6 +8,7 @@ CRITICAL CONSTRAINTS (read these before every task):
 - The client auth token are not mandatory, we are a self-hosted project, that only use by the package owner themself.
 - Do not add SSL support because this project will live after a reverse proxy server.
 - Do not change default listen address in development mode.
+- The CLI (repub_cli) ONLY manages admin users. Regular user registration, token management, and all other user operations are handled via the web UI (admin panel). Do not add CLI commands for token creation, user registration, or other non-admin operations.
 
 ## Build & Development Commands
 
@@ -69,7 +70,7 @@ repub_auth ← repub_storage
 | `repub_storage` | Database abstraction (SQLite/PostgreSQL) + blob storage (local/S3) |
 | `repub_migrate` | SQL schema migrations |
 | `repub_server` | HTTP API using Shelf framework |
-| `repub_cli` | Admin CLI for migrations, server startup, admin user management |
+| `repub_cli` | Admin CLI ONLY - database migrations, server startup, admin user management (does NOT manage tokens or regular users) |
 | `repub_web` | Public web UI using Jaspr framework (package browsing, search, docs) |
 | `repub_admin` | Admin web UI using Flutter (package management, stats dashboard, site configuration) |
 
