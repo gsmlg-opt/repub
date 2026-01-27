@@ -62,7 +62,7 @@ melos:
         scope: repub_server
 
     dev:
-      description: Start unified dev server on port 8080 (API + web UI with hot reload)
+      description: Start unified dev server on port 4920 (API + web UI with hot reload)
       run: bash scripts/dev.sh
 
     build:
@@ -78,8 +78,8 @@ melos:
         scope: repub_web
 
     dev:web:
-      description: Run web UI in development mode with hot reload (port 8081)
-      run: dart run build_runner serve web:8081
+      description: Run web UI in development mode with hot reload (port 4921)
+      run: dart run build_runner serve web:4921
       packageFilters:
         scope: repub_web
 
@@ -90,7 +90,7 @@ melos:
         scope: repub_admin
 
     dev:admin:
-      description: Run Flutter admin in development mode (port 8082)
-      run: flutter run -d web-server --web-port 8082 --web-hostname 0.0.0.0 --web-browser-flag="--disable-web-security"
+      description: Run Flutter admin in development mode (port 4922)
+      run: flutter run -d web-server --web-port 4922 --web-hostname 0.0.0.0 --web-browser-flag="--disable-web-security"
       packageFilters:
         scope: repub_admin

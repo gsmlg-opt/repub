@@ -16,8 +16,8 @@ void main() {
 
       config = Config(
         listenAddr: '0.0.0.0',
-        listenPort: 8080,
-        baseUrl: 'http://localhost:8080',
+        listenPort: 4920,
+        baseUrl: 'http://localhost:4920',
         databaseUrl: 'sqlite:${tempDir.path}/test.db',
         storagePath: tempDir.path,
         requirePublishAuth: true,

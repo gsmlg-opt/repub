@@ -23,7 +23,7 @@ Note:
   - Admin users are managed exclusively via CLI for security
 
 Environment Variables:
-  REPUB_LISTEN_ADDR          Listen address (default: 0.0.0.0:8080)
+  REPUB_LISTEN_ADDR          Listen address (default: 0.0.0.0:4920)
   REPUB_BASE_URL             Base URL for the registry
   REPUB_DATABASE_URL         Database URL (SQLite path or PostgreSQL URL)
                              Default: sqlite:./data/repub.db

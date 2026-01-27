@@ -91,15 +91,15 @@ class Config {
 
   /// Load configuration from environment variables.
   factory Config.fromEnv() {
-    final listenAddrFull = _env('REPUB_LISTEN_ADDR', '0.0.0.0:8080');
+    final listenAddrFull = _env('REPUB_LISTEN_ADDR', '0.0.0.0:4920');
     final parts = listenAddrFull.split(':');
     final addr = parts.length > 1 ? parts[0] : '0.0.0.0';
-    final port = parts.length > 1 ? int.parse(parts[1]) : 8080;
+    final port = parts.length > 1 ? int.parse(parts[1]) : 4920;
 
     return Config(
       listenAddr: addr,
       listenPort: port,
-      baseUrl: _env('REPUB_BASE_URL', 'http://localhost:8080'),
+      baseUrl: _env('REPUB_BASE_URL', 'http://localhost:4920'),
       databaseUrl: _env(
         'REPUB_DATABASE_URL',
         'sqlite:./data/repub.db',

@@ -12,14 +12,14 @@ import 'package:repub_server/src/handlers.dart';
 
 /// Development server that unifies API and web UI on a single port.
 ///
-/// This server runs on port 8080 and:
+/// This server runs on port 4920 and:
 /// - Handles all API routes directly (same as production)
-/// - Proxies web UI requests to webdev server on port 8081 (for hot reload)
+/// - Proxies web UI requests to webdev server on port 4921 (for hot reload)
 Future<void> main(List<String> args) async {
   final cfg = Config.fromEnv();
 
   print('Starting Repub Development Server...');
-  print('Unified URL: http://localhost:8080');
+  print('Unified URL: http://localhost:4920');
   print('Database: ${cfg.databaseType.name}');
 
   // Create metadata store
@@ -51,8 +51,8 @@ Future<void> main(List<String> args) async {
   );
 
   // Create proxy handlers for web dev servers
-  final webdevProxy = proxyHandler('http://localhost:8081'); // Jaspr web UI
-  final adminProxy = proxyHandler('http://localhost:8082'); // Flutter admin
+  final webdevProxy = proxyHandler('http://localhost:4921'); // Jaspr web UI
+  final adminProxy = proxyHandler('http://localhost:4922'); // Flutter admin
 
   // Check if path looks like a static asset
   bool isAssetPath(String path) {
@@ -93,7 +93,7 @@ Future<void> main(List<String> args) async {
         return await apiRouter(request);
       }
 
-      // Admin routes - proxy to Flutter admin on port 8082
+      // Admin routes - proxy to Flutter admin on port 4922
       // In dev mode, Flutter runs with base href "/" so we need to rewrite the HTML
       if (path.startsWith('admin')) {
         // Strip /admin prefix: /admin -> /, /admin/packages/local -> /packages/local
@@ -142,11 +142,11 @@ Future<void> main(List<String> args) async {
         return await webdevProxy(request);
       }
 
-      // Everything else - proxy to Jaspr webdev on port 8081
+      // Everything else - proxy to Jaspr webdev on port 4921
       var response = await webdevProxy(request);
 
       // Inject script to fix hot reload when accessing from remote IP
-      // This patches EventSource to redirect localhost:8081 to current origin
+      // This patches EventSource to redirect localhost:4921 to current origin
       if ((path == '' || path == '/' || path == 'index.html') &&
           response.statusCode == 200) {
         final contentType = response.headers['content-type'] ?? '';
@@ -158,8 +158,8 @@ Future<void> main(List<String> args) async {
 (function() {
   const OriginalEventSource = window.EventSource;
   window.EventSource = function(url, config) {
-    if (url && url.includes('localhost:8081')) {
-      url = url.replace('http://localhost:8081', location.origin);
+    if (url && url.includes('localhost:4921')) {
+      url = url.replace('http://localhost:4921', location.origin);
     }
     return new OriginalEventSource(url, config);
   };
@@ -240,7 +240,7 @@ Future<void> main(List<String> args) async {
       // Check if it's a connection refused to dev servers (expected during startup)
       final errorStr = e.toString();
       if (errorStr.contains('Connection refused') &&
-          (errorStr.contains('8081') || errorStr.contains('8082'))) {
+          (errorStr.contains('4921') || errorStr.contains('4922'))) {
         // Dev server not ready yet - return a friendly message without stack trace
         return Response(
           503,
@@ -263,7 +263,7 @@ Future<void> main(List<String> args) async {
       .addMiddleware(_corsMiddleware())
       .addHandler(combinedHandler);
 
-  // Start unified server on port 8080
+  // Start unified server on port 4920
   final server = await shelf_io.serve(
     handler,
     cfg.listenAddr,
@@ -271,10 +271,10 @@ Future<void> main(List<String> args) async {
   );
 
   print('\n🚀 Development server ready!');
-  print('   Access everything at: http://localhost:8080');
-  print('   API endpoints: http://localhost:8080/api/*');
-  print('   Web UI: http://localhost:8080/ (Jaspr, with hot reload)');
-  print('   Admin UI: http://localhost:8080/admin (Flutter, with hot reload)');
+  print('   Access everything at: http://localhost:4920');
+  print('   API endpoints: http://localhost:4920/api/*');
+  print('   Web UI: http://localhost:4920/ (Jaspr, with hot reload)');
+  print('   Admin UI: http://localhost:4920/admin (Flutter, with hot reload)');
   print('\nPress Ctrl+C to stop');
 
   // Handle shutdown
