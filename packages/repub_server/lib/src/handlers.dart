@@ -15,6 +15,7 @@ import 'feed.dart';
 import 'logger.dart';
 import 'publish.dart';
 import 'upstream.dart';
+import 'webhook_service.dart';
 
 /// Create the API router.
 /// Set [serveStaticFiles] to false in dev mode to use webdev proxy instead.
@@ -126,6 +127,15 @@ Router createRouter({
   router.get('/admin/api/users/<id>/tokens', handlers.adminListUserTokens);
   router.get('/admin/api/config', handlers.adminGetAllConfig);
   router.put('/admin/api/config/<name>', handlers.adminSetConfig);
+
+  // Webhook management (admin only)
+  router.get('/admin/api/webhooks', handlers.adminListWebhooks);
+  router.post('/admin/api/webhooks', handlers.adminCreateWebhook);
+  router.get('/admin/api/webhooks/<id>', handlers.adminGetWebhook);
+  router.put('/admin/api/webhooks/<id>', handlers.adminUpdateWebhook);
+  router.delete('/admin/api/webhooks/<id>', handlers.adminDeleteWebhook);
+  router.get('/admin/api/webhooks/<id>/deliveries', handlers.adminGetWebhookDeliveries);
+  router.post('/admin/api/webhooks/<id>/test', handlers.adminTestWebhook);
 
   // Auth endpoints (user authentication)
   router.post('/api/auth/register', handlers.authRegister);
@@ -295,12 +305,18 @@ class ApiHandlers {
   // Upstream client for caching proxy
   UpstreamClient? _upstream;
 
+  // Webhook service for triggering events
+  WebhookService? _webhookService;
+
   ApiHandlers({
     required this.config,
     required this.metadata,
     required this.blobs,
     required this.cacheBlobs,
   });
+
+  /// Get the webhook service (lazy initialization).
+  WebhookService get webhooks => _webhookService ??= WebhookService(metadata: metadata);
 
   /// Verify admin session. Returns error Response if invalid, null if valid.
   Future<Response?> _requireAdminAuth(Request request) async {
@@ -2832,6 +2848,260 @@ class ApiHandlers {
         'content-type': 'application/atom+xml; charset=utf-8',
         'cache-control': 'public, max-age=300', // Cache for 5 minutes
       },
+    );
+  }
+
+  // ============ Webhook Admin Endpoints ============
+
+  /// GET `/admin/api/webhooks` - List all webhooks.
+  Future<Response> adminListWebhooks(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final activeOnly = request.url.queryParameters['active_only'] == 'true';
+    final webhooks = await metadata.listWebhooks(activeOnly: activeOnly);
+
+    return Response.ok(
+      jsonEncode({
+        'webhooks': webhooks.map((w) => w.toJson()).toList(),
+        'total': webhooks.length,
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// POST `/admin/api/webhooks` - Create a new webhook.
+  Future<Response> adminCreateWebhook(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    try {
+      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final url = body['url'] as String?;
+      final secret = body['secret'] as String?;
+      final events = (body['events'] as List?)?.cast<String>() ?? ['*'];
+
+      if (url == null || url.isEmpty) {
+        return Response(
+          400,
+          headers: {'content-type': 'application/json'},
+          body: jsonEncode({
+            'error': {'code': 'invalid_request', 'message': 'URL is required'},
+          }),
+        );
+      }
+
+      // Validate URL
+      try {
+        final uri = Uri.parse(url);
+        if (!uri.hasScheme || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+          throw FormatException('Invalid URL scheme');
+        }
+      } catch (_) {
+        return Response(
+          400,
+          headers: {'content-type': 'application/json'},
+          body: jsonEncode({
+            'error': {'code': 'invalid_url', 'message': 'URL must be a valid HTTP/HTTPS URL'},
+          }),
+        );
+      }
+
+      // Validate events
+      for (final event in events) {
+        if (!WebhookEventType.isValid(event)) {
+          return Response(
+            400,
+            headers: {'content-type': 'application/json'},
+            body: jsonEncode({
+              'error': {
+                'code': 'invalid_event',
+                'message': 'Invalid event type: $event. Valid types are: ${WebhookEventType.all.join(', ')} or *',
+              },
+            }),
+          );
+        }
+      }
+
+      final webhook = await metadata.createWebhook(
+        url: url,
+        secret: secret,
+        events: events,
+      );
+
+      // Log activity
+      final admin = await _getAdminFromSession(request);
+      await metadata.logActivity(
+        activityType: 'webhook_created',
+        actorType: 'admin',
+        actorId: admin?.id,
+        actorUsername: admin?.username,
+        targetType: 'webhook',
+        targetId: webhook.id,
+        ipAddress: request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
+      );
+
+      return Response.ok(
+        jsonEncode(webhook.toJson()),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        400,
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({
+          'error': {'code': 'invalid_request', 'message': 'Invalid request body'},
+        }),
+      );
+    }
+  }
+
+  /// GET `/admin/api/webhooks/<id>` - Get a webhook by ID.
+  Future<Response> adminGetWebhook(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final webhook = await metadata.getWebhook(id);
+    if (webhook == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    return Response.ok(
+      jsonEncode(webhook.toJson()),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// PUT `/admin/api/webhooks/<id>` - Update a webhook.
+  Future<Response> adminUpdateWebhook(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final webhook = await metadata.getWebhook(id);
+    if (webhook == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    try {
+      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+
+      final updated = webhook.copyWith(
+        url: body['url'] as String? ?? webhook.url,
+        secret: body['secret'] as String?,
+        events: (body['events'] as List?)?.cast<String>(),
+        isActive: body['is_active'] as bool?,
+      );
+
+      await metadata.updateWebhook(updated);
+
+      return Response.ok(
+        jsonEncode(updated.toJson()),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response(
+        400,
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({
+          'error': {'code': 'invalid_request', 'message': 'Invalid request body'},
+        }),
+      );
+    }
+  }
+
+  /// DELETE `/admin/api/webhooks/<id>` - Delete a webhook.
+  Future<Response> adminDeleteWebhook(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final webhook = await metadata.getWebhook(id);
+    if (webhook == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    await metadata.deleteWebhook(id);
+
+    // Log activity
+    final admin = await _getAdminFromSession(request);
+    await metadata.logActivity(
+      activityType: 'webhook_deleted',
+      actorType: 'admin',
+      actorId: admin?.id,
+      actorUsername: admin?.username,
+      targetType: 'webhook',
+      targetId: id,
+      ipAddress: request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
+    );
+
+    return Response.ok(
+      jsonEncode({'success': true}),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/webhooks/<id>/deliveries` - Get recent deliveries for a webhook.
+  Future<Response> adminGetWebhookDeliveries(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final webhook = await metadata.getWebhook(id);
+    if (webhook == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final deliveries = await metadata.getWebhookDeliveries(id, limit: limit);
+
+    return Response.ok(
+      jsonEncode({
+        'deliveries': deliveries.map((d) => d.toJson()).toList(),
+        'total': deliveries.length,
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// POST `/admin/api/webhooks/<id>/test` - Send a test event to a webhook.
+  Future<Response> adminTestWebhook(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final webhook = await metadata.getWebhook(id);
+    if (webhook == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Send a test ping event
+    await webhooks.triggerEvent(
+      eventType: 'test.ping',
+      data: {
+        'webhook_id': id,
+        'message': 'This is a test webhook delivery',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'success': true,
+        'message': 'Test webhook sent. Check deliveries for result.',
+      }),
+      headers: {'content-type': 'application/json'},
     );
   }
 }

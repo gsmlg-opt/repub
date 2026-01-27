@@ -64,6 +64,8 @@ tags:
     description: Admin analytics and statistics
   - name: admin-config
     description: Admin configuration
+  - name: admin-webhooks
+    description: Admin webhook management
 
 paths:
   # ============================================================================
@@ -1423,6 +1425,243 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  # ============================================================================
+  # Admin - Webhooks
+  # ============================================================================
+  /admin/api/webhooks:
+    get:
+      tags: [admin-webhooks]
+      summary: List webhooks
+      description: Returns all configured webhooks
+      operationId: adminListWebhooks
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhooks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Webhook'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [admin-webhooks]
+      summary: Create webhook
+      description: Create a new webhook endpoint
+      operationId: adminCreateWebhook
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - events
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: Webhook endpoint URL
+                secret:
+                  type: string
+                  description: Secret for HMAC signature verification
+                events:
+                  type: array
+                  items:
+                    type: string
+                  description: Event types to subscribe to
+                  example: ["package.published", "package.deleted"]
+      responses:
+        '200':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '400':
+          description: Invalid request
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/webhooks/{id}:
+    get:
+      tags: [admin-webhooks]
+      summary: Get webhook
+      description: Returns a specific webhook by ID
+      operationId: adminGetWebhook
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Webhook not found
+    put:
+      tags: [admin-webhooks]
+      summary: Update webhook
+      description: Update an existing webhook
+      operationId: adminUpdateWebhook
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                secret:
+                  type: string
+                events:
+                  type: array
+                  items:
+                    type: string
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Webhook updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Webhook not found
+    delete:
+      tags: [admin-webhooks]
+      summary: Delete webhook
+      description: Delete a webhook
+      operationId: adminDeleteWebhook
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Webhook not found
+
+  /admin/api/webhooks/{id}/deliveries:
+    get:
+      tags: [admin-webhooks]
+      summary: Get webhook deliveries
+      description: Returns delivery history for a webhook
+      operationId: adminGetWebhookDeliveries
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Delivery history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deliveries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Webhook not found
+
+  /admin/api/webhooks/{id}/test:
+    post:
+      tags: [admin-webhooks]
+      summary: Test webhook
+      description: Send a test payload to the webhook endpoint
+      operationId: adminTestWebhook
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Test sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  statusCode:
+                    type: integer
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Webhook not found
+
 # ==============================================================================
 # Components
 # ==============================================================================
@@ -1690,3 +1929,69 @@ components:
           type: integer
         storageUsedBytes:
           type: integer
+
+    # ========================================================================
+    # Webhook Schemas
+    # ========================================================================
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+          description: |
+            Event types this webhook subscribes to. Available events:
+            - `package.published` - When a package version is published
+            - `package.deleted` - When a package is deleted
+            - `version.deleted` - When a specific version is deleted
+            - `package.discontinued` - When a package is marked discontinued
+            - `package.reactivated` - When a discontinued package is reactivated
+            - `user.registered` - When a new user registers
+            - `cache.cleared` - When cache is cleared
+            - `*` - Wildcard, subscribes to all events
+        isActive:
+          type: boolean
+        failureCount:
+          type: integer
+          description: Number of consecutive delivery failures
+        lastTriggeredAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        webhookId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        payload:
+          type: object
+        statusCode:
+          type: integer
+        success:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        duration:
+          type: integer
+          description: Delivery duration in milliseconds
+        deliveredAt:
+          type: string
+          format: date-time

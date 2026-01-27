@@ -342,6 +342,39 @@ abstract class MetadataStore {
     String? activityType,
     String? actorType,
   });
+
+  // ============ Webhook Operations ============
+
+  /// Create a new webhook.
+  Future<Webhook> createWebhook({
+    required String url,
+    String? secret,
+    required List<String> events,
+  });
+
+  /// Get a webhook by ID.
+  Future<Webhook?> getWebhook(String id);
+
+  /// List all webhooks.
+  Future<List<Webhook>> listWebhooks({bool activeOnly = false});
+
+  /// Update a webhook.
+  Future<void> updateWebhook(Webhook webhook);
+
+  /// Delete a webhook.
+  Future<void> deleteWebhook(String id);
+
+  /// Get webhooks that should be triggered for an event type.
+  Future<List<Webhook>> getWebhooksForEvent(String eventType);
+
+  /// Log a webhook delivery attempt.
+  Future<void> logWebhookDelivery(WebhookDelivery delivery);
+
+  /// Get recent deliveries for a webhook.
+  Future<List<WebhookDelivery>> getWebhookDeliveries(
+    String webhookId, {
+    int limit = 20,
+  });
 }
 
 /// Metadata storage backed by PostgreSQL.
@@ -1754,6 +1787,173 @@ class PostgresMetadataStore extends MetadataStore {
     }).toList();
   }
 
+  // ============ Webhook Operations ============
+
+  @override
+  Future<Webhook> createWebhook({
+    required String url,
+    String? secret,
+    required List<String> events,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO webhooks (id, url, secret, events)
+        VALUES (@id, @url, @secret, @events)
+      '''),
+      parameters: {
+        'id': id,
+        'url': url,
+        'secret': secret,
+        'events': events,
+      },
+    );
+
+    return Webhook(
+      id: id,
+      url: url,
+      secret: secret,
+      events: events,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<Webhook?> getWebhook(String id) async {
+    final result = await _conn.execute(
+      Sql.named('SELECT * FROM webhooks WHERE id = @id'),
+      parameters: {'id': id},
+    );
+
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return _webhookFromRow(row);
+  }
+
+  @override
+  Future<List<Webhook>> listWebhooks({bool activeOnly = false}) async {
+    final query = activeOnly
+        ? 'SELECT * FROM webhooks WHERE is_active = true ORDER BY created_at DESC'
+        : 'SELECT * FROM webhooks ORDER BY created_at DESC';
+
+    final result = await _conn.execute(query);
+    return result.map(_webhookFromRow).toList();
+  }
+
+  @override
+  Future<void> updateWebhook(Webhook webhook) async {
+    await _conn.execute(
+      Sql.named('''
+        UPDATE webhooks
+        SET url = @url, secret = @secret, events = @events, is_active = @isActive,
+            last_triggered_at = @lastTriggeredAt, failure_count = @failureCount
+        WHERE id = @id
+      '''),
+      parameters: {
+        'id': webhook.id,
+        'url': webhook.url,
+        'secret': webhook.secret,
+        'events': webhook.events,
+        'isActive': webhook.isActive,
+        'lastTriggeredAt': webhook.lastTriggeredAt,
+        'failureCount': webhook.failureCount,
+      },
+    );
+  }
+
+  @override
+  Future<void> deleteWebhook(String id) async {
+    await _conn.execute(
+      Sql.named('DELETE FROM webhooks WHERE id = @id'),
+      parameters: {'id': id},
+    );
+  }
+
+  @override
+  Future<List<Webhook>> getWebhooksForEvent(String eventType) async {
+    // Get webhooks that are active and match the event type or have '*' (all events)
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT * FROM webhooks
+        WHERE is_active = true
+          AND (@eventType = ANY(events) OR '*' = ANY(events))
+        ORDER BY created_at
+      '''),
+      parameters: {'eventType': eventType},
+    );
+    return result.map(_webhookFromRow).toList();
+  }
+
+  @override
+  Future<void> logWebhookDelivery(WebhookDelivery delivery) async {
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO webhook_deliveries
+          (id, webhook_id, event_type, payload, status_code, success, error, duration_ms, delivered_at)
+        VALUES
+          (@id, @webhookId, @eventType, @payload, @statusCode, @success, @error, @durationMs, @deliveredAt)
+      '''),
+      parameters: {
+        'id': delivery.id,
+        'webhookId': delivery.webhookId,
+        'eventType': delivery.eventType,
+        'payload': jsonEncode(delivery.payload),
+        'statusCode': delivery.statusCode,
+        'success': delivery.success,
+        'error': delivery.error,
+        'durationMs': delivery.duration.inMilliseconds,
+        'deliveredAt': delivery.deliveredAt,
+      },
+    );
+  }
+
+  @override
+  Future<List<WebhookDelivery>> getWebhookDeliveries(
+    String webhookId, {
+    int limit = 20,
+  }) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT * FROM webhook_deliveries
+        WHERE webhook_id = @webhookId
+        ORDER BY delivered_at DESC
+        LIMIT @limit
+      '''),
+      parameters: {'webhookId': webhookId, 'limit': limit},
+    );
+
+    return result.map((row) => _webhookDeliveryFromRow(row)).toList();
+  }
+
+  Webhook _webhookFromRow(ResultRow row) {
+    final map = row.toColumnMap();
+    return Webhook(
+      id: map['id'] as String,
+      url: map['url'] as String,
+      secret: map['secret'] as String?,
+      events: (map['events'] as List).cast<String>(),
+      isActive: map['is_active'] as bool,
+      createdAt: map['created_at'] as DateTime,
+      lastTriggeredAt: map['last_triggered_at'] as DateTime?,
+      failureCount: map['failure_count'] as int,
+    );
+  }
+
+  WebhookDelivery _webhookDeliveryFromRow(ResultRow row) {
+    final map = row.toColumnMap();
+    return WebhookDelivery(
+      id: map['id'] as String,
+      webhookId: map['webhook_id'] as String,
+      eventType: map['event_type'] as String,
+      payload: jsonDecode(map['payload'] as String) as Map<String, dynamic>,
+      statusCode: map['status_code'] as int,
+      success: map['success'] as bool,
+      error: map['error'] as String?,
+      duration: Duration(milliseconds: map['duration_ms'] as int),
+      deliveredAt: map['delivered_at'] as DateTime,
+    );
+  }
+
   // ============ Backup Export Methods ============
 
   /// Export all packages for backup.
@@ -1978,6 +2178,12 @@ class SqliteMetadataStore extends MetadataStore {
     }
 
     final db = sqlite3.open(path);
+    return SqliteMetadataStore._(db);
+  }
+
+  /// Create an in-memory SQLite database for testing.
+  factory SqliteMetadataStore.inMemory() {
+    final db = sqlite3.openInMemory();
     return SqliteMetadataStore._(db);
   }
 
@@ -3233,6 +3439,147 @@ class SqliteMetadataStore extends MetadataStore {
     }).toList();
   }
 
+  // ============ Webhook Operations ============
+
+  @override
+  Future<Webhook> createWebhook({
+    required String url,
+    String? secret,
+    required List<String> events,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    final now = DateTime.now().toIso8601String();
+    _db.execute('''
+      INSERT INTO webhooks (id, url, secret, events, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    ''', [id, url, secret, events.join(','), now]);
+
+    return Webhook(
+      id: id,
+      url: url,
+      secret: secret,
+      events: events,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<Webhook?> getWebhook(String id) async {
+    final result = _db.select('SELECT * FROM webhooks WHERE id = ?', [id]);
+    if (result.isEmpty) return null;
+    return _webhookFromRow(result.first);
+  }
+
+  @override
+  Future<List<Webhook>> listWebhooks({bool activeOnly = false}) async {
+    final query = activeOnly
+        ? 'SELECT * FROM webhooks WHERE is_active = 1 ORDER BY created_at DESC'
+        : 'SELECT * FROM webhooks ORDER BY created_at DESC';
+
+    final result = _db.select(query);
+    return result.map(_webhookFromRow).toList();
+  }
+
+  @override
+  Future<void> updateWebhook(Webhook webhook) async {
+    _db.execute('''
+      UPDATE webhooks
+      SET url = ?, secret = ?, events = ?, is_active = ?,
+          last_triggered_at = ?, failure_count = ?
+      WHERE id = ?
+    ''', [
+      webhook.url,
+      webhook.secret,
+      webhook.events.join(','),
+      webhook.isActive ? 1 : 0,
+      webhook.lastTriggeredAt?.toIso8601String(),
+      webhook.failureCount,
+      webhook.id,
+    ]);
+  }
+
+  @override
+  Future<void> deleteWebhook(String id) async {
+    _db.execute('DELETE FROM webhooks WHERE id = ?', [id]);
+  }
+
+  @override
+  Future<List<Webhook>> getWebhooksForEvent(String eventType) async {
+    // SQLite stores events as comma-separated string
+    // Match if events contains the specific type or '*'
+    final result = _db.select('''
+      SELECT * FROM webhooks
+      WHERE is_active = 1
+        AND (events LIKE '%' || ? || '%' OR events LIKE '%*%')
+      ORDER BY created_at
+    ''', [eventType]);
+    return result.map(_webhookFromRow).toList();
+  }
+
+  @override
+  Future<void> logWebhookDelivery(WebhookDelivery delivery) async {
+    _db.execute('''
+      INSERT INTO webhook_deliveries
+        (id, webhook_id, event_type, payload, status_code, success, error, duration_ms, delivered_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', [
+      delivery.id,
+      delivery.webhookId,
+      delivery.eventType,
+      jsonEncode(delivery.payload),
+      delivery.statusCode,
+      delivery.success ? 1 : 0,
+      delivery.error,
+      delivery.duration.inMilliseconds,
+      delivery.deliveredAt.toIso8601String(),
+    ]);
+  }
+
+  @override
+  Future<List<WebhookDelivery>> getWebhookDeliveries(
+    String webhookId, {
+    int limit = 20,
+  }) async {
+    final result = _db.select('''
+      SELECT * FROM webhook_deliveries
+      WHERE webhook_id = ?
+      ORDER BY delivered_at DESC
+      LIMIT ?
+    ''', [webhookId, limit]);
+
+    return result.map(_webhookDeliveryFromRow).toList();
+  }
+
+  Webhook _webhookFromRow(Row row) {
+    final eventsStr = row['events'] as String;
+    return Webhook(
+      id: row['id'] as String,
+      url: row['url'] as String,
+      secret: row['secret'] as String?,
+      events: eventsStr.split(',').where((e) => e.isNotEmpty).toList(),
+      isActive: (row['is_active'] as int) == 1,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      lastTriggeredAt: row['last_triggered_at'] != null
+          ? DateTime.parse(row['last_triggered_at'] as String)
+          : null,
+      failureCount: row['failure_count'] as int,
+    );
+  }
+
+  WebhookDelivery _webhookDeliveryFromRow(Row row) {
+    return WebhookDelivery(
+      id: row['id'] as String,
+      webhookId: row['webhook_id'] as String,
+      eventType: row['event_type'] as String,
+      payload: jsonDecode(row['payload'] as String) as Map<String, dynamic>,
+      statusCode: row['status_code'] as int,
+      success: (row['success'] as int) == 1,
+      error: row['error'] as String?,
+      duration: Duration(milliseconds: row['duration_ms'] as int),
+      deliveredAt: DateTime.parse(row['delivered_at'] as String),
+    );
+  }
+
   // ============ Backup Export Methods ============
 
   /// Export all packages for backup.
@@ -3714,6 +4061,37 @@ const _sqliteMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
     CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
+  ''',
+  '010_webhooks': '''
+    -- Webhooks table for event notifications
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      secret TEXT,
+      events TEXT NOT NULL DEFAULT '*',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_triggered_at TEXT,
+      failure_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    -- Webhook delivery log
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id TEXT PRIMARY KEY,
+      webhook_id TEXT NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      status_code INTEGER NOT NULL,
+      success INTEGER NOT NULL,
+      error TEXT,
+      duration_ms INTEGER NOT NULL,
+      delivered_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Index for recent deliveries
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_time ON webhook_deliveries(delivered_at DESC);
+    -- Index for webhook-specific queries
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, delivered_at DESC);
   ''',
 };
 

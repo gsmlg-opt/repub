@@ -152,6 +152,37 @@ const migrations = <String, String>{
     -- Index for actor-based queries
     CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
   ''',
+  '010_webhooks': '''
+    -- Webhooks table for event notifications
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      url TEXT NOT NULL,
+      secret VARCHAR(255) NULL, -- HMAC secret for signing payloads
+      events TEXT[] NOT NULL DEFAULT ARRAY['*']::TEXT[], -- event types to trigger on, '*' = all
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_triggered_at TIMESTAMPTZ NULL,
+      failure_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    -- Webhook delivery log
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      webhook_id UUID NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+      event_type VARCHAR(50) NOT NULL,
+      payload JSONB NOT NULL,
+      status_code INTEGER NOT NULL,
+      success BOOLEAN NOT NULL,
+      error TEXT NULL,
+      duration_ms INTEGER NOT NULL,
+      delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    -- Index for recent deliveries
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_time ON webhook_deliveries(delivered_at DESC);
+    -- Index for webhook-specific queries
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, delivered_at DESC);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.

@@ -7,3 +7,4 @@ export 'src/logger.dart';
 export 'src/publish.dart';
 export 'src/rate_limit.dart';
 export 'src/server.dart';
+export 'src/webhook_service.dart';

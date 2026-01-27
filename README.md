@@ -369,6 +369,48 @@ DELETE /admin/api/cache
 
 Package and cache management endpoints.
 
+### Webhooks
+
+Subscribe to registry events via webhooks. Webhooks are managed via the admin API.
+
+**Available event types:**
+- `package.published` - When a package version is published
+- `package.deleted` - When a package is deleted
+- `version.deleted` - When a specific version is deleted
+- `package.discontinued` - When a package is marked discontinued
+- `package.reactivated` - When a discontinued package is reactivated
+- `user.registered` - When a new user registers
+- `cache.cleared` - When cache is cleared
+- `*` - Wildcard, subscribes to all events
+
+**Webhook payload format:**
+```json
+{
+  "event": "package.published",
+  "timestamp": "2026-01-27T15:30:00Z",
+  "data": {
+    "package": "my_package",
+    "version": "1.0.0",
+    "publisher_email": "user@example.com"
+  }
+}
+```
+
+**Security:** Webhooks support HMAC-SHA256 signature verification. If a secret is configured, the `X-Webhook-Signature` header contains `sha256=<signature>` computed from the request body.
+
+**Admin API endpoints:**
+```
+GET    /admin/api/webhooks              # List all webhooks
+POST   /admin/api/webhooks              # Create webhook
+GET    /admin/api/webhooks/<id>         # Get webhook details
+PUT    /admin/api/webhooks/<id>         # Update webhook
+DELETE /admin/api/webhooks/<id>         # Delete webhook
+GET    /admin/api/webhooks/<id>/deliveries  # View delivery history
+POST   /admin/api/webhooks/<id>/test    # Send test payload
+```
+
+Webhooks are automatically disabled after 5 consecutive delivery failures to prevent repeated failures.
+
 ## Token Scopes
 
 Repub uses scope-based authorization to control what operations tokens can perform. Tokens are managed through the web UI at `/account/tokens`.
