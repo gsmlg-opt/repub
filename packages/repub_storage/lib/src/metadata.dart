@@ -106,6 +106,7 @@ abstract class MetadataStore {
   Future<String> createToken({
     required String userId,
     required String label,
+    List<String>? scopes,
     DateTime? expiresAt,
   });
 
@@ -594,7 +595,7 @@ class PostgresMetadataStore extends MetadataStore {
   Future<AuthToken?> getTokenByHash(String tokenHash) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+        SELECT token_hash, user_id, label, scopes, created_at, last_used_at, expires_at
         FROM auth_tokens WHERE token_hash = @hash
       '''),
       parameters: {'hash': tokenHash},
@@ -603,13 +604,19 @@ class PostgresMetadataStore extends MetadataStore {
     if (result.isEmpty) return null;
 
     final row = result.first;
+    final scopesRaw = row[3];
+    final scopes = scopesRaw is List
+        ? scopesRaw.cast<String>()
+        : <String>[]; // Empty list for null/missing scopes
+
     return AuthToken(
       tokenHash: row[0] as String,
       userId: row[1] as String? ?? User.anonymousId,
       label: row[2] as String,
-      createdAt: row[3] as DateTime,
-      lastUsedAt: row[4] as DateTime?,
-      expiresAt: row[5] as DateTime?,
+      scopes: scopes,
+      createdAt: row[4] as DateTime,
+      lastUsedAt: row[5] as DateTime?,
+      expiresAt: row[6] as DateTime?,
     );
   }
 
@@ -628,20 +635,23 @@ class PostgresMetadataStore extends MetadataStore {
   Future<String> createToken({
     required String userId,
     required String label,
+    List<String>? scopes,
     DateTime? expiresAt,
   }) async {
     final token = MetadataStore._uuid.v4() + MetadataStore._uuid.v4();
     final tokenHash = sha256.convert(utf8.encode(token)).toString();
+    final scopesArray = scopes ?? <String>[];
 
     await _conn.execute(
       Sql.named('''
-        INSERT INTO auth_tokens (token_hash, user_id, label, expires_at)
-        VALUES (@hash, @userId, @label, @expiresAt)
+        INSERT INTO auth_tokens (token_hash, user_id, label, scopes, expires_at)
+        VALUES (@hash, @userId, @label, @scopes, @expiresAt)
       '''),
       parameters: {
         'hash': tokenHash,
         'userId': userId,
         'label': label,
+        'scopes': scopesArray,
         'expiresAt': expiresAt,
       },
     );
@@ -653,11 +663,11 @@ class PostgresMetadataStore extends MetadataStore {
   Future<List<AuthToken>> listTokens({String? userId}) async {
     final sql = userId != null
         ? '''
-          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          SELECT token_hash, user_id, label, scopes, created_at, last_used_at, expires_at
           FROM auth_tokens WHERE user_id = @userId ORDER BY created_at DESC
         '''
         : '''
-          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          SELECT token_hash, user_id, label, scopes, created_at, last_used_at, expires_at
           FROM auth_tokens ORDER BY created_at DESC
         ''';
 
@@ -667,13 +677,19 @@ class PostgresMetadataStore extends MetadataStore {
     );
 
     return result.map((row) {
+      final scopesRaw = row[3];
+      final scopes = scopesRaw is List
+          ? scopesRaw.cast<String>()
+          : <String>[];
+
       return AuthToken(
         tokenHash: row[0] as String,
         userId: row[1] as String? ?? User.anonymousId,
         label: row[2] as String,
-        createdAt: row[3] as DateTime,
-        lastUsedAt: row[4] as DateTime?,
-        expiresAt: row[5] as DateTime?,
+        scopes: scopes,
+        createdAt: row[4] as DateTime,
+        lastUsedAt: row[5] as DateTime?,
+        expiresAt: row[6] as DateTime?,
       );
     }).toList();
   }
@@ -1839,17 +1855,23 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<AuthToken?> getTokenByHash(String tokenHash) async {
     final result = _db.select('''
-      SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+      SELECT token_hash, user_id, label, scopes, created_at, last_used_at, expires_at
       FROM auth_tokens WHERE token_hash = ?
     ''', [tokenHash]);
 
     if (result.isEmpty) return null;
 
     final row = result.first;
+    final scopesJson = row['scopes'] as String?;
+    final scopes = scopesJson != null && scopesJson.isNotEmpty
+        ? (jsonDecode(scopesJson) as List).cast<String>()
+        : <String>[];
+
     return AuthToken(
       tokenHash: row['token_hash'] as String,
       userId: row['user_id'] as String? ?? User.anonymousId,
       label: row['label'] as String,
+      scopes: scopes,
       createdAt: DateTime.parse(row['created_at'] as String),
       lastUsedAt: row['last_used_at'] != null
           ? DateTime.parse(row['last_used_at'] as String)
@@ -1873,16 +1895,18 @@ class SqliteMetadataStore extends MetadataStore {
   Future<String> createToken({
     required String userId,
     required String label,
+    List<String>? scopes,
     DateTime? expiresAt,
   }) async {
     final token = MetadataStore._uuid.v4() + MetadataStore._uuid.v4();
     final tokenHash = sha256.convert(utf8.encode(token)).toString();
     final now = DateTime.now().toIso8601String();
+    final scopesJson = jsonEncode(scopes ?? []);
 
     _db.execute('''
-      INSERT INTO auth_tokens (token_hash, user_id, label, created_at, expires_at)
-      VALUES (?, ?, ?, ?, ?)
-    ''', [tokenHash, userId, label, now, expiresAt?.toIso8601String()]);
+      INSERT INTO auth_tokens (token_hash, user_id, label, scopes, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    ''', [tokenHash, userId, label, scopesJson, now, expiresAt?.toIso8601String()]);
 
     return token;
   }
@@ -1891,21 +1915,27 @@ class SqliteMetadataStore extends MetadataStore {
   Future<List<AuthToken>> listTokens({String? userId}) async {
     final sql = userId != null
         ? '''
-          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          SELECT token_hash, user_id, label, scopes, created_at, last_used_at, expires_at
           FROM auth_tokens WHERE user_id = ? ORDER BY created_at DESC
         '''
         : '''
-          SELECT token_hash, user_id, label, created_at, last_used_at, expires_at
+          SELECT token_hash, user_id, label, scopes, created_at, last_used_at, expires_at
           FROM auth_tokens ORDER BY created_at DESC
         ''';
 
     final result = _db.select(sql, userId != null ? [userId] : []);
 
     return result.map((row) {
+      final scopesJson = row['scopes'] as String?;
+      final scopes = scopesJson != null && scopesJson.isNotEmpty
+          ? (jsonDecode(scopesJson) as List).cast<String>()
+          : <String>[];
+
       return AuthToken(
         tokenHash: row['token_hash'] as String,
         userId: row['user_id'] as String? ?? User.anonymousId,
         label: row['label'] as String,
+        scopes: scopes,
         createdAt: DateTime.parse(row['created_at'] as String),
         lastUsedAt: row['last_used_at'] != null
             ? DateTime.parse(row['last_used_at'] as String)
