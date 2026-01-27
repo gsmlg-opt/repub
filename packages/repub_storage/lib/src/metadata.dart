@@ -187,6 +187,11 @@ abstract class MetadataStore {
   /// Returns a map of datetime (YYYY-MM-DD HH:00:00) to count.
   Future<Map<String, int>> getDownloadsPerHour(int hours);
 
+  /// Get download statistics for a specific package.
+  /// Returns total downloads, downloads by version, and recent download history.
+  Future<PackageDownloadStats> getPackageDownloadStats(String packageName,
+      {int historyDays = 30});
+
   /// Get archive keys for a package (for blob deletion).
   Future<List<String>> getPackageArchiveKeys(String name);
 
@@ -1078,6 +1083,57 @@ class PostgresMetadataStore extends MetadataStore {
     return {
       for (final row in result) row[0].toString(): row[1] as int,
     };
+  }
+
+  @override
+  Future<PackageDownloadStats> getPackageDownloadStats(String packageName,
+      {int historyDays = 30}) async {
+    // Get total downloads
+    final totalResult = await _conn.execute(
+      Sql.named('''
+        SELECT COUNT(*) FROM package_downloads WHERE package_name = @name
+      '''),
+      parameters: {'name': packageName},
+    );
+    final totalDownloads = totalResult.first[0] as int;
+
+    // Get downloads by version
+    final versionResult = await _conn.execute(
+      Sql.named('''
+        SELECT version, COUNT(*) as count
+        FROM package_downloads
+        WHERE package_name = @name
+        GROUP BY version
+        ORDER BY count DESC
+      '''),
+      parameters: {'name': packageName},
+    );
+    final downloadsByVersion = <String, int>{
+      for (final row in versionResult) row[0] as String: row[1] as int,
+    };
+
+    // Get daily downloads for the last N days
+    final dailyResult = await _conn.execute(
+      Sql.named('''
+        SELECT DATE(downloaded_at) as day, COUNT(*) as count
+        FROM package_downloads
+        WHERE package_name = @name
+          AND downloaded_at >= NOW() - INTERVAL '@days days'
+        GROUP BY DATE(downloaded_at)
+        ORDER BY day DESC
+      '''),
+      parameters: {'name': packageName, 'days': historyDays.toString()},
+    );
+    final dailyDownloads = <String, int>{
+      for (final row in dailyResult) row[0].toString().split(' ')[0]: row[1] as int,
+    };
+
+    return PackageDownloadStats(
+      packageName: packageName,
+      totalDownloads: totalDownloads,
+      downloadsByVersion: downloadsByVersion,
+      dailyDownloads: dailyDownloads,
+    );
   }
 
   @override
@@ -2820,6 +2876,52 @@ class SqliteMetadataStore extends MetadataStore {
     return {
       for (final row in result) row['hour'] as String: row['count'] as int,
     };
+  }
+
+  @override
+  Future<PackageDownloadStats> getPackageDownloadStats(String packageName,
+      {int historyDays = 30}) async {
+    // Get total downloads
+    final totalResult = _db.select(
+      'SELECT COUNT(*) as count FROM package_downloads WHERE package_name = ?',
+      [packageName],
+    );
+    final totalDownloads = totalResult.first['count'] as int;
+
+    // Get downloads by version
+    final versionResult = _db.select('''
+      SELECT version, COUNT(*) as count
+      FROM package_downloads
+      WHERE package_name = ?
+      GROUP BY version
+      ORDER BY count DESC
+    ''', [packageName]);
+    final downloadsByVersion = <String, int>{
+      for (final row in versionResult)
+        row['version'] as String: row['count'] as int,
+    };
+
+    // Get daily downloads for the last N days
+    final cutoffDate =
+        DateTime.now().subtract(Duration(days: historyDays)).toIso8601String();
+    final dailyResult = _db.select('''
+      SELECT DATE(downloaded_at) as day, COUNT(*) as count
+      FROM package_downloads
+      WHERE package_name = ? AND downloaded_at >= ?
+      GROUP BY DATE(downloaded_at)
+      ORDER BY day DESC
+    ''', [packageName, cutoffDate]);
+    final dailyDownloads = <String, int>{
+      for (final row in dailyResult)
+        row['day'] as String: row['count'] as int,
+    };
+
+    return PackageDownloadStats(
+      packageName: packageName,
+      totalDownloads: totalDownloads,
+      downloadsByVersion: downloadsByVersion,
+      dailyDownloads: dailyDownloads,
+    );
   }
 
   @override

@@ -262,6 +262,31 @@ class AdminApiClient {
     return json.map((key, value) => MapEntry(key, value as int));
   }
 
+  /// Get package download statistics.
+  Future<Map<String, dynamic>> getPackageStats(String packageName,
+      {int days = 30}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/packages/$packageName/stats?days=$days'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Package not found: $packageName',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch package stats: ${response.body}',
+      );
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   /// List hosted packages (packages published directly to this registry).
   Future<PackageListResponse> listHostedPackages({
     int page = 1,

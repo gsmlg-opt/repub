@@ -111,6 +111,7 @@ Router createRouter({
   router.get('/admin/api/activity', handlers.adminGetRecentActivity);
   router.get('/admin/api/hosted-packages', handlers.adminListHostedPackages);
   router.get('/admin/api/cached-packages', handlers.adminListCachedPackages);
+  router.get('/admin/api/packages/<name>/stats', handlers.adminGetPackageStats);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
   router.delete('/admin/api/packages/<name>/versions/<version>',
       handlers.adminDeletePackageVersion);
@@ -1343,6 +1344,37 @@ class ApiHandlers {
 
     return Response.ok(
       jsonEncode(result.toJson(config.baseUrl)),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/packages/<name>/stats`
+  Future<Response> adminGetPackageStats(Request request, String name) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    // Get package info first to verify it exists
+    final pkgInfo = await metadata.getPackageInfo(name);
+    if (pkgInfo == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Get download statistics
+    final days = int.tryParse(request.url.queryParameters['days'] ?? '30') ?? 30;
+    final stats = await metadata.getPackageDownloadStats(name, historyDays: days);
+
+    return Response.ok(
+      jsonEncode({
+        'package': pkgInfo.package.toJson(),
+        'version_count': pkgInfo.versions.length,
+        'latest_version': pkgInfo.latest?.version,
+        'stats': stats.toJson(),
+      }),
       headers: {'content-type': 'application/json'},
     );
   }

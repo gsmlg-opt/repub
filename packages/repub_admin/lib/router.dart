@@ -12,6 +12,7 @@ import 'screens/users_screen.dart';
 import 'screens/admin_users_screen.dart';
 import 'screens/admin_user_detail_screen.dart';
 import 'screens/webhooks_screen.dart';
+import 'screens/package_detail_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 
@@ -58,6 +59,13 @@ GoRouter createRouter(BuildContext context) {
       GoRoute(
         path: '/packages/local',
         builder: (context, state) => const LocalPackagesScreen(),
+      ),
+      GoRoute(
+        path: '/packages/:name/stats',
+        builder: (context, state) {
+          final name = state.pathParameters['name']!;
+          return PackageDetailScreen(packageName: name);
+        },
       ),
       GoRoute(
         path: '/packages/cached',

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../blocs/packages/packages_bloc.dart';
 import '../blocs/packages/packages_event.dart';
@@ -205,10 +206,16 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              pkg.name,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w500),
+                            InkWell(
+                              onTap: () => context.go('/packages/${pkg.name}/stats'),
+                              child: Text(
+                                pkg.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
                             ),
                             if (pkg.isDiscontinued)
                               Padding(
