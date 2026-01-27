@@ -99,6 +99,9 @@ Router createRouter({
   router.post('/admin/api/packages/<name>/discontinue',
       handlers.adminDiscontinuePackage);
   router.delete('/admin/api/cache', handlers.adminClearCache);
+  // Semantic route for cached package deletion (same handler as /packages/:name)
+  router.delete(
+      '/admin/api/cached-packages/<name>', handlers.adminDeletePackage);
   router.get('/admin/api/users', handlers.adminListUsers);
   router.post('/admin/api/users', handlers.adminCreateUser);
   router.put('/admin/api/users/<id>', handlers.adminUpdateUser);

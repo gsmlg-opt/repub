@@ -174,10 +174,8 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
   ) async {
     emit(PackageOperationInProgress('clearing_cache', event.packageName));
     try {
-      // TODO: Add API method to clear individual package cache
-      emit(PackageOperationSuccess(
-        'Cache cleared for ${event.packageName}',
-      ));
+      final result = await _apiClient.clearCachedPackage(event.packageName);
+      emit(PackageOperationSuccess(result.message));
 
       // Reload cached packages view
       if (state is PackagesLoaded) {

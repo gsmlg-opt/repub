@@ -316,6 +316,35 @@ class AdminApiClient {
     );
   }
 
+  /// Clear a single cached package from the cache.
+  Future<DeleteResult> clearCachedPackage(String name) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/admin/api/cached-packages/$name'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Cached package not found: $name',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to clear cached package: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final success = json['success'] as Map<String, dynamic>;
+    return DeleteResult(
+      message: success['message'] as String,
+      versionsDeleted: success['versionsDeleted'] as int? ?? 0,
+    );
+  }
+
   PackageListResponse _parsePackageListResponse(
     String body,
     int page,
