@@ -140,16 +140,91 @@ class AdminApiClient {
   Future<Map<String, dynamic>> getDashboardStats() async {
     final stats = await getStats();
 
-    // TODO: Add recent activity feed from backend
-    // For now, return basic stats
+    // Fetch recent activity from backend
+    List<Map<String, dynamic>> recentActivity = [];
+    try {
+      final activities = await getRecentActivity(limit: 10);
+      recentActivity = activities;
+    } catch (e) {
+      // Silently fail for activity - dashboard still works without it
+    }
+
     return {
-      'totalPackages': stats.totalPackages,
-      'localPackages': stats.localPackages,
-      'cachedPackages': stats.cachedPackages,
-      'totalVersions': stats.totalVersions,
-      'recentActivity': <Map<String, dynamic>>[],
-      'topPackages': <Map<String, dynamic>>[],
+      'total_packages': stats.totalPackages,
+      'local_packages': stats.localPackages,
+      'cached_packages': stats.cachedPackages,
+      'total_versions': stats.totalVersions,
+      'total_users': 0, // TODO: Add users count to stats endpoint
+      'total_downloads': 0, // TODO: Add downloads count to stats endpoint
+      'active_tokens': 0, // TODO: Add tokens count to stats endpoint
+      'recent_activity': recentActivity,
+      'top_packages': <Map<String, dynamic>>[],
     };
+  }
+
+  /// Get recent activity from the activity log.
+  Future<List<Map<String, dynamic>>> getRecentActivity({int limit = 10}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/activity?limit=$limit'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch recent activity: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final activities = (json['activities'] as List<dynamic>?) ?? [];
+
+    // Transform API response to dashboard format
+    return activities.map((a) {
+      final activity = a as Map<String, dynamic>;
+      return {
+        'id': activity['id'] as String,
+        'type': activity['activityType'] as String,
+        'description': _generateDescription(activity),
+        'timestamp': activity['timestamp'] as String,
+        'actor_email': activity['actorEmail'] as String?,
+        'target_package': activity['targetId'] as String?,
+      };
+    }).toList();
+  }
+
+  /// Generate human-readable description from activity data.
+  String _generateDescription(Map<String, dynamic> activity) {
+    final activityType = activity['activityType'] as String;
+    final actorName = activity['actorUsername'] as String? ??
+        activity['actorEmail'] as String? ??
+        'Unknown';
+    final targetId = activity['targetId'] as String?;
+    final metadata = activity['metadata'] as Map<String, dynamic>?;
+    final version = metadata?['version'] as String?;
+
+    switch (activityType) {
+      case 'package_published':
+        return '$actorName published $targetId ${version ?? ''}';
+      case 'user_registered':
+        return '${activity['actorEmail']} registered';
+      case 'admin_login':
+        return '${activity['actorUsername']} logged in to admin panel';
+      case 'package_deleted':
+        return '$actorName deleted package $targetId';
+      case 'package_version_deleted':
+        return '$actorName deleted $targetId $version';
+      case 'user_created':
+        return '$actorName created user $targetId';
+      case 'user_deleted':
+        return '$actorName deleted user $targetId';
+      case 'config_updated':
+        return '$actorName updated configuration';
+      case 'cache_cleared':
+        return '$actorName cleared package cache';
+      default:
+        return '$activityType by $actorName';
+    }
   }
 
   Future<Map<String, int>> getPackagesCreatedPerDay({int days = 30}) async {

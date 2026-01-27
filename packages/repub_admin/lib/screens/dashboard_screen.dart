@@ -231,6 +231,34 @@ class DashboardScreen extends StatelessWidget {
         iconData = Icons.download;
         color = Colors.purple;
         break;
+      case 'admin_login':
+        iconData = Icons.login;
+        color = Colors.teal;
+        break;
+      case 'package_deleted':
+        iconData = Icons.delete_forever;
+        color = Colors.red;
+        break;
+      case 'package_version_deleted':
+        iconData = Icons.delete_outline;
+        color = Colors.orange;
+        break;
+      case 'user_created':
+        iconData = Icons.person_add_alt_1;
+        color = Colors.indigo;
+        break;
+      case 'user_deleted':
+        iconData = Icons.person_remove;
+        color = Colors.red;
+        break;
+      case 'config_updated':
+        iconData = Icons.settings;
+        color = Colors.amber;
+        break;
+      case 'cache_cleared':
+        iconData = Icons.cleaning_services;
+        color = Colors.brown;
+        break;
       default:
         iconData = Icons.circle;
         color = Colors.grey;
