@@ -4355,7 +4355,7 @@ const _sqliteMigrations = <String, String>{
       package_name TEXT NOT NULL REFERENCES packages(name) ON DELETE CASCADE,
       version TEXT NOT NULL,
       downloaded_at TEXT NOT NULL DEFAULT (datetime('now')),
-      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      user_agent TEXT,
       ip_address TEXT
     );
 
