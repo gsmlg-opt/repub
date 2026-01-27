@@ -61,7 +61,8 @@ class AdminUserDetailLoaded extends AdminUsersState {
 
   int get totalLogins => loginHistory.where((a) => a.success).length;
   int get failedLogins => loginHistory.where((a) => !a.success).length;
-  int get suspiciousAttempts => loginHistory.where((a) => a.isSuspicious).length;
+  int get suspiciousAttempts =>
+      loginHistory.where((a) => a.isSuspicious).length;
 
   @override
   List<Object?> get props => [adminUser, loginHistory];

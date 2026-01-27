@@ -42,7 +42,8 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
             configMap['require_download_auth'] == 'true' ? true : false,
         databaseType: configMap['database_type'] ?? 'sqlite',
         storageType: configMap['storage_type'] ?? 'local',
-        maxUploadSizeMb: int.tryParse(configMap['max_upload_size_mb'] ?? '100') ?? 100,
+        maxUploadSizeMb:
+            int.tryParse(configMap['max_upload_size_mb'] ?? '100') ?? 100,
         allowPublicRegistration:
             configMap['allow_public_registration'] != 'false',
         smtpHost: configMap['smtp_host'],

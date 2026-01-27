@@ -54,7 +54,8 @@ class _LineChartPainter extends CustomPainter {
     final timestamps = data.keys.map((k) => DateTime.parse(k)).toList();
     if (timestamps.isEmpty) return;
 
-    final maxValue = data.values.isEmpty ? 1 : data.values.reduce((a, b) => a > b ? a : b);
+    final maxValue =
+        data.values.isEmpty ? 1 : data.values.reduce((a, b) => a > b ? a : b);
 
     // Draw axes
     _drawAxes(canvas, size, padding, timestamps, maxValue);
@@ -170,7 +171,8 @@ class _LineChartPainter extends CustomPainter {
       textPainter.layout();
       textPainter.paint(
         canvas,
-        Offset(padding.left - textPainter.width - 8, padding.top + y - textPainter.height / 2),
+        Offset(padding.left - textPainter.width - 8,
+            padding.top + y - textPainter.height / 2),
       );
     }
 
@@ -181,7 +183,8 @@ class _LineChartPainter extends CustomPainter {
       if (idx >= timestamps.length) continue;
 
       final time = timestamps[idx];
-      final x = (idx / (timestamps.length - 1)) * (size.width - padding.left - padding.right);
+      final x = (idx / (timestamps.length - 1)) *
+          (size.width - padding.left - padding.right);
       final timeLabel = _timeFormat.format(time);
 
       final textSpan = TextSpan(

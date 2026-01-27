@@ -50,7 +50,8 @@ class _BarChartPainter extends CustomPainter {
     final chartWidth = size.width - padding.left - padding.right;
     final chartHeight = size.height - padding.top - padding.bottom;
 
-    final maxValue = data.values.isEmpty ? 1 : data.values.reduce((a, b) => a > b ? a : b);
+    final maxValue =
+        data.values.isEmpty ? 1 : data.values.reduce((a, b) => a > b ? a : b);
     final barCount = data.length;
     final barWidth = chartWidth / barCount * 0.8;
     final barSpacing = chartWidth / barCount * 0.2;
@@ -140,7 +141,8 @@ class _BarChartPainter extends CustomPainter {
       textPainter.layout();
       textPainter.paint(
         canvas,
-        Offset(padding.left - textPainter.width - 8, padding.top + y - textPainter.height / 2),
+        Offset(padding.left - textPainter.width - 8,
+            padding.top + y - textPainter.height / 2),
       );
     }
 

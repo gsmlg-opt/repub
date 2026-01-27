@@ -213,8 +213,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
 
   // Helper methods to extract data from existing PackageInfo model
 
-  String _extractDescription(
-      repub_model.PackageInfo pkgInfo) {
+  String _extractDescription(repub_model.PackageInfo pkgInfo) {
     if (pkgInfo.versions.isEmpty) return '';
     final latestVersion = pkgInfo.versions.first;
     final pubspec = latestVersion.pubspec;
