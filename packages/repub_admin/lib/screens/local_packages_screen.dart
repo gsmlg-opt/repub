@@ -23,7 +23,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
   void initState() {
     super.initState();
     // Load packages when screen initializes
-    context.read<PackagesBloc>().add(const LoadLocalPackages());
+    context.read<PackagesBloc>().add(const LoadHostedPackages());
   }
 
   @override
@@ -91,7 +91,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Local Packages',
+                'Hosted Packages',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               Row(
@@ -110,7 +110,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
                     onPressed: () {
                       context
                           .read<PackagesBloc>()
-                          .add(const LoadLocalPackages());
+                          .add(const LoadHostedPackages());
                     },
                     tooltip: 'Refresh',
                   ),
@@ -157,7 +157,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
       return _buildError(context, state.message);
     }
 
-    if (state is PackagesLoaded && state.viewType == PackageViewType.local) {
+    if (state is PackagesLoaded && state.viewType == PackageViewType.hosted) {
       if (state.packages.isEmpty) {
         return _buildEmptyState(context, state.searchQuery);
       }
@@ -335,7 +335,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             onPressed: state.hasPrevPage
                 ? () {
                     context.read<PackagesBloc>().add(
-                          LoadLocalPackages(
+                          LoadHostedPackages(
                             page: state.page - 1,
                             limit: state.limit,
                             search: state.searchQuery,
@@ -357,7 +357,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             onPressed: state.hasNextPage
                 ? () {
                     context.read<PackagesBloc>().add(
-                          LoadLocalPackages(
+                          LoadHostedPackages(
                             page: state.page + 1,
                             limit: state.limit,
                             search: state.searchQuery,
@@ -390,7 +390,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             Text(
               searchQuery != null && searchQuery.isNotEmpty
                   ? 'No packages found matching "$searchQuery"'
-                  : 'No local packages yet',
+                  : 'No hosted packages yet',
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
@@ -445,7 +445,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () {
-                context.read<PackagesBloc>().add(const LoadLocalPackages());
+                context.read<PackagesBloc>().add(const LoadHostedPackages());
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),

@@ -118,7 +118,7 @@ class AdminLayout extends StatelessWidget {
           _buildNavItem(
             context,
             icon: Icons.inventory,
-            title: 'Local Packages',
+            title: 'Hosted Packages',
             path: '/packages/local',
             isPermanent: isPermanent,
           ),

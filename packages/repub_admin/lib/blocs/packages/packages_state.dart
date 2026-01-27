@@ -2,7 +2,9 @@ import 'package:equatable/equatable.dart';
 import '../../models/package_info.dart';
 
 /// Type of package view.
-enum PackageViewType { local, cached }
+/// - hosted: Packages published directly to this registry
+/// - cached: Packages cached from upstream registry (pub.dev)
+enum PackageViewType { hosted, cached }
 
 /// Base class for all packages states.
 abstract class PackagesState extends Equatable {

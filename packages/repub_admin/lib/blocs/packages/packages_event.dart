@@ -8,13 +8,13 @@ abstract class PackagesEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Event to load local packages.
-class LoadLocalPackages extends PackagesEvent {
+/// Event to load hosted packages (packages published directly to this registry).
+class LoadHostedPackages extends PackagesEvent {
   final int page;
   final int limit;
   final String? search;
 
-  const LoadLocalPackages({
+  const LoadHostedPackages({
     this.page = 1,
     this.limit = 20,
     this.search,
@@ -24,7 +24,7 @@ class LoadLocalPackages extends PackagesEvent {
   List<Object?> get props => [page, limit, search];
 }
 
-/// Event to load cached packages.
+/// Event to load cached packages (packages cached from upstream registry).
 class LoadCachedPackages extends PackagesEvent {
   final int page;
   final int limit;
@@ -50,7 +50,7 @@ class SearchPackages extends PackagesEvent {
   List<Object?> get props => [query];
 }
 
-/// Event to delete a local package.
+/// Event to delete a hosted package.
 class DeletePackage extends PackagesEvent {
   final String packageName;
 
