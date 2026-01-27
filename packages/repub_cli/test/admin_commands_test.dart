@@ -1,35 +1,15 @@
-import 'dart:io';
-
 import 'package:repub_auth/repub_auth.dart';
-import 'package:repub_cli/src/admin_commands.dart';
-import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('Admin Commands', () {
     late SqliteMetadataStore metadata;
-    late Config config;
 
     setUp(() async {
       // Use in-memory SQLite for tests
       metadata = SqliteMetadataStore.inMemory();
       await metadata.runMigrations();
-
-      config = Config(
-        listenAddr: '0.0.0.0',
-        listenPort: 4920,
-        baseUrl: 'http://localhost:4920',
-        databaseUrl: 'sqlite::memory:',
-        storagePath: '/tmp',
-        requirePublishAuth: true,
-        requireDownloadAuth: false,
-        signedUrlTtlSeconds: 3600,
-        upstreamUrl: 'https://pub.dev',
-        enableUpstreamProxy: false,
-        rateLimitRequests: 100,
-        rateLimitWindowSeconds: 60,
-      );
     });
 
     tearDown(() async {
