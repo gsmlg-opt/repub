@@ -152,7 +152,12 @@ abstract class MetadataStore {
   Future<bool> deletePackageVersion(String name, String version);
 
   /// Retract a package version (soft delete - marks as retracted but keeps data).
-  Future<bool> retractPackageVersion(String name, String version);
+  /// [message] is an optional explanation (e.g., "Security vulnerability").
+  Future<bool> retractPackageVersion(
+    String name,
+    String version, {
+    String? message,
+  });
 
   /// Unretract a previously retracted package version.
   Future<bool> unretractPackageVersion(String name, String version);
@@ -502,7 +507,7 @@ class PostgresMetadataStore extends MetadataStore {
     final result = await _conn.execute(
       Sql.named('''
         SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
-               is_retracted, retracted_at
+               is_retracted, retracted_at, retraction_message
         FROM package_versions
         WHERE package_name = @name
         ORDER BY published_at DESC
@@ -525,6 +530,7 @@ class PostgresMetadataStore extends MetadataStore {
         publishedAt: row[5] as DateTime,
         isRetracted: row[6] as bool? ?? false,
         retractedAt: row[7] as DateTime?,
+        retractionMessage: row[8] as String?,
       );
     }).toList();
   }
@@ -546,7 +552,7 @@ class PostgresMetadataStore extends MetadataStore {
     final result = await _conn.execute(
       Sql.named('''
         SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
-               is_retracted, retracted_at
+               is_retracted, retracted_at, retraction_message
         FROM package_versions
         WHERE package_name = @name AND version = @version
       '''),
@@ -570,6 +576,7 @@ class PostgresMetadataStore extends MetadataStore {
       publishedAt: row[5] as DateTime,
       isRetracted: row[6] as bool? ?? false,
       retractedAt: row[7] as DateTime?,
+      retractionMessage: row[8] as String?,
     );
   }
 
@@ -970,14 +977,18 @@ class PostgresMetadataStore extends MetadataStore {
   }
 
   @override
-  Future<bool> retractPackageVersion(String name, String version) async {
+  Future<bool> retractPackageVersion(
+    String name,
+    String version, {
+    String? message,
+  }) async {
     final result = await _conn.execute(
       Sql.named('''
         UPDATE package_versions
-        SET is_retracted = TRUE, retracted_at = NOW()
+        SET is_retracted = TRUE, retracted_at = NOW(), retraction_message = @message
         WHERE package_name = @name AND version = @version
       '''),
-      parameters: {'name': name, 'version': version},
+      parameters: {'name': name, 'version': version, 'message': message},
     );
     return result.affectedRows > 0;
   }
@@ -987,7 +998,7 @@ class PostgresMetadataStore extends MetadataStore {
     final result = await _conn.execute(
       Sql.named('''
         UPDATE package_versions
-        SET is_retracted = FALSE, retracted_at = NULL
+        SET is_retracted = FALSE, retracted_at = NULL, retraction_message = NULL
         WHERE package_name = @name AND version = @version
       '''),
       parameters: {'name': name, 'version': version},
@@ -2389,7 +2400,7 @@ class SqliteMetadataStore extends MetadataStore {
   Future<List<PackageVersion>> getPackageVersions(String packageName) async {
     final result = _db.select('''
       SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
-             is_retracted, retracted_at
+             is_retracted, retracted_at, retraction_message
       FROM package_versions
       WHERE package_name = ?
       ORDER BY published_at DESC
@@ -2410,6 +2421,7 @@ class SqliteMetadataStore extends MetadataStore {
         retractedAt: row['retracted_at'] != null
             ? DateTime.parse(row['retracted_at'] as String)
             : null,
+        retractionMessage: row['retraction_message'] as String?,
       );
     }).toList();
   }
@@ -2430,7 +2442,7 @@ class SqliteMetadataStore extends MetadataStore {
   ) async {
     final result = _db.select('''
       SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
-             is_retracted, retracted_at
+             is_retracted, retracted_at, retraction_message
       FROM package_versions
       WHERE package_name = ? AND version = ?
     ''', [packageName, version]);
@@ -2452,6 +2464,7 @@ class SqliteMetadataStore extends MetadataStore {
       retractedAt: row['retracted_at'] != null
           ? DateTime.parse(row['retracted_at'] as String)
           : null,
+      retractionMessage: row['retraction_message'] as String?,
     );
   }
 
@@ -2810,12 +2823,16 @@ class SqliteMetadataStore extends MetadataStore {
   }
 
   @override
-  Future<bool> retractPackageVersion(String name, String version) async {
+  Future<bool> retractPackageVersion(
+    String name,
+    String version, {
+    String? message,
+  }) async {
     _db.execute('''
       UPDATE package_versions
-      SET is_retracted = 1, retracted_at = datetime('now')
+      SET is_retracted = 1, retracted_at = datetime('now'), retraction_message = ?
       WHERE package_name = ? AND version = ?
-    ''', [name, version]);
+    ''', [message, name, version]);
     return _db.updatedRows > 0;
   }
 
@@ -2823,7 +2840,7 @@ class SqliteMetadataStore extends MetadataStore {
   Future<bool> unretractPackageVersion(String name, String version) async {
     _db.execute('''
       UPDATE package_versions
-      SET is_retracted = 0, retracted_at = NULL
+      SET is_retracted = 0, retracted_at = NULL, retraction_message = NULL
       WHERE package_name = ? AND version = ?
     ''', [name, version]);
     return _db.updatedRows > 0;

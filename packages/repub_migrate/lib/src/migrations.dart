@@ -183,6 +183,17 @@ const migrations = <String, String>{
     -- Index for webhook-specific queries
     CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, delivered_at DESC);
   ''',
+  '011_version_retraction': '''
+    -- Add version retraction support to package_versions
+    -- Retracted versions are still available for download but marked as problematic
+    -- Useful for security vulnerabilities or critical bugs
+    ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS is_retracted BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retracted_at TIMESTAMPTZ NULL;
+    ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retraction_message TEXT NULL;
+
+    -- Index for filtering retracted versions
+    CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(is_retracted);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.

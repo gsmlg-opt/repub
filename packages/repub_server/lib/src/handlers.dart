@@ -1538,7 +1538,23 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final retracted = await metadata.retractPackageVersion(name, version);
+    // Parse optional retraction message from request body
+    String? retractionMessage;
+    try {
+      final body = await request.readAsString();
+      if (body.isNotEmpty) {
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        retractionMessage = json['message'] as String?;
+      }
+    } catch (e) {
+      // Ignore JSON parsing errors - message is optional
+    }
+
+    final retracted = await metadata.retractPackageVersion(
+      name,
+      version,
+      message: retractionMessage,
+    );
 
     if (!retracted) {
       return Response.notFound(
@@ -1560,7 +1576,11 @@ class ApiHandlers {
       actorId: adminUser?['username'] as String? ?? 'unknown',
       targetType: 'package_version',
       targetId: '$name@$version',
-      metadata: {'package': name, 'version': version},
+      metadata: {
+        'package': name,
+        'version': version,
+        if (retractionMessage != null) 'message': retractionMessage,
+      },
       ipAddress: request.headers['x-forwarded-for'] ??
           request.headers['x-real-ip'],
     );

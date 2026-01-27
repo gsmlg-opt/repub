@@ -58,6 +58,7 @@ class PackageVersion {
   final DateTime publishedAt;
   final bool isRetracted;
   final DateTime? retractedAt;
+  final String? retractionMessage;
 
   const PackageVersion({
     required this.packageName,
@@ -68,10 +69,15 @@ class PackageVersion {
     required this.publishedAt,
     this.isRetracted = false,
     this.retractedAt,
+    this.retractionMessage,
   });
 
   /// Create a copy with retraction flag set.
-  PackageVersion copyWith({bool? isRetracted, DateTime? retractedAt}) {
+  PackageVersion copyWith({
+    bool? isRetracted,
+    DateTime? retractedAt,
+    String? retractionMessage,
+  }) {
     return PackageVersion(
       packageName: packageName,
       version: version,
@@ -81,6 +87,7 @@ class PackageVersion {
       publishedAt: publishedAt,
       isRetracted: isRetracted ?? this.isRetracted,
       retractedAt: retractedAt ?? this.retractedAt,
+      retractionMessage: retractionMessage ?? this.retractionMessage,
     );
   }
 
@@ -92,7 +99,10 @@ class PackageVersion {
         'archive_url': archiveUrl,
         'archive_sha256': archiveSha256,
         'published': publishedAt.toUtc().toIso8601String(),
-        if (isRetracted) 'retracted': true,
+        if (isRetracted) ...{
+          'retracted': true,
+          if (retractionMessage != null) 'retraction_message': retractionMessage,
+        },
       };
 }
 
