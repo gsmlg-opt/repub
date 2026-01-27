@@ -99,9 +99,9 @@ class AdminApiClient {
 
   static String _detectBaseUrl() {
     final location = web.window.location;
-    // Dev mode: admin on different port, API on 8080
-    if (location.port == '8082') {
-      return '${location.protocol}//${location.hostname}:8080';
+    // Dev mode: admin on different port, API on 4920
+    if (location.port == '4922') {
+      return '${location.protocol}//${location.hostname}:4920';
     }
     // Production: same origin
     return '';

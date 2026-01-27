@@ -75,9 +75,9 @@ class AuthApiClient {
   /// Detect API base URL based on current location.
   static String _detectBaseUrl() {
     final location = web.window.location;
-    // Dev mode: web on 8081, API on 8080
-    if (location.port == '8081') {
-      return '${location.protocol}//${location.hostname}:8080';
+    // Dev mode: web on 4921, API on 4920
+    if (location.port == '4921') {
+      return '${location.protocol}//${location.hostname}:4920';
     }
     // Production: same origin
     return '';
