@@ -46,6 +46,8 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
             int.tryParse(configMap['max_upload_size_mb'] ?? '100') ?? 100,
         allowPublicRegistration:
             configMap['allow_public_registration'] != 'false',
+        tokenMaxTtlDays:
+            int.tryParse(configMap['token_max_ttl_days'] ?? '0') ?? 0,
         smtpHost: configMap['smtp_host'],
         smtpPort: int.tryParse(configMap['smtp_port'] ?? ''),
         smtpFrom: configMap['smtp_from'],
@@ -79,6 +81,10 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
       await _apiClient.setConfig(
         'allow_public_registration',
         event.config.allowPublicRegistration.toString(),
+      );
+      await _apiClient.setConfig(
+        'token_max_ttl_days',
+        event.config.tokenMaxTtlDays.toString(),
       );
 
       if (event.config.smtpHost != null) {

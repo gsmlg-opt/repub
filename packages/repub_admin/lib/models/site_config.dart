@@ -9,6 +9,7 @@ class SiteConfig extends Equatable {
   final String storageType; // 'local' or 's3'
   final int maxUploadSizeMb;
   final bool allowPublicRegistration;
+  final int tokenMaxTtlDays; // 0 = unlimited
   final String? smtpHost;
   final int? smtpPort;
   final String? smtpFrom;
@@ -21,6 +22,7 @@ class SiteConfig extends Equatable {
     required this.storageType,
     required this.maxUploadSizeMb,
     required this.allowPublicRegistration,
+    this.tokenMaxTtlDays = 0,
     this.smtpHost,
     this.smtpPort,
     this.smtpFrom,
@@ -36,6 +38,7 @@ class SiteConfig extends Equatable {
       maxUploadSizeMb: json['max_upload_size_mb'] as int? ?? 100,
       allowPublicRegistration:
           json['allow_public_registration'] as bool? ?? true,
+      tokenMaxTtlDays: json['token_max_ttl_days'] as int? ?? 0,
       smtpHost: json['smtp_host'] as String?,
       smtpPort: json['smtp_port'] as int?,
       smtpFrom: json['smtp_from'] as String?,
@@ -51,6 +54,7 @@ class SiteConfig extends Equatable {
       'storage_type': storageType,
       'max_upload_size_mb': maxUploadSizeMb,
       'allow_public_registration': allowPublicRegistration,
+      'token_max_ttl_days': tokenMaxTtlDays,
       'smtp_host': smtpHost,
       'smtp_port': smtpPort,
       'smtp_from': smtpFrom,
@@ -65,6 +69,7 @@ class SiteConfig extends Equatable {
     String? storageType,
     int? maxUploadSizeMb,
     bool? allowPublicRegistration,
+    int? tokenMaxTtlDays,
     String? smtpHost,
     int? smtpPort,
     String? smtpFrom,
@@ -78,6 +83,7 @@ class SiteConfig extends Equatable {
       maxUploadSizeMb: maxUploadSizeMb ?? this.maxUploadSizeMb,
       allowPublicRegistration:
           allowPublicRegistration ?? this.allowPublicRegistration,
+      tokenMaxTtlDays: tokenMaxTtlDays ?? this.tokenMaxTtlDays,
       smtpHost: smtpHost ?? this.smtpHost,
       smtpPort: smtpPort ?? this.smtpPort,
       smtpFrom: smtpFrom ?? this.smtpFrom,
@@ -93,6 +99,7 @@ class SiteConfig extends Equatable {
         storageType,
         maxUploadSizeMb,
         allowPublicRegistration,
+        tokenMaxTtlDays,
         smtpHost,
         smtpPort,
         smtpFrom,

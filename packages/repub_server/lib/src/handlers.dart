@@ -2214,9 +2214,27 @@ class ApiHandlers {
         );
       }
 
+      // Get maximum token TTL from config
+      final maxTtlConfig = await metadata.getConfig('token_max_ttl_days');
+      final maxTtlDays =
+          maxTtlConfig != null ? int.tryParse(maxTtlConfig.value) ?? 0 : 0;
+
+      // Calculate effective expiration days
+      int? effectiveExpiresInDays = expiresInDays;
+      if (maxTtlDays > 0) {
+        // Enforce maximum TTL
+        if (effectiveExpiresInDays == null || effectiveExpiresInDays <= 0) {
+          // If no expiration specified, use max TTL
+          effectiveExpiresInDays = maxTtlDays;
+        } else if (effectiveExpiresInDays > maxTtlDays) {
+          // If requested expiration exceeds max, cap at max
+          effectiveExpiresInDays = maxTtlDays;
+        }
+      }
+
       DateTime? expiresAt;
-      if (expiresInDays != null && expiresInDays > 0) {
-        expiresAt = DateTime.now().add(Duration(days: expiresInDays));
+      if (effectiveExpiresInDays != null && effectiveExpiresInDays > 0) {
+        expiresAt = DateTime.now().add(Duration(days: effectiveExpiresInDays));
       }
 
       final token = await metadata.createToken(

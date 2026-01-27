@@ -254,7 +254,43 @@ class _SiteConfigScreenState extends State<SiteConfigScreen> {
                 _editedConfig.copyWith(allowPublicRegistration: value));
           },
         ),
+        const Divider(),
+        _buildTokenExpirationField(),
       ],
+    );
+  }
+
+  Widget _buildTokenExpirationField() {
+    final value = _editedConfig.tokenMaxTtlDays;
+
+    return ListTile(
+      title: const Text('Maximum Token Lifetime'),
+      subtitle: Text(
+        value == 0
+            ? 'Tokens never expire unless user specifies expiration'
+            : 'Tokens will expire after maximum $value days',
+      ),
+      trailing: SizedBox(
+        width: 200,
+        child: DropdownButton<int>(
+          value: value,
+          isExpanded: true,
+          items: const [
+            DropdownMenuItem(value: 0, child: Text('Unlimited')),
+            DropdownMenuItem(value: 7, child: Text('7 days')),
+            DropdownMenuItem(value: 30, child: Text('30 days')),
+            DropdownMenuItem(value: 90, child: Text('90 days')),
+            DropdownMenuItem(value: 180, child: Text('180 days')),
+            DropdownMenuItem(value: 365, child: Text('1 year')),
+          ],
+          onChanged: (newValue) {
+            if (newValue != null) {
+              _onConfigChanged(
+                  _editedConfig.copyWith(tokenMaxTtlDays: newValue));
+            }
+          },
+        ),
+      ),
     );
   }
 

@@ -405,5 +405,82 @@ void main() {
         expect(restrictedToken.canRead, isFalse);
       });
     });
+
+    group('Token Expiration', () {
+      test('token can be created with expiration date', () async {
+        final userId = await metadata.createUser(
+          email: 'expires@example.com',
+          passwordHash: 'hash',
+        );
+
+        final expiresAt = DateTime.now().add(const Duration(days: 30));
+        await metadata.createToken(
+          userId: userId,
+          label: 'Expiring Token',
+          scopes: ['publish:all'],
+          expiresAt: expiresAt,
+        );
+
+        final tokens = await metadata.listTokens(userId: userId);
+        expect(tokens.length, equals(1));
+        expect(tokens.first.expiresAt, isNotNull);
+        expect(tokens.first.isExpired, isFalse);
+      });
+
+      test('expired token reports as expired', () async {
+        final userId = await metadata.createUser(
+          email: 'expired@example.com',
+          passwordHash: 'hash',
+        );
+
+        // Create token that expired in the past
+        final expiresAt = DateTime.now().subtract(const Duration(hours: 1));
+        await metadata.createToken(
+          userId: userId,
+          label: 'Expired Token',
+          scopes: ['publish:all'],
+          expiresAt: expiresAt,
+        );
+
+        final tokens = await metadata.listTokens(userId: userId);
+        expect(tokens.length, equals(1));
+        expect(tokens.first.expiresAt, isNotNull);
+        expect(tokens.first.isExpired, isTrue);
+      });
+
+      test('token without expiration never expires', () async {
+        final userId = await metadata.createUser(
+          email: 'permanent@example.com',
+          passwordHash: 'hash',
+        );
+
+        await metadata.createToken(
+          userId: userId,
+          label: 'Permanent Token',
+          scopes: ['publish:all'],
+        );
+
+        final tokens = await metadata.listTokens(userId: userId);
+        expect(tokens.length, equals(1));
+        expect(tokens.first.expiresAt, isNull);
+        expect(tokens.first.isExpired, isFalse);
+      });
+
+      test('token_max_ttl_days config can be set and retrieved', () async {
+        // Set maximum TTL to 90 days
+        await metadata.setConfig('token_max_ttl_days', '90');
+
+        final config = await metadata.getConfig('token_max_ttl_days');
+        expect(config, isNotNull);
+        expect(config!.value, equals('90'));
+        expect(config.intValue, equals(90));
+      });
+
+      test('token_max_ttl_days defaults to 0 (unlimited)', () async {
+        final config = await metadata.getConfig('token_max_ttl_days');
+        expect(config, isNotNull);
+        expect(config!.intValue, equals(0));
+      });
+    });
   });
 }
