@@ -2,7 +2,7 @@ import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:test/test.dart';
 
-import '../lib/src/email_service.dart';
+import 'package:repub_server/src/email_service.dart';
 
 void main() {
   group('SmtpConfig', () {

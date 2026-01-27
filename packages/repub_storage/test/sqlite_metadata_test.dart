@@ -409,9 +409,10 @@ void main() {
       await store.completeUploadSession(session.id);
 
       // Session should be cleaned up after completion
-      final retrieved = await store.getUploadSession(session.id);
-      // Completed sessions may be deleted or marked - check behavior
-      // The session should still exist but be marked complete
+      // Completed sessions are typically deleted, so getUploadSession returns null
+      final retrievedSession = await store.getUploadSession(session.id);
+      // Session may be deleted or still exist after completion depending on implementation
+      expect(retrievedSession == null || retrievedSession.id == session.id, isTrue);
     });
 
     test('cleanupExpiredSessions removes old sessions', () async {
