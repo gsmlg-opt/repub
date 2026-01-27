@@ -4135,6 +4135,7 @@ const _postgresMigrations = <String, String>{
     -- Add retraction support to package_versions
     ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS is_retracted BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retracted_at TIMESTAMPTZ;
+    ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retraction_message TEXT;
     CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
   ''',
 };
@@ -4353,6 +4354,7 @@ const _sqliteMigrations = <String, String>{
     -- Add retraction support to package_versions
     ALTER TABLE package_versions ADD COLUMN is_retracted INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE package_versions ADD COLUMN retracted_at TEXT;
+    ALTER TABLE package_versions ADD COLUMN retraction_message TEXT;
 
     -- Index for filtering retracted versions
     CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
