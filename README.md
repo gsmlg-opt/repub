@@ -309,6 +309,39 @@ GET /health
 
 Returns `{"status": "ok"}`.
 
+### Admin API Endpoints
+
+All admin endpoints require admin session authentication (cookie-based).
+
+```
+GET /admin/api/stats
+```
+
+Returns dashboard statistics (total packages, local/cached packages, versions).
+
+```
+GET /admin/api/analytics/packages-created?days=30
+```
+
+Returns packages created per day for the last N days. Response format: `{"2026-01-27": 5, "2026-01-26": 3, ...}`
+
+```
+GET /admin/api/analytics/downloads?hours=24
+```
+
+Returns package downloads per hour for the last N hours. Response format: `{"2026-01-27 15:00:00": 12, "2026-01-27 14:00:00": 8, ...}`
+
+```
+GET /admin/api/packages/local
+GET /admin/api/packages/cached
+DELETE /admin/api/packages/<name>
+DELETE /admin/api/packages/<name>/versions/<version>
+POST /admin/api/packages/<name>/discontinue
+DELETE /admin/api/cache
+```
+
+Package and cache management endpoints.
+
 ## Token Scopes
 
 | Scope | Description |
@@ -417,11 +450,15 @@ The admin dashboard is a Flutter web application accessible at `/admin`. It uses
 ### Features
 
 - **Dashboard**: Overview stats (total packages, local/cached packages, versions)
+- **Analytics Charts**:
+  - Bar chart: Packages created per day (last 30 days)
+  - Line chart: Package downloads per hour (last 24 hours)
 - **Package Management**: View, delete, and discontinue packages
 - **User Management**: Create and manage regular users
 - **Admin Users**: View admin users and their login history
 - **Site Configuration**: Configure registry settings
 - **Cache Management**: Clear upstream package cache
+- **Download Tracking**: Automatic logging of all package downloads with IP address and user agent
 
 ### Admin User Management
 

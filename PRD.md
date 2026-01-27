@@ -108,11 +108,15 @@ Enable Dart/Flutter developers to own and control their package distribution inf
 
 - **Admin UI** (Flutter web)
   - Dashboard with statistics
+  - Analytics charts:
+    - Bar chart: Packages created per day (last 30 days)
+    - Line chart: Package downloads per hour (last 24 hours)
   - Package management (delete, discontinue)
   - User management
   - Admin user viewing (with login history)
   - Cache management
   - Site configuration
+  - Download tracking (automatic logging with IP and user agent)
 
 #### 5. Developer Experience
 
@@ -157,8 +161,10 @@ Enable Dart/Flutter developers to own and control their package distribution inf
 - Package discontinuation with reason/replacement package
 - Package version retraction
 - Package ownership transfer
-- Package statistics (download counts, version popularity)
+- ~~Package statistics (download counts, version popularity)~~ ✅ **Implemented in v1.0** - Dashboard charts show packages created per day and downloads per hour
 - Package tags/categories
+- Per-package download statistics and detailed analytics
+- Download statistics by version and geographic region
 
 #### 2. Enhanced Security
 - Two-factor authentication for admin users
@@ -224,6 +230,7 @@ Enable Dart/Flutter developers to own and control their package distribution inf
 │   - Versions             │  │   - Cached packages      │
 │   - Users/Tokens         │  │                          │
 │   - Admin Users          │  │                          │
+│   - Download Analytics   │  │                          │
 └──────────────────────────┘  └──────────────────────────┘
 ```
 
@@ -328,6 +335,8 @@ repub_auth ← repub_storage
 | POST | `/admin/api/auth/logout` | Admin logout | Session |
 | GET | `/admin/api/auth/me` | Get current admin | Session |
 | GET | `/admin/api/stats` | Dashboard stats | Admin |
+| GET | `/admin/api/analytics/packages-created` | Packages created per day | Admin |
+| GET | `/admin/api/analytics/downloads` | Downloads per hour | Admin |
 | GET | `/admin/api/packages/local` | List local packages | Admin |
 | GET | `/admin/api/packages/cached` | List cached packages | Admin |
 | DELETE | `/admin/api/packages/:name` | Delete package | Admin |
@@ -500,6 +509,14 @@ Semantic versioning: `MAJOR.MINOR.PATCH`
 - [Melos](https://pub.dev/packages/melos)
 
 ### Changelog
+- **2026-01-27**: Analytics and data visualization
+  - Added download tracking system (package_downloads table)
+  - Implemented analytics charts in admin dashboard
+  - Bar chart: Packages created per day (last 30 days)
+  - Line chart: Package downloads per hour (last 24 hours)
+  - Added analytics API endpoints for admin dashboard
+  - Automatic logging of downloads with IP address and user agent
+
 - **2026-01-27**: Initial PRD created
   - Core features defined
   - Architecture documented
