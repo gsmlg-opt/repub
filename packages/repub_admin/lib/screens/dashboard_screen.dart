@@ -1,113 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../services/admin_api_client.dart';
+import '../blocs/dashboard/dashboard_bloc.dart';
+import '../blocs/dashboard/dashboard_event.dart';
+import '../blocs/dashboard/dashboard_state.dart';
+import '../models/dashboard_stats.dart';
 import '../widgets/admin_layout.dart';
-import '../widgets/packages_created_chart.dart';
-import '../widgets/downloads_line_chart.dart';
 
-class DashboardScreen extends StatefulWidget {
+/// Dashboard screen that displays statistics and analytics using BLoC pattern.
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardData {
-  final AdminStats stats;
-  final Map<String, int> packagesCreated;
-  final Map<String, int> downloads;
-
-  const _DashboardData({
-    required this.stats,
-    required this.packagesCreated,
-    required this.downloads,
-  });
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  final _apiClient = AdminApiClient();
-  late Future<_DashboardData> _dataFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _dataFuture = _loadData();
-  }
-
-  @override
-  void dispose() {
-    _apiClient.dispose();
-    super.dispose();
-  }
-
-  Future<_DashboardData> _loadData() async {
-    final results = await Future.wait([
-      _apiClient.getStats(),
-      _apiClient.getPackagesCreatedPerDay(days: 30),
-      _apiClient.getDownloadsPerHour(hours: 24),
-    ]);
-
-    return _DashboardData(
-      stats: results[0] as AdminStats,
-      packagesCreated: results[1] as Map<String, int>,
-      downloads: results[2] as Map<String, int>,
-    );
-  }
-
-  void _refresh() {
-    setState(() {
-      _dataFuture = _loadData();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Load dashboard data when screen is built
+    context.read<DashboardBloc>().add(const LoadDashboard());
+
     return AdminLayout(
       currentPath: '/',
-      child: FutureBuilder<_DashboardData>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      child: BlocBuilder<DashboardBloc, DashboardState>(
+        builder: (context, state) {
+          if (state is DashboardLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError) {
-            return _buildError(context, snapshot.error.toString());
+          if (state is DashboardError) {
+            return _buildError(context, state.message);
           }
 
-          if (!snapshot.hasData) {
-            return _buildError(context, 'No data available');
+          if (state is DashboardLoaded) {
+            return _buildDashboard(context, state.stats);
           }
 
-          return _buildDashboard(context, snapshot.data!);
+          return const Center(child: CircularProgressIndicator());
         },
       ),
     );
   }
 
-  Widget _buildDashboard(BuildContext context, _DashboardData data) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Dashboard',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          _buildStatsGrid(context, data.stats),
-          const SizedBox(height: 32),
-          _buildChartsSection(context, data),
-          const SizedBox(height: 32),
-          _buildQuickActions(context),
-        ],
+  Widget _buildDashboard(BuildContext context, DashboardStats stats) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<DashboardBloc>().add(const RefreshDashboard());
+        // Wait for the refresh to complete
+        await Future.delayed(const Duration(milliseconds: 500));
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Dashboard',
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    context.read<DashboardBloc>().add(const RefreshDashboard());
+                  },
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _buildStatsGrid(context, stats),
+            const SizedBox(height: 32),
+            if (stats.recentActivity.isNotEmpty) ...[
+              _buildRecentActivity(context, stats.recentActivity),
+              const SizedBox(height: 32),
+            ],
+            _buildQuickActions(context),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, AdminStats stats) {
+  Widget _buildStatsGrid(BuildContext context, DashboardStats stats) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 900
@@ -133,24 +108,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             _buildStatCard(
               context,
-              label: 'Local Packages',
-              value: stats.localPackages.toString(),
+              label: 'Total Users',
+              value: stats.totalUsers.toString(),
               color: Colors.green,
-              icon: Icons.upload,
+              icon: Icons.people,
             ),
             _buildStatCard(
               context,
-              label: 'Cached Packages',
-              value: stats.cachedPackages.toString(),
+              label: 'Total Downloads',
+              value: stats.totalDownloads.toString(),
               color: Colors.purple,
-              icon: Icons.cached,
+              icon: Icons.download,
             ),
             _buildStatCard(
               context,
-              label: 'Total Versions',
-              value: stats.totalVersions.toString(),
+              label: 'Active Tokens',
+              value: stats.activeTokens.toString(),
               color: Colors.orange,
-              icon: Icons.tag,
+              icon: Icons.key,
             ),
           ],
         );
@@ -176,11 +151,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 Icon(icon, color: color, size: 24),
               ],
@@ -197,51 +175,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildChartsSection(BuildContext context, _DashboardData data) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Analytics',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Show charts side by side on wide screens, stacked on narrow screens
-            if (constraints.maxWidth > 900) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildPackagesCreatedCard(context, data.packagesCreated),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDownloadsCard(context, data.downloads),
-                  ),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  _buildPackagesCreatedCard(context, data.packagesCreated),
-                  const SizedBox(height: 16),
-                  _buildDownloadsCard(context, data.downloads),
-                ],
-              );
-            }
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPackagesCreatedCard(
+  Widget _buildRecentActivity(
     BuildContext context,
-    Map<String, int> data,
+    List<RecentActivity> activities,
   ) {
     return Card(
       elevation: 2,
@@ -251,15 +187,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Packages Created (Last 30 Days)',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              'Recent Activity',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 16),
-            PackagesCreatedChart(
-              data: data,
-              height: 300,
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: activities.length > 10 ? 10 : activities.length,
+              separatorBuilder: (context, index) => const Divider(),
+              itemBuilder: (context, index) {
+                final activity = activities[index];
+                return ListTile(
+                  leading: _getActivityIcon(activity.type),
+                  title: Text(activity.description),
+                  subtitle: Text(_formatTimestamp(activity.timestamp)),
+                  dense: true,
+                );
+              },
             ),
           ],
         ),
@@ -267,32 +214,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDownloadsCard(
-    BuildContext context,
-    Map<String, int> data,
-  ) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Downloads (Last 24 Hours)',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            DownloadsLineChart(
-              data: data,
-              height: 300,
-            ),
-          ],
-        ),
-      ),
-    );
+  Icon _getActivityIcon(String type) {
+    IconData iconData;
+    Color color;
+
+    switch (type) {
+      case 'package_published':
+        iconData = Icons.upload;
+        color = Colors.green;
+        break;
+      case 'user_registered':
+        iconData = Icons.person_add;
+        color = Colors.blue;
+        break;
+      case 'download':
+        iconData = Icons.download;
+        color = Colors.purple;
+        break;
+      default:
+        iconData = Icons.circle;
+        color = Colors.grey;
+    }
+
+    return Icon(iconData, color: color, size: 20);
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${timestamp.month}/${timestamp.day}/${timestamp.year}';
+    }
   }
 
   Widget _buildQuickActions(BuildContext context) {
@@ -327,6 +288,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   icon: Icons.cached,
                   color: Colors.purple,
                   onTap: () => context.go('/packages/cached'),
+                ),
+                _buildActionButton(
+                  context,
+                  label: 'Manage Users',
+                  icon: Icons.people,
+                  color: Colors.blue,
+                  onTap: () => context.go('/users'),
+                ),
+                _buildActionButton(
+                  context,
+                  label: 'Site Configuration',
+                  icon: Icons.settings,
+                  color: Colors.orange,
+                  onTap: () => context.go('/config'),
                 ),
               ],
             ),
@@ -393,7 +368,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _refresh,
+              onPressed: () {
+                context.read<DashboardBloc>().add(const LoadDashboard());
+              },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
             ),
