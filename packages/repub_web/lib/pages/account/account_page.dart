@@ -6,7 +6,6 @@ import '../../src/components/layout.dart';
 import '../../src/services/auth_api_client.dart';
 
 /// Account page for viewing and managing user profile.
-@client
 class AccountPage extends StatefulComponent {
   const AccountPage({super.key});
 

@@ -4,7 +4,6 @@ import 'package:jaspr/dom.dart';
 import '../src/components/layout.dart';
 
 /// Documentation page with setup instructions
-@client
 class DocsPage extends StatelessComponent {
   const DocsPage({super.key});
 

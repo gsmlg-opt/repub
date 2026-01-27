@@ -6,7 +6,6 @@ import '../src/components/package_card.dart';
 import '../src/services/api_client.dart';
 
 /// Home page showing list of packages
-@client
 class HomePage extends StatefulComponent {
   const HomePage({super.key});
 

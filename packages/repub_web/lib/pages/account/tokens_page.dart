@@ -6,7 +6,6 @@ import '../../src/components/layout.dart';
 import '../../src/services/auth_api_client.dart';
 
 /// Token management page for viewing and managing API tokens.
-@client
 class TokensPage extends StatefulComponent {
   const TokensPage({super.key});
 

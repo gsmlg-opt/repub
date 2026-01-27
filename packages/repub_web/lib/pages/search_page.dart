@@ -6,7 +6,6 @@ import '../src/components/package_card.dart';
 import '../src/services/api_client.dart';
 
 /// Search page for finding packages
-@client
 class SearchPage extends StatefulComponent {
   final String query;
 
