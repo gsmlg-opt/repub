@@ -287,6 +287,35 @@ class AdminApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Get dependency information for a package.
+  Future<PackageDependencies> getPackageDependencies(
+    String packageName, {
+    int depth = 2,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/packages/$packageName/dependencies?depth=$depth'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Package not found: $packageName',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch dependencies: ${response.body}',
+      );
+    }
+
+    return PackageDependencies.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   /// List hosted packages (packages published directly to this registry).
   Future<PackageListResponse> listHostedPackages({
     int page = 1,
@@ -1038,4 +1067,74 @@ class UserToken {
   }
 
   bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
+}
+
+/// Package dependency information.
+class PackageDependencies {
+  final String package;
+  final String? version;
+  final Map<String, dynamic> dependencies;
+  final Map<String, dynamic> devDependencies;
+  final List<ReverseDependency> reverseDependencies;
+  final Map<String, dynamic> dependencyTree;
+  final Map<String, dynamic> environment;
+
+  const PackageDependencies({
+    required this.package,
+    this.version,
+    required this.dependencies,
+    required this.devDependencies,
+    required this.reverseDependencies,
+    required this.dependencyTree,
+    required this.environment,
+  });
+
+  factory PackageDependencies.fromJson(Map<String, dynamic> json) {
+    return PackageDependencies(
+      package: json['package'] as String,
+      version: json['version'] as String?,
+      dependencies:
+          (json['dependencies'] as Map<String, dynamic>?) ?? {},
+      devDependencies:
+          (json['dev_dependencies'] as Map<String, dynamic>?) ?? {},
+      reverseDependencies: (json['reverse_dependencies'] as List<dynamic>?)
+              ?.map((e) => ReverseDependency.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      dependencyTree:
+          (json['dependency_tree'] as Map<String, dynamic>?) ?? {},
+      environment:
+          (json['environment'] as Map<String, dynamic>?) ?? {},
+    );
+  }
+
+  int get totalDependencies => dependencies.length;
+  int get totalDevDependencies => devDependencies.length;
+  int get totalReverseDependencies => reverseDependencies.length;
+}
+
+/// A package that depends on another package.
+class ReverseDependency {
+  final String name;
+  final String version;
+  final dynamic constraint;
+  final String type;
+
+  const ReverseDependency({
+    required this.name,
+    required this.version,
+    required this.constraint,
+    required this.type,
+  });
+
+  factory ReverseDependency.fromJson(Map<String, dynamic> json) {
+    return ReverseDependency(
+      name: json['name'] as String,
+      version: json['version'] as String,
+      constraint: json['constraint'],
+      type: json['type'] as String,
+    );
+  }
+
+  bool get isDevDependency => type == 'dev_dependency';
 }

@@ -19,8 +19,10 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
   PackageStats? _stats;
   Map<String, dynamic>? _packageInfo;
   List<VersionInfo>? _versions;
+  PackageDependencies? _dependencies;
   bool _isLoading = true;
   bool _isVersionsLoading = false;
+  bool _isDepsLoading = false;
   String? _error;
   int _historyDays = 30;
 
@@ -29,6 +31,7 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
     super.initState();
     _loadStats();
     _loadVersions();
+    _loadDependencies();
   }
 
   Future<void> _loadStats() async {
@@ -63,6 +66,19 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
       });
     } catch (e) {
       setState(() => _isVersionsLoading = false);
+    }
+  }
+
+  Future<void> _loadDependencies() async {
+    setState(() => _isDepsLoading = true);
+    try {
+      final deps = await _apiClient.getPackageDependencies(widget.packageName);
+      setState(() {
+        _dependencies = deps;
+        _isDepsLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isDepsLoading = false);
     }
   }
 
@@ -251,8 +267,204 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
           const SizedBox(height: 24),
           _buildVersionStats(),
           const SizedBox(height: 24),
+          _buildDependenciesSection(),
+          const SizedBox(height: 24),
           if (_packageInfo != null) _buildPackageInfo(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDependenciesSection() {
+    if (_isDepsLoading) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_dependencies == null) {
+      return const SizedBox.shrink();
+    }
+
+    final deps = _dependencies!;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.account_tree, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Dependencies',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: _loadDependencies,
+                  tooltip: 'Refresh dependencies',
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Summary row
+            Row(
+              children: [
+                _buildDepSummaryChip(
+                  'Dependencies',
+                  deps.totalDependencies,
+                  Colors.blue,
+                ),
+                const SizedBox(width: 12),
+                _buildDepSummaryChip(
+                  'Dev Dependencies',
+                  deps.totalDevDependencies,
+                  Colors.purple,
+                ),
+                const SizedBox(width: 12),
+                _buildDepSummaryChip(
+                  'Used By',
+                  deps.totalReverseDependencies,
+                  Colors.green,
+                ),
+              ],
+            ),
+            if (deps.dependencies.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Production Dependencies',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: deps.dependencies.entries.map((e) {
+                  return _buildDependencyChip(e.key, e.value, Colors.blue);
+                }).toList(),
+              ),
+            ],
+            if (deps.devDependencies.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Development Dependencies',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: deps.devDependencies.entries.map((e) {
+                  return _buildDependencyChip(e.key, e.value, Colors.purple);
+                }).toList(),
+              ),
+            ],
+            if (deps.reverseDependencies.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Packages Using This',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: deps.reverseDependencies.map((rd) {
+                  return Tooltip(
+                    message:
+                        '${rd.name} ${rd.version} (${rd.isDevDependency ? "dev" : "prod"})',
+                    child: Chip(
+                      avatar: Icon(
+                        rd.isDevDependency ? Icons.code : Icons.inventory,
+                        size: 16,
+                        color: Colors.green.shade700,
+                      ),
+                      label: Text(rd.name),
+                      backgroundColor: Colors.green.shade50,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+            if (deps.environment.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Environment',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: deps.environment.entries.map((e) {
+                  return Chip(
+                    avatar: const Icon(Icons.settings, size: 16),
+                    label: Text('${e.key}: ${e.value}'),
+                    backgroundColor: Colors.grey.shade100,
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDepSummaryChip(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            count.toString(),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: color,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color.withOpacity(0.8))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDependencyChip(String name, dynamic constraint, Color color) {
+    final constraintStr = constraint is String
+        ? constraint
+        : constraint is Map
+            ? (constraint.containsKey('git')
+                ? 'git'
+                : constraint.containsKey('path')
+                    ? 'path'
+                    : 'hosted')
+            : constraint.toString();
+
+    return Tooltip(
+      message: '$name: $constraint',
+      child: Chip(
+        avatar: Icon(
+          constraint is Map ? Icons.link : Icons.extension,
+          size: 16,
+          color: color,
+        ),
+        label: Text('$name $constraintStr'),
+        backgroundColor: color.withOpacity(0.1),
+        side: BorderSide(color: color.withOpacity(0.3)),
       ),
     );
   }

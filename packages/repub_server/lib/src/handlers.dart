@@ -120,6 +120,8 @@ Router createRouter({
       handlers.adminRetractPackageVersion);
   router.delete('/admin/api/packages/<name>/versions/<version>/retract',
       handlers.adminUnretractPackageVersion);
+  router.get('/admin/api/packages/<name>/dependencies',
+      handlers.adminGetPackageDependencies);
   router.post('/admin/api/packages/<name>/discontinue',
       handlers.adminDiscontinuePackage);
   router.delete('/admin/api/cache', handlers.adminClearCache);
@@ -1639,6 +1641,170 @@ class ApiHandlers {
       }),
       headers: {'content-type': 'application/json'},
     );
+  }
+
+  /// GET `/admin/api/packages/<name>/dependencies`
+  ///
+  /// Returns dependency information for a package:
+  /// - Direct dependencies from latest version
+  /// - Reverse dependencies (packages that depend on this one)
+  /// - Dependency tree (dependencies of dependencies, depth-limited)
+  Future<Response> adminGetPackageDependencies(
+    Request request,
+    String name,
+  ) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final info = await metadata.getPackageInfo(name);
+    if (info == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final latest = info.latest;
+    if (latest == null) {
+      return Response.ok(
+        jsonEncode({
+          'package': name,
+          'dependencies': <String, dynamic>{},
+          'dev_dependencies': <String, dynamic>{},
+          'reverse_dependencies': <String>[],
+          'dependency_tree': <String, dynamic>{},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Get depth parameter (default 2, max 5)
+    final depth = int.tryParse(
+            request.requestedUri.queryParameters['depth'] ?? '2') ??
+        2;
+    final maxDepth = depth.clamp(1, 5);
+
+    // Extract direct dependencies from pubspec
+    final pubspec = latest.pubspec;
+    final dependencies =
+        (pubspec['dependencies'] as Map<String, dynamic>?) ?? {};
+    final devDependencies =
+        (pubspec['dev_dependencies'] as Map<String, dynamic>?) ?? {};
+
+    // Find reverse dependencies (packages that depend on this package)
+    final reverseDeps = await _findReverseDependencies(name);
+
+    // Build dependency tree (dependencies of dependencies)
+    final dependencyTree = await _buildDependencyTree(
+      dependencies.keys.toList(),
+      maxDepth,
+      visited: {name},
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'package': name,
+        'version': latest.version,
+        'dependencies': dependencies,
+        'dev_dependencies': devDependencies,
+        'reverse_dependencies': reverseDeps,
+        'dependency_tree': dependencyTree,
+        'environment': pubspec['environment'] ?? {},
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// Find packages that depend on the given package.
+  Future<List<Map<String, dynamic>>> _findReverseDependencies(
+      String packageName) async {
+    final result = <Map<String, dynamic>>[];
+
+    // Get all hosted packages
+    final packages = await metadata.listPackagesByType(
+      isUpstreamCache: false,
+      page: 1,
+      limit: 1000,
+    );
+    for (final pkg in packages.packages) {
+      final latest = pkg.latest;
+      if (latest == null) continue;
+
+      final dependencies =
+          (latest.pubspec['dependencies'] as Map<String, dynamic>?) ?? {};
+      final devDependencies =
+          (latest.pubspec['dev_dependencies'] as Map<String, dynamic>?) ?? {};
+
+      if (dependencies.containsKey(packageName)) {
+        result.add({
+          'name': pkg.package.name,
+          'version': latest.version,
+          'constraint': dependencies[packageName],
+          'type': 'dependency',
+        });
+      } else if (devDependencies.containsKey(packageName)) {
+        result.add({
+          'name': pkg.package.name,
+          'version': latest.version,
+          'constraint': devDependencies[packageName],
+          'type': 'dev_dependency',
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /// Build a dependency tree showing transitive dependencies.
+  Future<Map<String, dynamic>> _buildDependencyTree(
+    List<String> dependencies,
+    int depth, {
+    Set<String>? visited,
+  }) async {
+    if (depth <= 0) return {};
+
+    final effectiveVisited = visited ?? <String>{};
+    final tree = <String, dynamic>{};
+
+    for (final depName in dependencies) {
+      if (effectiveVisited.contains(depName)) {
+        tree[depName] = {'circular': true};
+        continue;
+      }
+
+      final depInfo = await metadata.getPackageInfo(depName);
+      if (depInfo == null) {
+        tree[depName] = {'external': true};
+        continue;
+      }
+
+      final latest = depInfo.latest;
+      if (latest == null) {
+        tree[depName] = {'no_versions': true};
+        continue;
+      }
+
+      final depDeps =
+          (latest.pubspec['dependencies'] as Map<String, dynamic>?) ?? {};
+
+      if (depDeps.isEmpty) {
+        tree[depName] = {'version': latest.version, 'dependencies': {}};
+      } else {
+        final subTree = await _buildDependencyTree(
+          depDeps.keys.toList(),
+          depth - 1,
+          visited: {...effectiveVisited, depName},
+        );
+        tree[depName] = {
+          'version': latest.version,
+          'dependencies': subTree,
+        };
+      }
+    }
+
+    return tree;
   }
 
   /// POST `/api/admin/packages/<name>/discontinue`
