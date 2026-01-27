@@ -128,6 +128,23 @@ class AdminApiClient {
     return AdminStats.fromJson(json);
   }
 
+  /// Get comprehensive dashboard statistics including recent activity.
+  /// This is a wrapper around getStats() that can be extended with more data.
+  Future<Map<String, dynamic>> getDashboardStats() async {
+    final stats = await getStats();
+
+    // TODO: Add recent activity feed from backend
+    // For now, return basic stats
+    return {
+      'totalPackages': stats.totalPackages,
+      'localPackages': stats.localPackages,
+      'cachedPackages': stats.cachedPackages,
+      'totalVersions': stats.totalVersions,
+      'recentActivity': <Map<String, dynamic>>[],
+      'topPackages': <Map<String, dynamic>>[],
+    };
+  }
+
   Future<Map<String, int>> getPackagesCreatedPerDay({int days = 30}) async {
     final response = await _client.get(
       Uri.parse('$baseUrl/admin/api/analytics/packages-created?days=$days'),
