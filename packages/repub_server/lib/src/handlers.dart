@@ -820,6 +820,16 @@ class ApiHandlers {
 
     final success = result as PublishSuccess;
 
+    // Check scope authorization if token is present
+    if (token != null) {
+      final scopeForbidden =
+          requirePackagePublishScope(token, success.packageName);
+      if (scopeForbidden != null) {
+        _uploadData.remove(sessionId);
+        return scopeForbidden;
+      }
+    }
+
     // Determine the user ID for ownership
     final userId = token?.userId ?? User.anonymousId;
 
