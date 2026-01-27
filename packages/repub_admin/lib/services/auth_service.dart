@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
-import 'package:web/web.dart' as web;
+
+import 'url_detector_stub.dart'
+    if (dart.library.html) 'url_detector_web.dart';
 
 // Events
 abstract class AuthEvent {}
@@ -71,13 +73,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   static String _detectBaseUrl() {
-    final location = web.window.location;
-    // Dev mode: admin on different port, API on 4920
-    if (location.port == '4922') {
-      return '${location.protocol}//${location.hostname}:4920';
-    }
-    // Production: same origin
-    return '';
+    return createUrlDetector().detectBaseUrl();
   }
 
   Map<String, String> get _headers => {
