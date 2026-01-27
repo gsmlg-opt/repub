@@ -112,9 +112,14 @@ Router createRouter({
   router.get('/admin/api/hosted-packages', handlers.adminListHostedPackages);
   router.get('/admin/api/cached-packages', handlers.adminListCachedPackages);
   router.get('/admin/api/packages/<name>/stats', handlers.adminGetPackageStats);
+  router.get('/admin/api/packages/<name>/versions', handlers.adminGetPackageVersions);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
   router.delete('/admin/api/packages/<name>/versions/<version>',
       handlers.adminDeletePackageVersion);
+  router.post('/admin/api/packages/<name>/versions/<version>/retract',
+      handlers.adminRetractPackageVersion);
+  router.delete('/admin/api/packages/<name>/versions/<version>/retract',
+      handlers.adminUnretractPackageVersion);
   router.post('/admin/api/packages/<name>/discontinue',
       handlers.adminDiscontinuePackage);
   router.delete('/admin/api/cache', handlers.adminClearCache);
@@ -1379,6 +1384,41 @@ class ApiHandlers {
     );
   }
 
+  /// GET `/admin/api/packages/<name>/versions`
+  Future<Response> adminGetPackageVersions(Request request, String name) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final pkgInfo = await metadata.getPackageInfo(name);
+    if (pkgInfo == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final versions = pkgInfo.versions.map((v) => {
+      'version': v.version,
+      'published_at': v.publishedAt.toIso8601String(),
+      'is_retracted': v.isRetracted,
+      'retracted_at': v.retractedAt?.toIso8601String(),
+    }).toList();
+
+    // Sort by version descending (latest first)
+    versions.sort((a, b) =>
+      (b['version'] as String).compareTo(a['version'] as String));
+
+    return Response.ok(
+      jsonEncode({
+        'package': name,
+        'versions': versions,
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
   /// DELETE `/api/admin/packages/<name>`
   Future<Response> adminDeletePackage(Request request, String name) async {
     final authError = await _requireAdminAuth(request);
@@ -1483,6 +1523,98 @@ class ApiHandlers {
       jsonEncode({
         'success': {
           'message': 'Deleted version $version of package $name',
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// POST `/admin/api/packages/<name>/versions/<version>/retract`
+  Future<Response> adminRetractPackageVersion(
+    Request request,
+    String name,
+    String version,
+  ) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final retracted = await metadata.retractPackageVersion(name, version);
+
+    if (!retracted) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {
+            'code': 'not_found',
+            'message': 'Version $version of package $name not found',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Log activity
+    final adminUser = request.context['adminUser'] as Map<String, dynamic>?;
+    await metadata.logActivity(
+      activityType: 'version_retracted',
+      actorType: 'admin',
+      actorId: adminUser?['username'] as String? ?? 'unknown',
+      targetType: 'package_version',
+      targetId: '$name@$version',
+      metadata: {'package': name, 'version': version},
+      ipAddress: request.headers['x-forwarded-for'] ??
+          request.headers['x-real-ip'],
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Retracted version $version of package $name',
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// DELETE `/admin/api/packages/<name>/versions/<version>/retract`
+  Future<Response> adminUnretractPackageVersion(
+    Request request,
+    String name,
+    String version,
+  ) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final unretracted = await metadata.unretractPackageVersion(name, version);
+
+    if (!unretracted) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {
+            'code': 'not_found',
+            'message': 'Version $version of package $name not found',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Log activity
+    final adminUser = request.context['adminUser'] as Map<String, dynamic>?;
+    await metadata.logActivity(
+      activityType: 'version_unretracted',
+      actorType: 'admin',
+      actorId: adminUser?['username'] as String? ?? 'unknown',
+      targetType: 'package_version',
+      targetId: '$name@$version',
+      metadata: {'package': name, 'version': version},
+      ipAddress: request.headers['x-forwarded-for'] ??
+          request.headers['x-real-ip'],
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Unretracted version $version of package $name',
         },
       }),
       headers: {'content-type': 'application/json'},

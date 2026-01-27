@@ -151,6 +151,12 @@ abstract class MetadataStore {
   /// Delete a single package version.
   Future<bool> deletePackageVersion(String name, String version);
 
+  /// Retract a package version (soft delete - marks as retracted but keeps data).
+  Future<bool> retractPackageVersion(String name, String version);
+
+  /// Unretract a previously retracted package version.
+  Future<bool> unretractPackageVersion(String name, String version);
+
   /// Mark a package as discontinued.
   Future<bool> discontinuePackage(String name, {String? replacedBy});
 
@@ -495,7 +501,8 @@ class PostgresMetadataStore extends MetadataStore {
   Future<List<PackageVersion>> getPackageVersions(String packageName) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at
+        SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
+               is_retracted, retracted_at
         FROM package_versions
         WHERE package_name = @name
         ORDER BY published_at DESC
@@ -516,6 +523,8 @@ class PostgresMetadataStore extends MetadataStore {
         archiveKey: row[3] as String,
         archiveSha256: row[4] as String,
         publishedAt: row[5] as DateTime,
+        isRetracted: row[6] as bool? ?? false,
+        retractedAt: row[7] as DateTime?,
       );
     }).toList();
   }
@@ -536,7 +545,8 @@ class PostgresMetadataStore extends MetadataStore {
   ) async {
     final result = await _conn.execute(
       Sql.named('''
-        SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at
+        SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
+               is_retracted, retracted_at
         FROM package_versions
         WHERE package_name = @name AND version = @version
       '''),
@@ -558,6 +568,8 @@ class PostgresMetadataStore extends MetadataStore {
       archiveKey: row[3] as String,
       archiveSha256: row[4] as String,
       publishedAt: row[5] as DateTime,
+      isRetracted: row[6] as bool? ?? false,
+      retractedAt: row[7] as DateTime?,
     );
   }
 
@@ -954,6 +966,32 @@ class PostgresMetadataStore extends MetadataStore {
       );
     }
 
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> retractPackageVersion(String name, String version) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        UPDATE package_versions
+        SET is_retracted = TRUE, retracted_at = NOW()
+        WHERE package_name = @name AND version = @version
+      '''),
+      parameters: {'name': name, 'version': version},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> unretractPackageVersion(String name, String version) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        UPDATE package_versions
+        SET is_retracted = FALSE, retracted_at = NULL
+        WHERE package_name = @name AND version = @version
+      '''),
+      parameters: {'name': name, 'version': version},
+    );
     return result.affectedRows > 0;
   }
 
@@ -2350,7 +2388,8 @@ class SqliteMetadataStore extends MetadataStore {
   @override
   Future<List<PackageVersion>> getPackageVersions(String packageName) async {
     final result = _db.select('''
-      SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at
+      SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
+             is_retracted, retracted_at
       FROM package_versions
       WHERE package_name = ?
       ORDER BY published_at DESC
@@ -2367,6 +2406,10 @@ class SqliteMetadataStore extends MetadataStore {
         archiveKey: row['archive_key'] as String,
         archiveSha256: row['archive_sha256'] as String,
         publishedAt: DateTime.parse(row['published_at'] as String),
+        isRetracted: (row['is_retracted'] as int?) == 1,
+        retractedAt: row['retracted_at'] != null
+            ? DateTime.parse(row['retracted_at'] as String)
+            : null,
       );
     }).toList();
   }
@@ -2386,7 +2429,8 @@ class SqliteMetadataStore extends MetadataStore {
     String version,
   ) async {
     final result = _db.select('''
-      SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at
+      SELECT package_name, version, pubspec_json, archive_key, archive_sha256, published_at,
+             is_retracted, retracted_at
       FROM package_versions
       WHERE package_name = ? AND version = ?
     ''', [packageName, version]);
@@ -2404,6 +2448,10 @@ class SqliteMetadataStore extends MetadataStore {
       archiveKey: row['archive_key'] as String,
       archiveSha256: row['archive_sha256'] as String,
       publishedAt: DateTime.parse(row['published_at'] as String),
+      isRetracted: (row['is_retracted'] as int?) == 1,
+      retractedAt: row['retracted_at'] != null
+          ? DateTime.parse(row['retracted_at'] as String)
+          : null,
     );
   }
 
@@ -2759,6 +2807,26 @@ class SqliteMetadataStore extends MetadataStore {
     }
 
     return deleted;
+  }
+
+  @override
+  Future<bool> retractPackageVersion(String name, String version) async {
+    _db.execute('''
+      UPDATE package_versions
+      SET is_retracted = 1, retracted_at = datetime('now')
+      WHERE package_name = ? AND version = ?
+    ''', [name, version]);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<bool> unretractPackageVersion(String name, String version) async {
+    _db.execute('''
+      UPDATE package_versions
+      SET is_retracted = 0, retracted_at = NULL
+      WHERE package_name = ? AND version = ?
+    ''', [name, version]);
+    return _db.updatedRows > 0;
   }
 
   @override
@@ -3983,6 +4051,75 @@ const _postgresMigrations = <String, String>{
     -- Add must_change_password flag for forcing password change on first login
     ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
   ''',
+  '007_package_downloads': '''
+    -- Package download tracking
+    CREATE TABLE IF NOT EXISTS package_downloads (
+      id SERIAL PRIMARY KEY,
+      package_name VARCHAR(255) NOT NULL REFERENCES packages(name) ON DELETE CASCADE,
+      version VARCHAR(255) NOT NULL,
+      downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      user_agent TEXT,
+      ip_address TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_package ON package_downloads(package_name);
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_time ON package_downloads(downloaded_at DESC);
+  ''',
+  '008_add_default_token_scopes': '''
+    -- No-op: token scopes already exist in initial migration
+  ''',
+  '009_activity_log': '''
+    -- Activity log table
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id SERIAL PRIMARY KEY,
+      activity_type VARCHAR(50) NOT NULL,
+      actor_type VARCHAR(50) NOT NULL,
+      actor_id TEXT,
+      target_type VARCHAR(50),
+      target_id TEXT,
+      description TEXT NOT NULL,
+      metadata JSONB,
+      ip_address TEXT,
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
+  ''',
+  '010_webhooks': '''
+    -- Webhooks table for event notifications
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      url TEXT NOT NULL,
+      secret TEXT,
+      events TEXT[] NOT NULL DEFAULT '{"*"}',
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      last_triggered_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhooks_active ON webhooks(is_active);
+
+    -- Webhook delivery log
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      webhook_id UUID NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      payload JSONB NOT NULL,
+      status_code INTEGER NOT NULL,
+      success BOOLEAN NOT NULL,
+      error TEXT,
+      duration_ms INTEGER NOT NULL,
+      delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_time ON webhook_deliveries(delivered_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, delivered_at DESC);
+  ''',
+  '011_version_retraction': '''
+    -- Add retraction support to package_versions
+    ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS is_retracted BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retracted_at TIMESTAMPTZ;
+    CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
+  ''',
 };
 
 // SQLite migrations
@@ -4194,6 +4331,14 @@ const _sqliteMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_time ON webhook_deliveries(delivered_at DESC);
     -- Index for webhook-specific queries
     CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, delivered_at DESC);
+  ''',
+  '011_version_retraction': '''
+    -- Add retraction support to package_versions
+    ALTER TABLE package_versions ADD COLUMN is_retracted INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE package_versions ADD COLUMN retracted_at TEXT;
+
+    -- Index for filtering retracted versions
+    CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
   ''',
 };
 

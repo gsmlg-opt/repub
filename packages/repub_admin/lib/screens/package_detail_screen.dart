@@ -18,7 +18,9 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
   final AdminApiClient _apiClient = AdminApiClient();
   PackageStats? _stats;
   Map<String, dynamic>? _packageInfo;
+  List<VersionInfo>? _versions;
   bool _isLoading = true;
+  bool _isVersionsLoading = false;
   String? _error;
   int _historyDays = 30;
 
@@ -26,6 +28,7 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
   void initState() {
     super.initState();
     _loadStats();
+    _loadVersions();
   }
 
   Future<void> _loadStats() async {
@@ -47,6 +50,78 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadVersions() async {
+    setState(() => _isVersionsLoading = true);
+    try {
+      final versions = await _apiClient.getPackageVersions(widget.packageName);
+      setState(() {
+        _versions = versions;
+        _isVersionsLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isVersionsLoading = false);
+    }
+  }
+
+  Future<void> _toggleRetraction(VersionInfo version) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(version.isRetracted ? 'Un-retract Version' : 'Retract Version'),
+        content: Text(
+          version.isRetracted
+              ? 'Are you sure you want to un-retract version ${version.version}? '
+                'It will be available for resolution again.'
+              : 'Are you sure you want to retract version ${version.version}? '
+                'Retracted versions are still downloadable but won\'t be selected '
+                'during dependency resolution unless already in use.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: version.isRetracted
+                ? null
+                : FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: Text(version.isRetracted ? 'Un-retract' : 'Retract'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      if (version.isRetracted) {
+        await _apiClient.unretractPackageVersion(widget.packageName, version.version);
+      } else {
+        await _apiClient.retractPackageVersion(widget.packageName, version.version);
+      }
+      _loadVersions();
+      _loadStats();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              version.isRetracted
+                  ? 'Version ${version.version} un-retracted'
+                  : 'Version ${version.version} retracted',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -155,6 +230,8 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
           _buildStatsCards(),
           const SizedBox(height: 24),
           _buildDownloadChart(),
+          const SizedBox(height: 24),
+          _buildVersionManagement(),
           const SizedBox(height: 24),
           _buildVersionStats(),
           const SizedBox(height: 24),
@@ -322,6 +399,176 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                         style: const TextStyle(fontSize: 10)),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVersionManagement() {
+    if (_isVersionsLoading) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_versions == null || _versions!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final dateFormat = DateFormat('MMM d, y');
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.manage_history, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Version Management',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: _loadVersions,
+                  tooltip: 'Refresh versions',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Retracted versions remain downloadable but are excluded from '
+              'dependency resolution unless already in use.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            DataTable(
+              columns: const [
+                DataColumn(label: Text('Version')),
+                DataColumn(label: Text('Published')),
+                DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Actions')),
+              ],
+              rows: _versions!.map((version) {
+                return DataRow(cells: [
+                  DataCell(
+                    Row(
+                      children: [
+                        Text(
+                          version.version,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            decoration: version.isRetracted
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: version.isRetracted ? Colors.grey : null,
+                          ),
+                        ),
+                        if (_stats?.latestVersion == version.version &&
+                            !version.isRetracted) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Latest',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  DataCell(Text(dateFormat.format(version.publishedAt))),
+                  DataCell(
+                    version.isRetracted
+                        ? Tooltip(
+                            message: version.retractedAt != null
+                                ? 'Retracted on ${dateFormat.format(version.retractedAt!)}'
+                                : 'Retracted',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.warning_amber,
+                                      size: 14, color: Colors.orange.shade700),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Retracted',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.orange.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_circle,
+                                    size: 14, color: Colors.green.shade700),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Active',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  DataCell(
+                    TextButton.icon(
+                      icon: Icon(
+                        version.isRetracted ? Icons.undo : Icons.block,
+                        size: 16,
+                      ),
+                      label: Text(version.isRetracted ? 'Un-retract' : 'Retract'),
+                      style: TextButton.styleFrom(
+                        foregroundColor:
+                            version.isRetracted ? Colors.green : Colors.orange,
+                      ),
+                      onPressed: () => _toggleRetraction(version),
+                    ),
+                  ),
+                ]);
+              }).toList(),
             ),
           ],
         ),

@@ -880,6 +880,108 @@ class AdminApiClient {
 
     return deliveries;
   }
+
+  // ============ Version Retraction ============
+
+  /// Retract a package version.
+  Future<void> retractPackageVersion(String packageName, String version) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Version not found: $packageName@$version',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to retract version: ${response.body}',
+      );
+    }
+  }
+
+  /// Un-retract a package version.
+  Future<void> unretractPackageVersion(String packageName, String version) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Version not found: $packageName@$version',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to un-retract version: ${response.body}',
+      );
+    }
+  }
+
+  /// Get package versions with their metadata including retraction status.
+  Future<List<VersionInfo>> getPackageVersions(String packageName) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/packages/$packageName/versions'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Package not found: $packageName',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch versions: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final versions = (json['versions'] as List<dynamic>?)
+            ?.map((v) => VersionInfo.fromJson(v as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return versions;
+  }
+}
+
+/// Represents a package version with retraction metadata.
+class VersionInfo {
+  final String version;
+  final DateTime publishedAt;
+  final bool isRetracted;
+  final DateTime? retractedAt;
+
+  const VersionInfo({
+    required this.version,
+    required this.publishedAt,
+    this.isRetracted = false,
+    this.retractedAt,
+  });
+
+  factory VersionInfo.fromJson(Map<String, dynamic> json) {
+    return VersionInfo(
+      version: json['version'] as String,
+      publishedAt: DateTime.parse(json['published_at'] as String),
+      isRetracted: json['is_retracted'] as bool? ?? false,
+      retractedAt: json['retracted_at'] != null
+          ? DateTime.parse(json['retracted_at'] as String)
+          : null,
+    );
+  }
 }
 
 class AdminUserDetail {

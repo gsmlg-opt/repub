@@ -56,6 +56,8 @@ class PackageVersion {
   final String archiveKey;
   final String archiveSha256;
   final DateTime publishedAt;
+  final bool isRetracted;
+  final DateTime? retractedAt;
 
   const PackageVersion({
     required this.packageName,
@@ -64,7 +66,23 @@ class PackageVersion {
     required this.archiveKey,
     required this.archiveSha256,
     required this.publishedAt,
+    this.isRetracted = false,
+    this.retractedAt,
   });
+
+  /// Create a copy with retraction flag set.
+  PackageVersion copyWith({bool? isRetracted, DateTime? retractedAt}) {
+    return PackageVersion(
+      packageName: packageName,
+      version: version,
+      pubspec: pubspec,
+      archiveKey: archiveKey,
+      archiveSha256: archiveSha256,
+      publishedAt: publishedAt,
+      isRetracted: isRetracted ?? this.isRetracted,
+      retractedAt: retractedAt ?? this.retractedAt,
+    );
+  }
 
   /// Convert to JSON for API response.
   /// [archiveUrl] is the full URL to download the archive.
@@ -74,6 +92,7 @@ class PackageVersion {
         'archive_url': archiveUrl,
         'archive_sha256': archiveSha256,
         'published': publishedAt.toUtc().toIso8601String(),
+        if (isRetracted) 'retracted': true,
       };
 }
 
@@ -84,10 +103,18 @@ class PackageInfo {
 
   const PackageInfo({required this.package, required this.versions});
 
-  /// Get the latest version (highest semver).
+  /// Get the latest version (highest semver, excluding retracted).
   PackageVersion? get latest {
     if (versions.isEmpty) return null;
-    final sorted = List<PackageVersion>.from(versions)
+    // Filter out retracted versions when determining latest
+    final nonRetracted = versions.where((v) => !v.isRetracted).toList();
+    if (nonRetracted.isEmpty) {
+      // If all versions are retracted, return the highest semver anyway
+      final sorted = List<PackageVersion>.from(versions)
+        ..sort((a, b) => _compareSemver(b.version, a.version));
+      return sorted.first;
+    }
+    final sorted = List<PackageVersion>.from(nonRetracted)
       ..sort((a, b) => _compareSemver(b.version, a.version));
     return sorted.first;
   }

@@ -318,5 +318,120 @@ void main() {
         expect(stats.totalVersions, greaterThanOrEqualTo(0));
       });
     });
+
+    group('Version Retraction', () {
+      late String userId;
+
+      setUp(() async {
+        userId = await metadata.createUser(
+          email: 'retraction@example.com',
+          passwordHash: 'hash',
+        );
+      });
+
+      Future<void> publishVersion(String pkgName, String version) async {
+        await metadata.upsertPackageVersion(
+          packageName: pkgName,
+          version: version,
+          pubspec: {'name': pkgName, 'version': version},
+          archiveKey: 'archives/$pkgName-$version.tar.gz',
+          archiveSha256: 'sha256_$version',
+          ownerId: userId,
+        );
+      }
+
+      test('can retract a package version', () async {
+        await publishVersion('retract_pkg', '1.0.0');
+
+        final result = await metadata.retractPackageVersion('retract_pkg', '1.0.0');
+        expect(result, isTrue);
+
+        final pkgInfo = await metadata.getPackageInfo('retract_pkg');
+        final version = pkgInfo!.versions.first;
+        expect(version.isRetracted, isTrue);
+        expect(version.retractedAt, isNotNull);
+      });
+
+      test('retracted version is excluded from latest', () async {
+        await publishVersion('latest_test', '1.0.0');
+        await publishVersion('latest_test', '2.0.0');
+
+        // Before retraction, latest should be 2.0.0
+        var pkgInfo = await metadata.getPackageInfo('latest_test');
+        expect(pkgInfo!.latest!.version, equals('2.0.0'));
+
+        // Retract 2.0.0
+        await metadata.retractPackageVersion('latest_test', '2.0.0');
+
+        // After retraction, latest should fall back to 1.0.0
+        pkgInfo = await metadata.getPackageInfo('latest_test');
+        expect(pkgInfo!.latest!.version, equals('1.0.0'));
+      });
+
+      test('can un-retract a package version', () async {
+        await publishVersion('unretract_pkg', '1.0.0');
+
+        // Retract first
+        await metadata.retractPackageVersion('unretract_pkg', '1.0.0');
+        var pkgInfo = await metadata.getPackageInfo('unretract_pkg');
+        expect(pkgInfo!.versions.first.isRetracted, isTrue);
+
+        // Un-retract
+        final result = await metadata.unretractPackageVersion('unretract_pkg', '1.0.0');
+        expect(result, isTrue);
+
+        pkgInfo = await metadata.getPackageInfo('unretract_pkg');
+        expect(pkgInfo!.versions.first.isRetracted, isFalse);
+        expect(pkgInfo.versions.first.retractedAt, isNull);
+      });
+
+      test('retract returns false for non-existent version', () async {
+        await publishVersion('exists_pkg', '1.0.0');
+
+        final result = await metadata.retractPackageVersion('exists_pkg', '9.9.9');
+        expect(result, isFalse);
+      });
+
+      test('retract returns false for non-existent package', () async {
+        final result = await metadata.retractPackageVersion('no_such_pkg', '1.0.0');
+        expect(result, isFalse);
+      });
+
+      test('retracted version still appears in versions list', () async {
+        await publishVersion('visible_pkg', '1.0.0');
+        await publishVersion('visible_pkg', '2.0.0');
+
+        await metadata.retractPackageVersion('visible_pkg', '1.0.0');
+
+        final pkgInfo = await metadata.getPackageInfo('visible_pkg');
+        expect(pkgInfo!.versions.length, equals(2));
+
+        final v1 = pkgInfo.versions.firstWhere((v) => v.version == '1.0.0');
+        final v2 = pkgInfo.versions.firstWhere((v) => v.version == '2.0.0');
+        expect(v1.isRetracted, isTrue);
+        expect(v2.isRetracted, isFalse);
+      });
+
+      test('version toJson includes retracted flag when retracted', () async {
+        await publishVersion('json_pkg', '1.0.0');
+        await metadata.retractPackageVersion('json_pkg', '1.0.0');
+
+        final pkgInfo = await metadata.getPackageInfo('json_pkg');
+        final version = pkgInfo!.versions.first;
+        final json = version.toJson('http://example.com/archive.tar.gz');
+
+        expect(json['retracted'], isTrue);
+      });
+
+      test('version toJson excludes retracted flag when not retracted', () async {
+        await publishVersion('nojson_pkg', '1.0.0');
+
+        final pkgInfo = await metadata.getPackageInfo('nojson_pkg');
+        final version = pkgInfo!.versions.first;
+        final json = version.toJson('http://example.com/archive.tar.gz');
+
+        expect(json.containsKey('retracted'), isFalse);
+      });
+    });
   });
 }
