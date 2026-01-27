@@ -99,6 +99,28 @@ const migrations = <String, String>{
     -- Add must_change_password flag for forcing password change on first login
     ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
   ''',
+  '006_admin_must_change_password_fix': '''
+    -- Duplicate of 005 for databases that have 006_admin_must_change_password applied
+    -- This is a no-op migration to maintain consistency
+    SELECT 1;
+  ''',
+  '007_package_downloads': '''
+    -- Package downloads tracking table
+    CREATE TABLE IF NOT EXISTS package_downloads (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      package_name VARCHAR(255) NOT NULL,
+      version VARCHAR(255) NOT NULL,
+      downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ip_address VARCHAR(45),
+      user_agent TEXT
+    );
+
+    -- Index for time-based queries (most common query pattern)
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_time ON package_downloads(downloaded_at DESC);
+
+    -- Index for package-specific queries
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_package ON package_downloads(package_name, downloaded_at DESC);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.

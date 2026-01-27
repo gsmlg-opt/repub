@@ -155,6 +155,24 @@ abstract class MetadataStore {
   /// Get admin statistics.
   Future<AdminStats> getAdminStats();
 
+  // ============ Analytics ============
+
+  /// Log a package download.
+  Future<void> logDownload({
+    required String packageName,
+    required String version,
+    String? ipAddress,
+    String? userAgent,
+  });
+
+  /// Get packages created per day for the last N days.
+  /// Returns a map of date (YYYY-MM-DD) to count.
+  Future<Map<String, int>> getPackagesCreatedPerDay(int days);
+
+  /// Get downloads per hour for the last N hours.
+  /// Returns a map of datetime (YYYY-MM-DD HH:00:00) to count.
+  Future<Map<String, int>> getDownloadsPerHour(int hours);
+
   /// Get archive keys for a package (for blob deletion).
   Future<List<String>> getPackageArchiveKeys(String name);
 
@@ -865,6 +883,67 @@ class PostgresMetadataStore extends MetadataStore {
       cachedPackages: results[2].first[0] as int,
       totalVersions: results[3].first[0] as int,
     );
+  }
+
+  @override
+  Future<void> logDownload({
+    required String packageName,
+    required String version,
+    String? ipAddress,
+    String? userAgent,
+  }) async {
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO package_downloads (package_name, version, ip_address, user_agent)
+        VALUES (@packageName, @version, @ipAddress, @userAgent)
+      '''),
+      parameters: {
+        'packageName': packageName,
+        'version': version,
+        'ipAddress': ipAddress,
+        'userAgent': userAgent,
+      },
+    );
+  }
+
+  @override
+  Future<Map<String, int>> getPackagesCreatedPerDay(int days) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT
+          DATE(created_at) as date,
+          COUNT(*) as count
+        FROM packages
+        WHERE created_at >= NOW() - INTERVAL '@days days'
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+      '''),
+      parameters: {'days': days.toString()},
+    );
+
+    return {
+      for (final row in result) row[0].toString(): row[1] as int,
+    };
+  }
+
+  @override
+  Future<Map<String, int>> getDownloadsPerHour(int hours) async {
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT
+          DATE_TRUNC('hour', downloaded_at) as hour,
+          COUNT(*) as count
+        FROM package_downloads
+        WHERE downloaded_at >= NOW() - INTERVAL '@hours hours'
+        GROUP BY DATE_TRUNC('hour', downloaded_at)
+        ORDER BY hour DESC
+      '''),
+      parameters: {'hours': hours.toString()},
+    );
+
+    return {
+      for (final row in result) row[0].toString(): row[1] as int,
+    };
   }
 
   @override
@@ -2008,6 +2087,56 @@ class SqliteMetadataStore extends MetadataStore {
       cachedPackages: cachedResult.first.values.first as int,
       totalVersions: versionsResult.first.values.first as int,
     );
+  }
+
+  @override
+  Future<void> logDownload({
+    required String packageName,
+    required String version,
+    String? ipAddress,
+    String? userAgent,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    _db.execute('''
+      INSERT INTO package_downloads (package_name, version, downloaded_at, ip_address, user_agent)
+      VALUES (?, ?, ?, ?, ?)
+    ''', [packageName, version, now, ipAddress, userAgent]);
+  }
+
+  @override
+  Future<Map<String, int>> getPackagesCreatedPerDay(int days) async {
+    final cutoffDate = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final result = _db.select('''
+      SELECT
+        DATE(created_at) as date,
+        COUNT(*) as count
+      FROM packages
+      WHERE created_at >= ?
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+    ''', [cutoffDate]);
+
+    return {
+      for (final row in result) row['date'] as String: row['count'] as int,
+    };
+  }
+
+  @override
+  Future<Map<String, int>> getDownloadsPerHour(int hours) async {
+    final cutoffTime = DateTime.now().subtract(Duration(hours: hours)).toIso8601String();
+    final result = _db.select('''
+      SELECT
+        STRFTIME('%Y-%m-%d %H:00:00', downloaded_at) as hour,
+        COUNT(*) as count
+      FROM package_downloads
+      WHERE downloaded_at >= ?
+      GROUP BY STRFTIME('%Y-%m-%d %H:00:00', downloaded_at)
+      ORDER BY hour DESC
+    ''', [cutoffTime]);
+
+    return {
+      for (final row in result) row['hour'] as String: row['count'] as int,
+    };
   }
 
   @override

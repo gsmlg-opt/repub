@@ -87,6 +87,10 @@ Router createRouter({
 
   // Admin endpoints (protected - each handler verifies admin session)
   router.get('/admin/api/stats', handlers.adminGetStats);
+  router.get('/admin/api/analytics/packages-created',
+      handlers.adminGetPackagesCreatedPerDay);
+  router.get('/admin/api/analytics/downloads',
+      handlers.adminGetDownloadsPerHour);
   router.get('/admin/api/packages/local', handlers.adminListLocalPackages);
   router.get('/admin/api/packages/cached', handlers.adminListCachedPackages);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
@@ -884,6 +888,12 @@ class ApiHandlers {
     String name,
     String version,
   ) async {
+    // Extract IP address and user agent for analytics
+    final ipAddress =
+        request.headers['x-forwarded-for']?.split(',').first.trim() ??
+            request.headers['x-real-ip'];
+    final userAgent = request.headers['user-agent'];
+
     // Check auth if required
     if (config.requireDownloadAuth) {
       final authResult = await authenticate(
@@ -908,6 +918,15 @@ class ApiHandlers {
         final store = isCache ? cacheBlobs : blobs;
 
         final bytes = await store.getArchive(versionInfo.archiveKey);
+
+        // Log download for analytics
+        await metadata.logDownload(
+          packageName: name,
+          version: version,
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+        );
+
         return Response.ok(
           Stream.value(bytes),
           headers: {
@@ -951,6 +970,14 @@ class ApiHandlers {
 
             print('Cached $name@$version from upstream');
 
+            // Log download for analytics
+            await metadata.logDownload(
+              packageName: name,
+              version: version,
+              ipAddress: ipAddress,
+              userAgent: userAgent,
+            );
+
             return Response.ok(
               Stream.value(archiveBytes),
               headers: {
@@ -960,6 +987,15 @@ class ApiHandlers {
             );
           } catch (e) {
             print('Failed to cache $name@$version: $e');
+
+            // Log download for analytics (even if caching failed)
+            await metadata.logDownload(
+              packageName: name,
+              version: version,
+              ipAddress: ipAddress,
+              userAgent: userAgent,
+            );
+
             // Still return the archive even if caching failed
             return Response.ok(
               Stream.value(archiveBytes),
@@ -1123,6 +1159,36 @@ class ApiHandlers {
 
     return Response.ok(
       jsonEncode(stats.toJson()),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/analytics/packages-created`
+  Future<Response> adminGetPackagesCreatedPerDay(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final days =
+        int.tryParse(request.url.queryParameters['days'] ?? '30') ?? 30;
+    final data = await metadata.getPackagesCreatedPerDay(days);
+
+    return Response.ok(
+      jsonEncode(data),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/analytics/downloads`
+  Future<Response> adminGetDownloadsPerHour(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final hours =
+        int.tryParse(request.url.queryParameters['hours'] ?? '24') ?? 24;
+    final data = await metadata.getDownloadsPerHour(hours);
+
+    return Response.ok(
+      jsonEncode(data),
       headers: {'content-type': 'application/json'},
     );
   }

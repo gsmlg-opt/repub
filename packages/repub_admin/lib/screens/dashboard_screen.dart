@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../services/admin_api_client.dart';
 import '../widgets/admin_layout.dart';
+import '../widgets/packages_created_chart.dart';
+import '../widgets/downloads_line_chart.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -11,14 +13,26 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+class _DashboardData {
+  final AdminStats stats;
+  final Map<String, int> packagesCreated;
+  final Map<String, int> downloads;
+
+  const _DashboardData({
+    required this.stats,
+    required this.packagesCreated,
+    required this.downloads,
+  });
+}
+
 class _DashboardScreenState extends State<DashboardScreen> {
   final _apiClient = AdminApiClient();
-  late Future<AdminStats> _statsFuture;
+  late Future<_DashboardData> _dataFuture;
 
   @override
   void initState() {
     super.initState();
-    _statsFuture = _apiClient.getStats();
+    _dataFuture = _loadData();
   }
 
   @override
@@ -27,9 +41,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  Future<_DashboardData> _loadData() async {
+    final results = await Future.wait([
+      _apiClient.getStats(),
+      _apiClient.getPackagesCreatedPerDay(days: 30),
+      _apiClient.getDownloadsPerHour(hours: 24),
+    ]);
+
+    return _DashboardData(
+      stats: results[0] as AdminStats,
+      packagesCreated: results[1] as Map<String, int>,
+      downloads: results[2] as Map<String, int>,
+    );
+  }
+
   void _refresh() {
     setState(() {
-      _statsFuture = _apiClient.getStats();
+      _dataFuture = _loadData();
     });
   }
 
@@ -37,8 +65,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return AdminLayout(
       currentPath: '/',
-      child: FutureBuilder<AdminStats>(
-        future: _statsFuture,
+      child: FutureBuilder<_DashboardData>(
+        future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -58,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDashboard(BuildContext context, AdminStats stats) {
+  Widget _buildDashboard(BuildContext context, _DashboardData data) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -69,7 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          _buildStatsGrid(context, stats),
+          _buildStatsGrid(context, data.stats),
+          const SizedBox(height: 32),
+          _buildChartsSection(context, data),
           const SizedBox(height: 32),
           _buildQuickActions(context),
         ],
@@ -160,6 +190,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChartsSection(BuildContext context, _DashboardData data) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Analytics',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Show charts side by side on wide screens, stacked on narrow screens
+            if (constraints.maxWidth > 900) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _buildPackagesCreatedCard(context, data.packagesCreated),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildDownloadsCard(context, data.downloads),
+                  ),
+                ],
+              );
+            } else {
+              return Column(
+                children: [
+                  _buildPackagesCreatedCard(context, data.packagesCreated),
+                  const SizedBox(height: 16),
+                  _buildDownloadsCard(context, data.downloads),
+                ],
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPackagesCreatedCard(
+    BuildContext context,
+    Map<String, int> data,
+  ) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Packages Created (Last 30 Days)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            PackagesCreatedChart(
+              data: data,
+              height: 300,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDownloadsCard(
+    BuildContext context,
+    Map<String, int> data,
+  ) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Downloads (Last 24 Hours)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            DownloadsLineChart(
+              data: data,
+              height: 300,
             ),
           ],
         ),

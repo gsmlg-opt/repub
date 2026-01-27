@@ -128,6 +128,40 @@ class AdminApiClient {
     return AdminStats.fromJson(json);
   }
 
+  Future<Map<String, int>> getPackagesCreatedPerDay({int days = 30}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/analytics/packages-created?days=$days'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch packages created analytics: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json.map((key, value) => MapEntry(key, value as int));
+  }
+
+  Future<Map<String, int>> getDownloadsPerHour({int hours = 24}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/analytics/downloads?hours=$hours'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch downloads analytics: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json.map((key, value) => MapEntry(key, value as int));
+  }
+
   Future<PackageListResponse> listLocalPackages({
     int page = 1,
     int limit = 20,
