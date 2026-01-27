@@ -482,11 +482,64 @@ Cannot: Any write operations
 
 ### Security Best Practices
 
+#### Token Management
 - **Principle of Least Privilege**: Create tokens with minimal required scopes
 - **Package-Specific Tokens**: Use `publish:pkg:<name>` for single-package CI/CD
 - **Token Rotation**: Regularly rotate tokens, especially for CI/CD
-- **Expiration**: Set expiration dates on tokens when possible
+- **Expiration**: Set expiration dates on tokens when possible (admin can enforce max TTL)
 - **Revocation**: Revoke tokens immediately if compromised (via web UI)
+
+#### Password Requirements
+User passwords must meet the following complexity requirements:
+- Minimum 8 characters
+- At least one uppercase letter (A-Z)
+- At least one lowercase letter (a-z)
+- At least one number (0-9)
+
+#### Deployment Security
+- **Reverse Proxy**: Always deploy behind a reverse proxy (nginx, traefik, caddy) for TLS termination
+- **CORS Configuration**: Set `REPUB_CORS_ALLOWED_ORIGINS` to your frontend domain(s) in production
+- **IP Whitelisting**: Use `REPUB_ADMIN_IP_WHITELIST` to restrict admin panel access to trusted IPs
+- **Rate Limiting**: Configure `REPUB_RATE_LIMIT_REQUESTS` and `REPUB_RATE_LIMIT_WINDOW_SECONDS` to prevent abuse
+
+#### Environment Variables for Security
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPUB_CORS_ALLOWED_ORIGINS` | (baseUrl only) | Comma-separated allowed CORS origins, or `*` for wildcard |
+| `REPUB_ADMIN_IP_WHITELIST` | (disabled) | Comma-separated IPs/CIDRs allowed to access admin panel |
+| `REPUB_RATE_LIMIT_REQUESTS` | 100 | Max requests per window |
+| `REPUB_RATE_LIMIT_WINDOW_SECONDS` | 60 | Rate limit window in seconds |
+
+**CORS Examples:**
+```bash
+# Allow specific frontend domains
+REPUB_CORS_ALLOWED_ORIGINS="https://packages.mycompany.com,https://admin.mycompany.com"
+
+# Development mode (allows all origins - NOT for production)
+REPUB_CORS_ALLOWED_ORIGINS="*"
+```
+
+**IP Whitelist Examples:**
+```bash
+# Allow specific IPs
+REPUB_ADMIN_IP_WHITELIST="192.168.1.100,10.0.0.50"
+
+# Allow CIDR range
+REPUB_ADMIN_IP_WHITELIST="192.168.1.0/24,10.0.0.0/8"
+
+# Allow localhost only
+REPUB_ADMIN_IP_WHITELIST="localhost"
+```
+
+#### Webhook Security
+- **SSRF Protection**: Webhook URLs cannot target private/internal IP ranges:
+  - localhost, 127.x.x.x (loopback)
+  - 10.x.x.x, 192.168.x.x, 172.16-31.x.x (private networks)
+  - 169.254.x.x (link-local, including AWS metadata service)
+  - IPv6 private ranges
+- **Signature Verification**: Configure a webhook secret for HMAC-SHA256 payload verification
+- **HTTPS**: Always use HTTPS URLs for webhooks in production
 
 ## CLI Commands
 
