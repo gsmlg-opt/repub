@@ -7,6 +7,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'handlers.dart';
+import 'ip_whitelist.dart';
 import 'logger.dart';
 import 'rate_limit.dart';
 
@@ -65,11 +66,29 @@ Future<void> startServer({Config? config}) async {
     cacheBlobs: cacheBlobs,
   );
 
+  // Log IP whitelist configuration if enabled
+  if (cfg.adminIpWhitelist.isNotEmpty) {
+    Logger.info('Admin IP whitelist enabled', component: 'security', metadata: {
+      'whitelist': cfg.adminIpWhitelist,
+    });
+  }
+
   // Add middleware pipeline
-  final handler = const Pipeline()
+  var pipeline = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(_corsMiddleware())
-      .addMiddleware(_versionMiddleware())
+      .addMiddleware(_versionMiddleware());
+
+  // Add IP whitelist middleware if configured
+  if (cfg.adminIpWhitelist.isNotEmpty) {
+    pipeline = pipeline.addMiddleware(ipWhitelistMiddleware(
+      whitelist: cfg.adminIpWhitelist,
+      pathPrefix: '/admin',
+    ));
+  }
+
+  // Add rate limiting
+  final handler = pipeline
       .addMiddleware(rateLimitMiddleware(
         keyExtractor: extractCompositeKey,
         config: RateLimitConfig(

@@ -41,6 +41,12 @@ class Config {
   /// Rate limiting: window duration in seconds.
   final int rateLimitWindowSeconds;
 
+  /// IP whitelist for admin panel access.
+  /// When non-empty, only these IPs/CIDRs can access /admin/* endpoints.
+  /// Supports IPv4 addresses, IPv4 CIDRs (e.g., 192.168.1.0/24),
+  /// and special values like 'localhost' (expands to 127.0.0.1).
+  final List<String> adminIpWhitelist;
+
   const Config({
     required this.listenAddr,
     required this.listenPort,
@@ -60,6 +66,7 @@ class Config {
     required this.enableUpstreamProxy,
     required this.rateLimitRequests,
     required this.rateLimitWindowSeconds,
+    this.adminIpWhitelist = const [],
   });
 
   /// Get the database type based on the URL scheme.
@@ -126,7 +133,18 @@ class Config {
       enableUpstreamProxy: _envBool('REPUB_ENABLE_UPSTREAM_PROXY', true),
       rateLimitRequests: _envInt('REPUB_RATE_LIMIT_REQUESTS', 100),
       rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
+      adminIpWhitelist: _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
     );
+  }
+
+  /// Parse comma-separated IP whitelist from environment variable.
+  static List<String> _parseIpWhitelist(String? value) {
+    if (value == null || value.isEmpty) return [];
+    return value
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   static String _env(String key, String defaultValue) {
