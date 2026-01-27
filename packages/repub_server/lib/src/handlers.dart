@@ -2124,7 +2124,7 @@ class ApiHandlers {
 
       return Response.ok(
         jsonEncode({
-          'admin': adminUser.toJson(),
+          'adminUser': adminUser.toJson(),
         }),
         headers: {
           'content-type': 'application/json',
@@ -2132,13 +2132,15 @@ class ApiHandlers {
               maxAge: const Duration(hours: 8)),
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('Admin login error: $e');
+      print('Stack trace: $stackTrace');
       return Response(
         400,
         body: jsonEncode({
           'error': {
             'code': 'invalid_request',
-            'message': 'Invalid request body'
+            'message': 'Invalid request body: ${e.toString()}'
           },
         }),
         headers: {'content-type': 'application/json'},
@@ -2196,7 +2198,7 @@ class ApiHandlers {
     }
 
     return Response.ok(
-      jsonEncode({'admin': adminUser.toJson()}),
+      jsonEncode({'adminUser': adminUser.toJson()}),
       headers: {'content-type': 'application/json'},
     );
   }
