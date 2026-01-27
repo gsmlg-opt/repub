@@ -319,19 +319,19 @@ class LocalPackagesPageChanged extends LocalPackagesEvent {
 - Show package name and version count
 - Require typing package name to confirm
 - Cannot be undone warning
-- API call: `DELETE /admin/api/packages/:name`
+- API call: `DELETE /admin/api/hosted-packages/:name`
 
 **Discontinue Dialog**:
 - Reason for discontinuation (optional text)
 - Replacement package name (optional)
 - Package becomes unavailable for new installs
 - Existing installs continue to work
-- API call: `POST /admin/api/packages/:name/discontinue`
+- API call: `POST /admin/api/hosted-packages/:name/discontinue`
 
 #### API Endpoints
-- `GET /admin/api/packages/local?page=1&limit=20&search=query`
-- `DELETE /admin/api/packages/:name`
-- `POST /admin/api/packages/:name/discontinue`
+- `GET /admin/api/hosted-packages?page=1&limit=20&search=query`
+- `DELETE /admin/api/hosted-packages/:name`
+- `POST /admin/api/hosted-packages/:name/discontinue`
 
 ---
 
@@ -453,9 +453,9 @@ class CachedPackagesPageChanged extends CachedPackagesEvent {
 - Updates storage stats after clear
 
 #### API Endpoints
-- `GET /admin/api/packages/cached?page=1&limit=20`
-- `DELETE /admin/api/packages/cached/:name` - Clear individual
-- `DELETE /admin/api/packages/cached` - Clear all cache
+- `GET /admin/api/cached-packages?page=1&limit=20&search=query`
+- `DELETE /admin/api/cached-packages/:name` - Clear individual package cache
+- `DELETE /admin/api/cached-packages` - Clear all cached packages
 
 ---
 
@@ -1167,6 +1167,8 @@ void main() {
 
 ## API Endpoints Summary
 
+**API Design**: Hosted and cached packages use separate API routes (`/hosted-packages` and `/cached-packages`) because they are fundamentally different entities with different operations and lifecycle management. This separation ensures clear API contracts and prevents confusion.
+
 ### Existing (Implemented)
 - ✅ `POST /admin/api/auth/login`
 - ✅ `POST /admin/api/auth/logout`
@@ -1174,18 +1176,18 @@ void main() {
 - ✅ `GET /admin/api/stats`
 - ✅ `GET /admin/api/analytics/packages-created`
 - ✅ `GET /admin/api/analytics/downloads`
-- ✅ `GET /admin/api/packages/local`
-- ✅ `GET /admin/api/packages/cached`
+- ✅ `GET /admin/api/hosted-packages` - List locally hosted packages
+- ✅ `GET /admin/api/cached-packages` - List cached packages from upstream
 - ✅ `GET /admin/api/users`
 - ✅ `GET /admin/api/admin-users`
 - ✅ `GET /admin/api/admin-users/:id/login-history`
 
 ### To Be Implemented
 - 🔨 `GET /admin/api/activity` - Recent activity feed
-- 🔨 `DELETE /admin/api/packages/:name` - Delete local package
-- 🔨 `POST /admin/api/packages/:name/discontinue` - Discontinue package
-- 🔨 `DELETE /admin/api/packages/cached/:name` - Clear cached package
-- 🔨 `DELETE /admin/api/packages/cached` - Clear all cache
+- 🔨 `DELETE /admin/api/hosted-packages/:name` - Delete locally hosted package
+- 🔨 `POST /admin/api/hosted-packages/:name/discontinue` - Discontinue hosted package
+- 🔨 `DELETE /admin/api/cached-packages/:name` - Clear individual cached package
+- 🔨 `DELETE /admin/api/cached-packages` - Clear all cached packages
 - 🔨 `POST /admin/api/users/:id/activate` - Activate user
 - 🔨 `POST /admin/api/users/:id/deactivate` - Deactivate user
 - 🔨 `DELETE /admin/api/users/:id` - Delete user
