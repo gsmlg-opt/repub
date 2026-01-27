@@ -57,6 +57,10 @@ abstract class MetadataStore {
   /// Close the database connection.
   Future<void> close();
 
+  /// Check database health.
+  /// Returns a map with health status information.
+  Future<Map<String, dynamic>> healthCheck();
+
   // ============ Packages ============
 
   /// Get a package by name, returns null if not found.
@@ -155,6 +159,15 @@ abstract class MetadataStore {
 
   /// Get admin statistics.
   Future<AdminStats> getAdminStats();
+
+  /// Count total users.
+  Future<int> countUsers();
+
+  /// Count active tokens.
+  Future<int> countActiveTokens();
+
+  /// Get total download count.
+  Future<int> getTotalDownloads();
 
   // ============ Analytics ============
 
@@ -381,6 +394,39 @@ class PostgresMetadataStore extends MetadataStore {
   @override
   Future<void> close() async {
     await _conn.close();
+  }
+
+  @override
+  Future<Map<String, dynamic>> healthCheck() async {
+    try {
+      // Test basic query with timing
+      final startTime = DateTime.now();
+      final result = await _conn.execute('SELECT COUNT(*) FROM packages');
+      final endTime = DateTime.now();
+      final latencyMs =
+          endTime.difference(startTime).inMicroseconds / 1000.0;
+
+      final packageCount = result.first[0] as int;
+
+      // Get database size
+      final sizeResult = await _conn.execute(
+          'SELECT pg_database_size(current_database())');
+      final dbSizeBytes = sizeResult.first[0] as int;
+
+      return {
+        'status': 'healthy',
+        'type': 'postgresql',
+        'latencyMs': latencyMs,
+        'packageCount': packageCount,
+        'dbSizeBytes': dbSizeBytes,
+      };
+    } catch (e) {
+      return {
+        'status': 'unhealthy',
+        'type': 'postgresql',
+        'error': e.toString(),
+      };
+    }
   }
 
   @override
@@ -919,6 +965,25 @@ class PostgresMetadataStore extends MetadataStore {
       cachedPackages: results[2].first[0] as int,
       totalVersions: results[3].first[0] as int,
     );
+  }
+
+  @override
+  Future<int> countUsers() async {
+    final result = await _conn.execute('SELECT COUNT(*) FROM users');
+    return result.first[0] as int;
+  }
+
+  @override
+  Future<int> countActiveTokens() async {
+    final result = await _conn.execute(
+        'SELECT COUNT(*) FROM auth_tokens WHERE expires_at IS NULL OR expires_at > NOW()');
+    return result.first[0] as int;
+  }
+
+  @override
+  Future<int> getTotalDownloads() async {
+    final result = await _conn.execute('SELECT COUNT(*) FROM package_downloads');
+    return result.first[0] as int;
   }
 
   @override
@@ -1759,6 +1824,39 @@ class SqliteMetadataStore extends MetadataStore {
   }
 
   @override
+  Future<Map<String, dynamic>> healthCheck() async {
+    try {
+      // Test basic query
+      final startTime = DateTime.now();
+      final result = _db.select('SELECT COUNT(*) as count FROM packages');
+      final endTime = DateTime.now();
+      final latencyMs =
+          endTime.difference(startTime).inMicroseconds / 1000.0;
+
+      final packageCount = result.first['count'] as int;
+
+      // Get database file size
+      final dbPath = _db.select('PRAGMA database_list').first['file'] as String;
+      final dbFile = File(dbPath);
+      final dbSizeBytes = dbFile.existsSync() ? dbFile.lengthSync() : 0;
+
+      return {
+        'status': 'healthy',
+        'type': 'sqlite',
+        'latencyMs': latencyMs,
+        'packageCount': packageCount,
+        'dbSizeBytes': dbSizeBytes,
+      };
+    } catch (e) {
+      return {
+        'status': 'unhealthy',
+        'type': 'sqlite',
+        'error': e.toString(),
+      };
+    }
+  }
+
+  @override
   Future<Package?> getPackage(String name) async {
     final result = _db.select('''
       SELECT name, owner_id, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache
@@ -2234,6 +2332,28 @@ class SqliteMetadataStore extends MetadataStore {
       cachedPackages: cachedResult.first.values.first as int,
       totalVersions: versionsResult.first.values.first as int,
     );
+  }
+
+  @override
+  Future<int> countUsers() async {
+    final result = _db.select('SELECT COUNT(*) as count FROM users');
+    return result.first['count'] as int;
+  }
+
+  @override
+  Future<int> countActiveTokens() async {
+    final now = DateTime.now().toIso8601String();
+    final result = _db.select(
+      'SELECT COUNT(*) as count FROM auth_tokens WHERE expires_at IS NULL OR expires_at > ?',
+      [now],
+    );
+    return result.first['count'] as int;
+  }
+
+  @override
+  Future<int> getTotalDownloads() async {
+    final result = _db.select('SELECT COUNT(*) as count FROM package_downloads');
+    return result.first['count'] as int;
   }
 
   @override

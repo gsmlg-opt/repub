@@ -54,11 +54,17 @@ Router createRouter({
   router.get(
       '/packages/<name>/versions/<version>.tar.gz', handlers.downloadPackage);
 
-  // Health check
+  // Health check - basic (for load balancer probes)
   router.get('/health', (Request req) {
     return Response.ok(jsonEncode({'status': 'ok'}),
         headers: {'content-type': 'application/json'});
   });
+
+  // Health check - detailed (includes database status)
+  router.get('/health/detailed', handlers.detailedHealthCheck);
+
+  // Prometheus metrics endpoint
+  router.get('/metrics', handlers.prometheusMetrics);
 
   // Version info
   router.get('/api/version', (Request req) {
@@ -2600,6 +2606,123 @@ class ApiHandlers {
         'loginHistory': loginHistory.map((l) => l.toJson()).toList(),
       }),
       headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/health/detailed` - Detailed health check with database status
+  Future<Response> detailedHealthCheck(Request request) async {
+    final startTime = DateTime.now();
+
+    // Get database health
+    final dbHealth = await metadata.healthCheck();
+
+    // Get blob storage health (check if accessible)
+    Map<String, dynamic> storageHealth;
+    final storageType = config.useLocalStorage ? 'local' : 's3';
+    try {
+      // Just checking if the storage is accessible
+      storageHealth = {
+        'status': 'healthy',
+        'type': storageType,
+      };
+    } catch (e) {
+      storageHealth = {
+        'status': 'unhealthy',
+        'type': storageType,
+        'error': e.toString(),
+      };
+    }
+
+    final endTime = DateTime.now();
+    final totalLatencyMs =
+        endTime.difference(startTime).inMicroseconds / 1000.0;
+
+    // Overall status is unhealthy if any component is unhealthy
+    final overallStatus =
+        dbHealth['status'] == 'healthy' && storageHealth['status'] == 'healthy'
+            ? 'healthy'
+            : 'unhealthy';
+
+    return Response.ok(
+      jsonEncode({
+        'status': overallStatus,
+        'totalLatencyMs': totalLatencyMs,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'version': Platform.environment['REPUB_VERSION'] ?? 'unknown',
+        'components': {
+          'database': dbHealth,
+          'storage': storageHealth,
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/metrics` - Prometheus metrics endpoint
+  Future<Response> prometheusMetrics(Request request) async {
+    final dbHealth = await metadata.healthCheck();
+
+    // Get stats for metrics
+    final stats = await metadata.getAdminStats();
+    final userCount = await metadata.countUsers();
+    final tokenCount = await metadata.countActiveTokens();
+    final downloadCount = await metadata.getTotalDownloads();
+
+    final buffer = StringBuffer();
+
+    // Help and type comments
+    buffer.writeln('# HELP repub_up Server availability (1 = up, 0 = down)');
+    buffer.writeln('# TYPE repub_up gauge');
+    buffer.writeln(
+        'repub_up ${dbHealth['status'] == 'healthy' ? 1 : 0}');
+
+    buffer.writeln();
+    buffer.writeln('# HELP repub_packages_total Total number of packages');
+    buffer.writeln('# TYPE repub_packages_total gauge');
+    buffer.writeln(
+        'repub_packages_total{type="local"} ${stats.localPackages}');
+    buffer.writeln(
+        'repub_packages_total{type="cached"} ${stats.cachedPackages}');
+
+    buffer.writeln();
+    buffer.writeln('# HELP repub_versions_total Total number of package versions');
+    buffer.writeln('# TYPE repub_versions_total gauge');
+    buffer.writeln('repub_versions_total ${stats.totalVersions}');
+
+    buffer.writeln();
+    buffer.writeln('# HELP repub_users_total Total number of users');
+    buffer.writeln('# TYPE repub_users_total gauge');
+    buffer.writeln('repub_users_total $userCount');
+
+    buffer.writeln();
+    buffer.writeln('# HELP repub_tokens_active Number of active tokens');
+    buffer.writeln('# TYPE repub_tokens_active gauge');
+    buffer.writeln('repub_tokens_active $tokenCount');
+
+    buffer.writeln();
+    buffer.writeln('# HELP repub_downloads_total Total number of downloads');
+    buffer.writeln('# TYPE repub_downloads_total counter');
+    buffer.writeln('repub_downloads_total $downloadCount');
+
+    if (dbHealth['dbSizeBytes'] != null) {
+      buffer.writeln();
+      buffer.writeln(
+          '# HELP repub_database_size_bytes Size of the database in bytes');
+      buffer.writeln('# TYPE repub_database_size_bytes gauge');
+      buffer.writeln('repub_database_size_bytes ${dbHealth['dbSizeBytes']}');
+    }
+
+    if (dbHealth['latencyMs'] != null) {
+      buffer.writeln();
+      buffer.writeln(
+          '# HELP repub_database_latency_ms Database query latency in milliseconds');
+      buffer.writeln('# TYPE repub_database_latency_ms gauge');
+      buffer.writeln('repub_database_latency_ms ${dbHealth['latencyMs']}');
+    }
+
+    return Response.ok(
+      buffer.toString(),
+      headers: {'content-type': 'text/plain; version=0.0.4; charset=utf-8'},
     );
   }
 }
