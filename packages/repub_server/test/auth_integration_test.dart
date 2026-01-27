@@ -161,7 +161,7 @@ void main() {
           passwordHash: 'hash',
         );
 
-        final token = await metadata.createToken(
+        await metadata.createToken(
           userId: userId,
           label: 'Persistence Test',
           scopes: ['admin', 'publish:all', 'read:all'],

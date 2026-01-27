@@ -1,6 +1,5 @@
 import 'package:repub_auth/repub_auth.dart';
 import 'package:repub_model/repub_model.dart';
-import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
 void main() {

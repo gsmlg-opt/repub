@@ -23,6 +23,7 @@ class _TokensPageState extends State<TokensPage> {
   bool _showCreateForm = false;
   String _newLabel = '';
   int? _expiresInDays;
+  Set<String> _selectedScopes = {};
   bool _creating = false;
   String? _createError;
   String? _newToken; // Newly created token (shown once)
@@ -81,6 +82,7 @@ class _TokensPageState extends State<TokensPage> {
     try {
       final token = await client.createToken(
         label: _newLabel,
+        scopes: _selectedScopes.toList(),
         expiresInDays: _expiresInDays,
       );
       setState(() {
@@ -88,6 +90,7 @@ class _TokensPageState extends State<TokensPage> {
         _showCreateForm = false;
         _newLabel = '';
         _expiresInDays = null;
+        _selectedScopes = {};
         _creating = false;
       });
       await _loadTokens();
@@ -300,6 +303,107 @@ class _TokensPageState extends State<TokensPage> {
             ),
           ],
         ),
+        // Scopes selection
+        div(
+          classes: 'mb-4',
+          [
+            label(
+              classes: 'block text-sm font-medium text-gray-700 mb-2',
+              [Component.text('Permissions (Scopes)')],
+            ),
+            p(
+              classes: 'text-xs text-gray-500 mb-3',
+              [Component.text('Select the permissions this token should have')],
+            ),
+            // publish:all scope
+            div(
+              classes: 'flex items-start mb-2',
+              [
+                input(
+                  type: InputType.checkbox,
+                  classes: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded',
+                  attributes: {
+                    'id': 'scope-publish-all',
+                    if (_selectedScopes.contains('publish:all')) 'checked': 'true',
+                  },
+                  events: {
+                    'change': (e) {
+                      final checked = (e.target as dynamic).checked as bool;
+                      setState(() {
+                        if (checked) {
+                          _selectedScopes.add('publish:all');
+                        } else {
+                          _selectedScopes.remove('publish:all');
+                        }
+                      });
+                    },
+                  },
+                ),
+                label(
+                  classes: 'ml-2 flex-1',
+                  attributes: {'for': 'scope-publish-all'},
+                  [
+                    div(
+                      classes: 'text-sm font-medium text-gray-700',
+                      [Component.text('publish:all')],
+                    ),
+                    div(
+                      classes: 'text-xs text-gray-500',
+                      [Component.text('Publish any package to the registry')],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            // read:all scope
+            div(
+              classes: 'flex items-start mb-2',
+              [
+                input(
+                  type: InputType.checkbox,
+                  classes: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded',
+                  attributes: {
+                    'id': 'scope-read-all',
+                    if (_selectedScopes.contains('read:all')) 'checked': 'true',
+                  },
+                  events: {
+                    'change': (e) {
+                      final checked = (e.target as dynamic).checked as bool;
+                      setState(() {
+                        if (checked) {
+                          _selectedScopes.add('read:all');
+                        } else {
+                          _selectedScopes.remove('read:all');
+                        }
+                      });
+                    },
+                  },
+                ),
+                label(
+                  classes: 'ml-2 flex-1',
+                  attributes: {'for': 'scope-read-all'},
+                  [
+                    div(
+                      classes: 'text-sm font-medium text-gray-700',
+                      [Component.text('read:all')],
+                    ),
+                    div(
+                      classes: 'text-xs text-gray-500',
+                      [Component.text('Download packages (when download auth is required)')],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            // Note about package-specific scopes
+            div(
+              classes: 'mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700',
+              [
+                Component.text('Note: For package-specific scopes like publish:pkg:<name>, tokens default to no permissions. Use publish:all for general publishing.')
+              ],
+            ),
+          ],
+        ),
         // Buttons
         div(
           classes: 'flex justify-end space-x-3',
@@ -312,6 +416,7 @@ class _TokensPageState extends State<TokensPage> {
                       _showCreateForm = false;
                       _newLabel = '';
                       _expiresInDays = null;
+                      _selectedScopes = {};
                       _createError = null;
                     })
               },
@@ -423,6 +528,30 @@ class _TokensPageState extends State<TokensPage> {
                   classes:
                       'text-sm ${isExpired ? 'text-red-500' : 'text-gray-500'} mt-1',
                   [Component.text('Expires: ${_formatDate(token.expiresAt!)}')],
+                ),
+              // Display scopes
+              if (token.scopes.isNotEmpty)
+                div(
+                  classes: 'flex flex-wrap gap-1 mt-2',
+                  [
+                    for (final scope in token.scopes)
+                      span(
+                        classes:
+                            'px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded font-mono',
+                        [Component.text(scope)],
+                      ),
+                  ],
+                )
+              else
+                div(
+                  classes: 'mt-2',
+                  [
+                    span(
+                      classes:
+                          'px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded',
+                      [Component.text('No scopes')],
+                    ),
+                  ],
                 ),
             ]),
             button(

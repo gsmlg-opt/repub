@@ -35,12 +35,14 @@ class UserData {
 /// API token data.
 class TokenData {
   final String label;
+  final List<String> scopes;
   final DateTime createdAt;
   final DateTime? lastUsedAt;
   final DateTime? expiresAt;
 
   const TokenData({
     required this.label,
+    required this.scopes,
     required this.createdAt,
     this.lastUsedAt,
     this.expiresAt,
@@ -48,6 +50,7 @@ class TokenData {
 
   factory TokenData.fromJson(Map<String, dynamic> json) => TokenData(
         label: json['label'] as String,
+        scopes: (json['scopes'] as List<dynamic>?)?.cast<String>() ?? [],
         createdAt: DateTime.parse(json['createdAt'] as String),
         lastUsedAt: json['lastUsedAt'] != null
             ? DateTime.parse(json['lastUsedAt'] as String)
@@ -236,6 +239,7 @@ class AuthApiClient {
   /// Create a new token.
   Future<String> createToken({
     required String label,
+    List<String>? scopes,
     int? expiresInDays,
   }) async {
     final response = await _client.post(
@@ -243,6 +247,7 @@ class AuthApiClient {
       headers: _headers,
       body: jsonEncode({
         'label': label,
+        'scopes': scopes ?? [],
         if (expiresInDays != null) 'expiresInDays': expiresInDays,
       }),
     );

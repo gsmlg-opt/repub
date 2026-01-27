@@ -2015,6 +2015,8 @@ class ApiHandlers {
 
       final label = body['label'] as String?;
       final expiresInDays = body['expiresInDays'] as int?;
+      final scopesRaw = body['scopes'] as List<dynamic>?;
+      final scopes = scopesRaw?.cast<String>() ?? <String>[];
 
       if (label == null || label.isEmpty) {
         return Response(
@@ -2037,6 +2039,7 @@ class ApiHandlers {
       final token = await metadata.createToken(
         userId: sessionResult.session.userId,
         label: label,
+        scopes: scopes,
         expiresAt: expiresAt,
       );
 
