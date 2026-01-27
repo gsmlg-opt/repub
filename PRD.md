@@ -419,27 +419,99 @@ All configuration via environment variables:
 ## Security Considerations
 
 ### Authentication
-- Admin users managed exclusively via CLI
-- Separate session cookies for admin vs. regular users
+
+**Admin Authentication (Session-Based)**:
+- Admin users managed exclusively via CLI for security
+- Separate `admin_session` cookies for admin panel access
 - Admin sessions restricted to `/admin` path with `SameSite=Strict`
-- Shorter TTL for admin sessions (8 hours vs. 24 hours)
-- Password hashing with Argon2
+- Shorter TTL for admin sessions (8 hours vs. 24 hours for users)
+- Password hashing with BCrypt (12 rounds)
+- No token-based admin access (must use session cookies)
+
+**Regular User Authentication (Dual Mode)**:
+- Session-based: Cookie authentication for web UI (`/account`, `/login`, etc.)
+- Token-based: Bearer tokens for API operations (publish, download)
+- User registration via web UI
+- Tokens managed via web UI at `/account/tokens`
+- Token hashing with SHA-256 before storage
 
 ### Authorization
-- Token scopes strictly enforced
-- Scope-specific tokens limit blast radius
-- Admin panel requires admin session (not just admin token)
+
+**Scope-Based Authorization System**:
+- All API tokens have associated scopes that define permissions
+- Scopes are checked on every protected operation
+- Authorization failures return `403 Forbidden` with clear error messages
+
+**Scope Types**:
+1. **`admin`**: Full access (all permissions)
+   - Use case: Internal automation, admin operations
+   - Grants: Publish all, delete, admin panel access (via token + session)
+
+2. **`publish:all`**: Publish any package
+   - Use case: CI/CD pipeline for multiple packages
+   - Grants: Package publishing only
+   - Denies: Delete operations, admin operations
+
+3. **`publish:pkg:<name>`**: Package-specific publishing
+   - Use case: Per-package CI/CD tokens
+   - Grants: Publish only the specified package
+   - Denies: Other packages, delete operations
+
+4. **`read:all`**: Download packages
+   - Use case: Private package access when download auth enabled
+   - Grants: Package downloads only
+   - Denies: All write operations
+
+**Authorization Enforcement Points**:
+- `/api/packages/versions/finalize/<sessionId>`: Requires `admin`, `publish:all`, or `publish:pkg:<name>`
+- `/admin/api/*`: Requires admin session (cookie-based, not token)
+- Package/version deletion: Requires admin session
+- Token creation: User session required (users create their own tokens)
+
+**Security Properties**:
+- **Principle of Least Privilege**: Tokens can be scoped to minimal required permissions
+- **Defense in Depth**: Multiple layers (token validation, scope checking, session validation)
+- **Fail Secure**: Missing scopes default to deny
+- **Audit Trail**: All token usage logged (last_used_at timestamp)
+
+**Implementation Details**:
+- Scopes stored as `TEXT[]` in PostgreSQL, JSON array in SQLite
+- Scope checking happens after authentication but before operation execution
+- Helper methods in `AuthToken` model: `hasScope()`, `canPublish()`, `canRead()`, `isAdmin`
+- Centralized scope enforcement in `repub_auth/src/scopes.dart`
+
+### Backwards Compatibility
+
+- Migration `008_add_default_token_scopes` grants `admin` scope to existing tokens
+- Ensures existing deployments continue working after upgrade
+- Existing tokens effectively had unlimited access before scope enforcement
 
 ### Audit Trail
-- All admin login attempts logged (IP, user agent, success/failure)
-- Package operations traceable to users/tokens
+- All admin login attempts logged (IP, user agent, success/failure, timestamp)
+- Failed login attempts tracked separately for security monitoring
+- Package operations traceable to users via token ownership
+- Token last used timestamp updated on each API call
 
 ### Best Practices
-- Never commit .env files with credentials
-- Use strong admin passwords
-- Rotate API tokens regularly
-- Run behind reverse proxy with HTTPS in production
-- Keep Docker images updated
+- **Token Management**:
+  - Create package-specific tokens (`publish:pkg:<name>`) for CI/CD
+  - Use `publish:all` only when necessary (multi-package pipelines)
+  - Set expiration dates on tokens when possible
+  - Revoke tokens immediately if compromised
+  - Rotate tokens regularly (quarterly recommended)
+
+- **Deployment Security**:
+  - Never commit .env files with credentials or tokens
+  - Use strong admin passwords (CLI-managed)
+  - Run behind reverse proxy with HTTPS in production
+  - Keep Docker images updated for security patches
+  - Enable `REQUIRE_DOWNLOAD_AUTH` for private registries
+
+- **Access Control**:
+  - Limit admin user count to necessary personnel
+  - Use package-specific scopes to limit blast radius
+  - Monitor failed login attempts in admin panel
+  - Audit token usage via `last_used_at` timestamps
 
 ## Success Metrics
 

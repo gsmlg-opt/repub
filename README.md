@@ -344,12 +344,59 @@ Package and cache management endpoints.
 
 ## Token Scopes
 
-| Scope | Description |
-|-------|-------------|
-| `admin` | Full access |
-| `publish:all` | Publish any package |
-| `publish:pkg:<name>` | Publish specific package |
-| `read:all` | Read/download (if `REQUIRE_DOWNLOAD_AUTH=true`) |
+Repub uses scope-based authorization to control what operations tokens can perform. Tokens are managed through the web UI at `/account/tokens`.
+
+| Scope | Description | Example Use Case |
+|-------|-------------|------------------|
+| `admin` | Full access including admin panel operations | Internal admin automation |
+| `publish:all` | Publish any package to the registry | CI/CD pipeline for multiple packages |
+| `publish:pkg:<name>` | Publish only the specific named package | Package-specific CI/CD token |
+| `read:all` | Read/download packages (only needed if `REQUIRE_DOWNLOAD_AUTH=true`) | Private package access |
+
+### Scope Examples
+
+**Publishing multiple packages (CI/CD):**
+```
+Scopes: ["publish:all"]
+Can: Publish any package
+Cannot: Delete packages, access admin panel
+```
+
+**Publishing a specific package:**
+```
+Scopes: ["publish:pkg:my_package"]
+Can: Publish only my_package
+Cannot: Publish other packages, delete anything
+```
+
+**Admin operations:**
+```
+Scopes: ["admin"]
+Can: Everything (publish, delete, admin operations)
+```
+
+**No scopes (authentication only):**
+```
+Scopes: []
+Can: Authenticate (verify user identity)
+Cannot: Any write operations
+```
+
+### Authorization Flow
+
+1. **Token Creation**: Users create tokens via `/account/tokens` and select which scopes to grant
+2. **API Request**: Client sends `Authorization: Bearer <token>` header
+3. **Token Validation**: Server verifies token hash and checks expiration
+4. **Scope Check**: Server validates token has required scope for the operation
+5. **Operation**: If authorized, operation proceeds; otherwise returns 403 Forbidden
+
+### Security Best Practices
+
+- **Principle of Least Privilege**: Create tokens with minimal required scopes
+- **Package-Specific Tokens**: Use `publish:pkg:<name>` for single-package CI/CD
+- **Token Rotation**: Regularly rotate tokens, especially for CI/CD
+- **Expiration**: Set expiration dates on tokens when possible
+- **Revocation**: Revoke tokens immediately if compromised (via web UI)
 
 ## CLI Commands
 
