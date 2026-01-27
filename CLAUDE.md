@@ -69,7 +69,7 @@ repub_auth ← repub_storage
 | `repub_storage` | Database abstraction (SQLite/PostgreSQL) + blob storage (local/S3) |
 | `repub_migrate` | SQL schema migrations |
 | `repub_server` | HTTP API using Shelf framework |
-| `repub_cli` | Admin CLI for tokens, migrations, server startup |
+| `repub_cli` | Admin CLI for migrations, server startup, admin user management |
 | `repub_web` | Public web UI using Jaspr framework (package browsing, search, docs) |
 | `repub_admin` | Admin web UI using Flutter (package management, stats dashboard, site configuration) |
 

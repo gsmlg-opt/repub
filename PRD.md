@@ -118,8 +118,8 @@ Enable Dart/Flutter developers to own and control their package distribution inf
 
 - **CLI Administration**
   - Server management (`serve`, `migrate`)
-  - Token management (`token create`, `token list`, `token delete`)
   - Admin user management (`admin create`, `admin list`, `admin reset-password`, `admin activate`, `admin deactivate`, `admin delete`)
+  - Note: User tokens are managed via web UI at `/account/tokens` (not CLI)
 
 - **Development Mode**
   - Unified dev server (single port for API + both UIs)

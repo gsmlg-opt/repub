@@ -17,11 +17,12 @@ Usage:
 Commands:
   serve           Start the HTTP server
   migrate         Run database migrations
-  token create    Create a new auth token
-  token list      List all tokens
-  token delete    Delete a token
   admin <cmd>     Admin user management (create, list, reset-password, etc.)
   help            Show this help message
+
+Note:
+  - User tokens are managed via the web UI at /account/tokens
+  - Admin users are managed exclusively via CLI for security
 
 Environment Variables:
   REPUB_LISTEN_ADDR          Listen address (default: 0.0.0.0:8080)
@@ -63,88 +64,6 @@ Future<void> runMigrate() async {
   }
 
   await metadata.close();
-}
-
-/// Handle token commands.
-Future<void> runTokenCommand(List<String> args) async {
-  if (args.isEmpty) {
-    print('Usage:');
-    print('  dart run repub_cli token create <label> [user_id]');
-    print('  dart run repub_cli token list [user_id]');
-    print('  dart run repub_cli token delete <label>');
-    print('');
-    print('Notes:');
-    print('  - Tokens authenticate users for publishing');
-    print('  - If user_id is not specified, anonymous user is used');
-    print('  - Users can only publish to packages they own');
-    print('  - First publisher of a package becomes its owner');
-    exit(1);
-  }
-
-  final config = Config.fromEnv();
-  final metadata = await MetadataStore.create(config);
-
-  // Ensure migrations are run
-  await metadata.runMigrations();
-
-  try {
-    switch (args[0]) {
-      case 'create':
-        if (args.length < 2) {
-          print('Usage: dart run repub_cli token create <label> [user_id]');
-          print('Example: dart run repub_cli token create ci-publish');
-          print('Example: dart run repub_cli token create my-token user-uuid');
-          exit(1);
-        }
-        final label = args[1];
-        final userId = args.length > 2 ? args[2] : User.anonymousId;
-
-        final token = await metadata.createToken(label: label, userId: userId);
-        print('Created token: $token');
-        print('');
-        print('Use this token with:');
-        print('  dart pub token add ${config.baseUrl}');
-        print('  (paste the token when prompted)');
-
-      case 'list':
-        final userId = args.length > 1 ? args[1] : null;
-        final tokens = await metadata.listTokens(userId: userId);
-        if (tokens.isEmpty) {
-          print('No tokens found');
-        } else {
-          print('Tokens:');
-          for (final t in tokens) {
-            print('  ${t.label}');
-            print('    User: ${t.userId}');
-            print('    Created: ${t.createdAt}');
-            print('    Last used: ${t.lastUsedAt ?? 'never'}');
-            if (t.expiresAt != null) {
-              print('    Expires: ${t.expiresAt}');
-            }
-          }
-        }
-
-      case 'delete':
-        if (args.length < 2) {
-          print('Usage: dart run repub_cli token delete <label>');
-          exit(1);
-        }
-        final label = args[1];
-        final deleted = await metadata.deleteToken(label);
-        if (deleted) {
-          print('Deleted token: $label');
-        } else {
-          print('Token not found: $label');
-          exit(1);
-        }
-
-      default:
-        print('Unknown token command: ${args[0]}');
-        exit(1);
-    }
-  } finally {
-    await metadata.close();
-  }
 }
 
 /// Handle admin commands.

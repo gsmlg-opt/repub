@@ -59,11 +59,12 @@ docker run -d \
   -v repub_data:/data \
   ghcr.io/gsmlg-dev/repub:latest
 
-# Create an auth token
-docker exec <container_id> /app/bin/repub_cli token create my-token publish:all
-
 # Create an admin user (for accessing /admin UI)
 docker exec <container_id> /app/bin/repub_cli admin create admin password123 "Admin User"
+
+# Note: User tokens are managed via the web UI
+# 1. Register/login at http://localhost:8080/login
+# 2. Navigate to /account/tokens to create publish tokens
 ```
 
 Data is stored in `/data`:
@@ -103,13 +104,15 @@ This starts:
 - MinIO (ports 9000, 9001 for console)
 - Repub server (port 8080)
 
-### 4. Create an auth token
+### 4. Create a user account and token
+
+Register a user account to create publish tokens:
 
 ```bash
-docker compose exec repub /app/bin/repub_cli token create my-token publish:all
+# Visit http://localhost:8080/register to create an account
+# Then login at http://localhost:8080/login
+# Navigate to /account/tokens to create publish tokens
 ```
-
-Save the token output - you'll need it for publishing.
 
 Optionally, create an admin user to access the admin UI at `/admin`:
 
@@ -324,11 +327,6 @@ dart run -C packages/repub_cli repub_cli serve
 # Run migrations
 dart run -C packages/repub_cli repub_cli migrate
 
-# Token management
-dart run -C packages/repub_cli repub_cli token create <label> [scopes...]
-dart run -C packages/repub_cli repub_cli token list
-dart run -C packages/repub_cli repub_cli token delete <label>
-
 # Admin user management (CLI-only for security)
 dart run -C packages/repub_cli repub_cli admin create <username> <password> [name]
 dart run -C packages/repub_cli repub_cli admin list
@@ -336,6 +334,9 @@ dart run -C packages/repub_cli repub_cli admin reset-password <username> <new-pa
 dart run -C packages/repub_cli repub_cli admin activate <username>
 dart run -C packages/repub_cli repub_cli admin deactivate <username>
 dart run -C packages/repub_cli repub_cli admin delete <username>
+
+# Note: User token management is done via the web UI
+# Navigate to /account/tokens after logging in
 
 # Or directly with repub_server
 dart run -C packages/repub_server repub_server

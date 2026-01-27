@@ -16,8 +16,6 @@ void main(List<String> args) async {
       await runServe(subArgs);
     case 'migrate':
       await runMigrate();
-    case 'token':
-      await runTokenCommand(subArgs);
     case 'admin':
       await runAdminCommand(subArgs);
     case 'help':
