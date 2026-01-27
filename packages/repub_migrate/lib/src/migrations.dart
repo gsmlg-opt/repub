@@ -121,6 +121,14 @@ const migrations = <String, String>{
     -- Index for package-specific queries
     CREATE INDEX IF NOT EXISTS idx_package_downloads_package ON package_downloads(package_name, downloaded_at DESC);
   ''',
+  '008_add_default_token_scopes': '''
+    -- Add default admin scope to existing tokens for backwards compatibility
+    -- Existing deployments had no scope enforcement, so existing tokens effectively had full access
+    -- This migration ensures they continue to work by granting admin scope
+    UPDATE auth_tokens
+    SET scopes = ARRAY['admin']::TEXT[]
+    WHERE scopes = '{}' OR scopes IS NULL;
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.
