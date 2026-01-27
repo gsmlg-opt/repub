@@ -13,7 +13,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
   PackagesBloc({AdminApiClient? apiClient})
       : _apiClient = apiClient ?? AdminApiClient(),
         super(const PackagesInitial()) {
-    on<LoadLocalPackages>(_onLoadLocalPackages);
+    on<LoadHostedPackages>(_onLoadHostedPackages);
     on<LoadCachedPackages>(_onLoadCachedPackages);
     on<SearchPackages>(_onSearchPackages);
     on<DeletePackage>(_onDeletePackage);
@@ -22,13 +22,13 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
     on<ClearAllCache>(_onClearAllCache);
   }
 
-  Future<void> _onLoadLocalPackages(
-    LoadLocalPackages event,
+  Future<void> _onLoadHostedPackages(
+    LoadHostedPackages event,
     Emitter<PackagesState> emit,
   ) async {
-    emit(const PackagesLoading(PackageViewType.local));
+    emit(const PackagesLoading(PackageViewType.hosted));
     try {
-      final response = await _apiClient.listLocalPackages(
+      final response = await _apiClient.listHostedPackages(
         page: event.page,
         limit: event.limit,
       );
@@ -49,7 +49,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
       }).toList();
 
       emit(PackagesLoaded(
-        viewType: PackageViewType.local,
+        viewType: PackageViewType.hosted,
         packages: packages,
         total: response.total,
         page: response.page,
@@ -57,7 +57,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
         searchQuery: event.search,
       ));
     } catch (e) {
-      emit(PackagesError('Failed to load local packages: $e'));
+      emit(PackagesError('Failed to load hosted packages: $e'));
     }
   }
 
@@ -106,8 +106,8 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
     if (state is PackagesLoaded) {
       final currentState = state as PackagesLoaded;
       // Reload with search query
-      if (currentState.viewType == PackageViewType.local) {
-        add(LoadLocalPackages(search: event.query));
+      if (currentState.viewType == PackageViewType.hosted) {
+        add(LoadHostedPackages(search: event.query));
       } else {
         add(LoadCachedPackages(search: event.query));
       }
@@ -128,13 +128,13 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
       // Reload the current view
       if (state is PackagesLoaded) {
         final currentState = state as PackagesLoaded;
-        add(LoadLocalPackages(
+        add(LoadHostedPackages(
           page: currentState.page,
           limit: currentState.limit,
           search: currentState.searchQuery,
         ));
       } else {
-        add(const LoadLocalPackages());
+        add(const LoadHostedPackages());
       }
     } catch (e) {
       emit(PackageOperationError('Failed to delete package: $e'));
@@ -155,13 +155,13 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
       // Reload the current view
       if (state is PackagesLoaded) {
         final currentState = state as PackagesLoaded;
-        add(LoadLocalPackages(
+        add(LoadHostedPackages(
           page: currentState.page,
           limit: currentState.limit,
           search: currentState.searchQuery,
         ));
       } else {
-        add(const LoadLocalPackages());
+        add(const LoadHostedPackages());
       }
     } catch (e) {
       emit(PackageOperationError('Failed to update package: $e'));

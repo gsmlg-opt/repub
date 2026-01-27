@@ -1,4 +1,12 @@
 /// A package in the registry.
+///
+/// Packages can be one of two types:
+/// - **Hosted packages** (isUpstreamCache=false): Packages published directly to this registry
+/// - **Cached packages** (isUpstreamCache=true): Packages cached from upstream registry (pub.dev)
+///
+/// These are fundamentally different entities with different lifecycles:
+/// - Hosted packages are owned, managed, and published by users of this registry
+/// - Cached packages are read-only mirrors fetched from upstream on first download
 class Package {
   final String name;
   final String? ownerId;
@@ -6,6 +14,10 @@ class Package {
   final DateTime updatedAt;
   final bool isDiscontinued;
   final String? replacedBy;
+
+  /// Whether this package is cached from an upstream registry (pub.dev).
+  /// If true, this is a cached package and cannot be published to directly.
+  /// If false, this is a hosted package that was published to this registry.
   final bool isUpstreamCache;
 
   const Package({
