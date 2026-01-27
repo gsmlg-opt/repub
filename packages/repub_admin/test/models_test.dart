@@ -305,7 +305,8 @@ void main() {
       expect(modified.baseUrl, original.baseUrl);
       expect(modified.requireDownloadAuth, true);
       expect(modified.maxUploadSizeMb, 200);
-      expect(modified.allowPublicRegistration, original.allowPublicRegistration);
+      expect(
+          modified.allowPublicRegistration, original.allowPublicRegistration);
     });
 
     test('toJson roundtrips correctly', () {
