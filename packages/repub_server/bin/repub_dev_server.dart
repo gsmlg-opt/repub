@@ -174,26 +174,35 @@ Future<void> main(List<String> args) async {
 // Auto-run Dart main function after modules are loaded
 // This fixes an issue where defer scripts don't auto-execute through the proxy
 (function() {
+  var started = false;
+
   function tryRunMain() {
+    if (started) return true;
+
     // Check if require.js is loaded
     if (typeof require !== 'undefined' && require.s && require.s.contexts) {
       var app = document.querySelector('#app');
-      // Check if main module is defined but app hasn't rendered
-      if (app && !app.hasChildNodes()) {
+      var initialLoader = document.querySelector('#initial-loader');
+
+      // Check if main module is defined but app hasn't rendered (has initial loader or empty)
+      if (app && (!app.hasChildNodes() || (initialLoader && initialLoader.parentNode === app))) {
         // Check if main is already defined
         var ctx = require.s.contexts._;
         if (ctx.defined && ctx.defined['web/main']) {
           // Main module is loaded, trigger it via \$dartRunMain
           if (window.\$dartRunMain) {
+            started = true;
             window.\$dartRunMain();
             return true;
           }
         } else {
           // Main module not loaded yet, manually trigger require
           try {
+            started = true;
             require(['web/main']);
             return true;
           } catch (e) {
+            started = false;
             // Module not ready yet
           }
         }
@@ -202,11 +211,11 @@ Future<void> main(List<String> args) async {
     return false;
   }
 
-  // Set up interval checking
+  // Set up interval checking with increased timeout
   var attempts = 0;
   var checkInterval = setInterval(function() {
     attempts++;
-    if (tryRunMain() || attempts > 200) {  // Stop after 10 seconds (200 * 50ms)
+    if (tryRunMain() || attempts > 400) {  // Stop after 20 seconds (400 * 50ms)
       clearInterval(checkInterval);
     }
   }, 50);
