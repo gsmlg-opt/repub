@@ -92,10 +92,10 @@ class DocsPage extends StatelessComponent {
               ],
             ),
             _buildCodeBlock('''# Linux/macOS - Add to ~/.bashrc or ~/.zshrc
-export PUB_HOSTED_URL="http://localhost:8080"
+export PUB_HOSTED_URL="http://localhost:4920"
 
 # Windows - Set in System Environment Variables or run:
-setx PUB_HOSTED_URL "http://localhost:8080"'''),
+setx PUB_HOSTED_URL "http://localhost:4920"'''),
             p(
               classes: 'text-gray-700 mb-4',
               [
@@ -123,7 +123,7 @@ flutter pub get'''),
   my_package:
     version: ^1.0.0
     hosted:
-      url: http://localhost:8080
+      url: http://localhost:4920
       name: my_package'''),
 
             // Method 3: Global config
@@ -139,7 +139,7 @@ flutter pub get'''),
 {
   "hosted": [
     {
-      "url": "http://localhost:8080"
+      "url": "http://localhost:4920"
     }
   ]
 }'''),
@@ -184,7 +184,7 @@ environment:
               ],
             ),
             _buildCodeBlock(
-                '''dart pub publish --server http://localhost:8080'''),
+                '''dart pub publish --server http://localhost:4920'''),
             h3(
               classes: 'text-lg font-semibold text-gray-900 mb-3 mt-6',
               [Component.text('3. Authenticate (if required)')],
@@ -226,7 +226,7 @@ environment:
 {
   "accessToken": "your-token-here",
   "refreshToken": null,
-  "tokenEndpoint": "http://localhost:8080/api/token",
+  "tokenEndpoint": "http://localhost:4920/api/token",
   "scopes": ["openid"],
   "expiration": null
 }'''),

@@ -54,8 +54,8 @@ services:
       minio-init:
         condition: service_completed_successfully
     environment:
-      REPUB_LISTEN_ADDR: "0.0.0.0:8080"
-      REPUB_BASE_URL: "http://localhost:8080"
+      REPUB_LISTEN_ADDR: "0.0.0.0:4920"
+      REPUB_BASE_URL: "http://localhost:4920"
       REPUB_DATABASE_URL: "postgres://repub:repub@postgres:5432/repub"
       REPUB_S3_ENDPOINT: "http://minio:9000"
       REPUB_S3_REGION: "us-east-1"
@@ -65,9 +65,9 @@ services:
       REPUB_REQUIRE_DOWNLOAD_AUTH: "false"
       REPUB_SIGNED_URL_TTL_SECONDS: "3600"
     ports:
-      - "8080:8080"
+      - "4920:4920"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:4920/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3

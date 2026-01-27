@@ -58,9 +58,9 @@ jobs:
           --health-retries 5
 
     env:
-      REPUB_URL: http://localhost:8080
-      REPUB_LISTEN_ADDR: "0.0.0.0:8080"
-      REPUB_BASE_URL: "http://localhost:8080"
+      REPUB_URL: http://localhost:4920
+      REPUB_LISTEN_ADDR: "0.0.0.0:4920"
+      REPUB_BASE_URL: "http://localhost:4920"
       REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
       REPUB_S3_ENDPOINT: "http://localhost:9000"
       REPUB_S3_REGION: "us-east-1"
@@ -116,14 +116,14 @@ jobs:
 
           # Wait for server to be ready
           for i in {1..30}; do
-            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+            if curl -sf http://localhost:4920/health > /dev/null 2>&1; then
               echo "Server is ready"
               break
             fi
             sleep 1
           done
 
-          curl -sf http://localhost:8080/health || exit 1
+          curl -sf http://localhost:4920/health || exit 1
 
       - name: Create auth token
         id: token
@@ -143,7 +143,7 @@ jobs:
           description: Integration test package for CI
           environment:
             sdk: ^3.0.0
-          publish_to: http://localhost:8080
+          publish_to: http://localhost:4920
           EOF
 
           cat > /tmp/test_pkg/lib/integration_test_pkg.dart << 'EOF'
@@ -172,7 +172,7 @@ jobs:
       - name: Publish test package
         run: |
           # Add token to dart pub
-          echo "${{ steps.token.outputs.token }}" | dart pub token add http://localhost:8080
+          echo "${{ steps.token.outputs.token }}" | dart pub token add http://localhost:4920
 
           cd /tmp/test_pkg
           dart pub publish --force
@@ -182,7 +182,7 @@ jobs:
       - name: Verify package in registry
         run: |
           # Check package exists via API
-          response=$(curl -sf http://localhost:8080/api/packages/integration_test_pkg)
+          response=$(curl -sf http://localhost:4920/api/packages/integration_test_pkg)
 
           if echo "$response" | grep -q '"name":"integration_test_pkg"'; then
             echo "Package found in registry"
@@ -211,7 +211,7 @@ jobs:
           dependencies:
             integration_test_pkg:
               hosted:
-                url: http://localhost:8080
+                url: http://localhost:4920
               version: ^1.0.0
           EOF
 
@@ -242,7 +242,7 @@ jobs:
 
       - name: Test package versions endpoint
         run: |
-          response=$(curl -sf http://localhost:8080/api/packages/integration_test_pkg/versions/1.0.0)
+          response=$(curl -sf http://localhost:4920/api/packages/integration_test_pkg/versions/1.0.0)
 
           if echo "$response" | grep -q '"version":"1.0.0"'; then
             echo "Version endpoint working correctly"
@@ -256,7 +256,7 @@ jobs:
         if: always()
         run: |
           # Remove token
-          dart pub token remove http://localhost:8080 || true
+          dart pub token remove http://localhost:4920 || true
 
           # Stop server
           if [ -f /tmp/server.pid ]; then

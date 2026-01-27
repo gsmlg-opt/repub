@@ -104,8 +104,8 @@ jobs:
         run: |
           docker run -d --name repub-server \
             --network host \
-            -e REPUB_LISTEN_ADDR="0.0.0.0:8080" \
-            -e REPUB_BASE_URL="http://localhost:8080" \
+            -e REPUB_LISTEN_ADDR="0.0.0.0:4920" \
+            -e REPUB_BASE_URL="http://localhost:4920" \
             -e REPUB_DATABASE_URL="postgres://repub:repub@localhost:5432/repub" \
             -e REPUB_S3_ENDPOINT="http://localhost:9000" \
             -e REPUB_S3_REGION="us-east-1" \
@@ -120,7 +120,7 @@ jobs:
       - name: Test health endpoint
         run: |
           for i in {1..30}; do
-            if curl -sf http://localhost:8080/health; then
+            if curl -sf http://localhost:4920/health; then
               echo "Health check passed"
               exit 0
             fi

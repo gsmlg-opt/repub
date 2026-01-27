@@ -41,7 +41,7 @@ Authorization: Bearer <token>
 Returns:
 ```json
 {
-  "url": "http://localhost:8080/api/packages/versions/upload/<session-id>",
+  "url": "http://localhost:4920/api/packages/versions/upload/<session-id>",
   "fields": {}
 }
 ```
@@ -58,7 +58,7 @@ Content-Type: application/octet-stream
 
 Returns:
 - 204 No Content
-- Location: http://localhost:8080/api/packages/versions/finalize/<session-id>
+- Location: http://localhost:4920/api/packages/versions/finalize/<session-id>
 
 #### 3. Finalize Upload
 
@@ -155,14 +155,14 @@ WWW-Authenticate: Bearer realm="pub", message="..."
 
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:4920/health
 
 # Get package info
-curl http://localhost:8080/api/packages/my_package
+curl http://localhost:4920/api/packages/my_package
 
 # Create token (via CLI)
 dart run repub token create test publish:all
 
 # Initiate upload
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/packages/versions/new
+curl -H "Authorization: Bearer $TOKEN" http://localhost:4920/api/packages/versions/new
 ```

@@ -99,7 +99,7 @@ ENV REPUB_DATABASE_URL=sqlite:/data/metadata/repub.db
 ENV REPUB_STORAGE_PATH=/data/packages
 ENV REPUB_CACHE_PATH=/data/cache
 
-EXPOSE 8080
+EXPOSE 4920
 
 # Default to running the server
 ENTRYPOINT ["/app/bin/repub_server"]
