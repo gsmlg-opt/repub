@@ -263,6 +263,27 @@ export REPUB_S3_SECRET_KEY=minioadmin
 export REPUB_S3_BUCKET=repub
 ```
 
+### Email Notifications
+
+Email notifications are configured via the Site Configuration in the admin panel (`/admin`). Navigate to Site Configuration to set up SMTP:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `smtp_host` | *(empty)* | SMTP server hostname |
+| `smtp_port` | `587` | SMTP server port |
+| `smtp_username` | *(empty)* | SMTP authentication username |
+| `smtp_password` | *(empty)* | SMTP authentication password |
+| `smtp_from_address` | *(empty)* | Sender email address |
+| `smtp_from_name` | `Repub Package Registry` | Sender name |
+| `smtp_ssl` | `false` | Use SSL/TLS for SMTP connection |
+| `email_notifications_enabled` | `false` | Enable email notifications |
+| `email_on_package_published` | `true` | Send email when a package is published |
+| `email_on_user_registered` | `true` | Send welcome email when a user registers |
+
+When enabled, the following emails are sent:
+- **Welcome email**: Sent to new users upon registration
+- **Package published**: Sent to the publisher when a package version is published
+
 ## API Documentation
 
 **Full API specification**: See [`openapi.yaml`](./openapi.yaml) for the complete OpenAPI 3.0 specification.
