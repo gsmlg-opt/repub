@@ -93,9 +93,20 @@ class AdminApiClient {
   final String baseUrl;
   final http.Client _client;
 
-  AdminApiClient({String? baseUrl})
+  /// Creates an AdminApiClient with optional baseUrl and http.Client.
+  /// If baseUrl is null, it will be auto-detected from browser location.
+  /// The httpClient parameter allows injecting a mock client for testing.
+  AdminApiClient({String? baseUrl, http.Client? httpClient})
       : baseUrl = baseUrl ?? _detectBaseUrl(),
-        _client = http.Client();
+        _client = httpClient ?? http.Client();
+
+  /// Creates an AdminApiClient for testing (no browser dependencies).
+  factory AdminApiClient.forTesting({
+    required String baseUrl,
+    required http.Client httpClient,
+  }) {
+    return AdminApiClient(baseUrl: baseUrl, httpClient: httpClient);
+  }
 
   static String _detectBaseUrl() {
     final location = web.window.location;
