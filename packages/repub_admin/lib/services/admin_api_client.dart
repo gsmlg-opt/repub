@@ -883,11 +883,18 @@ class AdminApiClient {
 
   // ============ Version Retraction ============
 
-  /// Retract a package version.
-  Future<void> retractPackageVersion(String packageName, String version) async {
+  /// Retract a package version with an optional message explaining why.
+  Future<void> retractPackageVersion(
+    String packageName,
+    String version, {
+    String? message,
+  }) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
       headers: _headers,
+      body: message != null && message.isNotEmpty
+          ? jsonEncode({'message': message})
+          : null,
     );
 
     if (response.statusCode == 404) {
@@ -964,12 +971,14 @@ class VersionInfo {
   final DateTime publishedAt;
   final bool isRetracted;
   final DateTime? retractedAt;
+  final String? retractionMessage;
 
   const VersionInfo({
     required this.version,
     required this.publishedAt,
     this.isRetracted = false,
     this.retractedAt,
+    this.retractionMessage,
   });
 
   factory VersionInfo.fromJson(Map<String, dynamic> json) {
@@ -980,6 +989,7 @@ class VersionInfo {
       retractedAt: json['retracted_at'] != null
           ? DateTime.parse(json['retracted_at'] as String)
           : null,
+      retractionMessage: json['retraction_message'] as String?,
     );
   }
 }

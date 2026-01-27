@@ -67,60 +67,76 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
   }
 
   Future<void> _toggleRetraction(VersionInfo version) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(version.isRetracted ? 'Un-retract Version' : 'Retract Version'),
-        content: Text(
-          version.isRetracted
-              ? 'Are you sure you want to un-retract version ${version.version}? '
-                'It will be available for resolution again.'
-              : 'Are you sure you want to retract version ${version.version}? '
-                'Retracted versions are still downloadable but won\'t be selected '
-                'during dependency resolution unless already in use.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+    if (version.isRetracted) {
+      // Un-retract: simple confirmation dialog
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Un-retract Version'),
+          content: Text(
+            'Are you sure you want to un-retract version ${version.version}? '
+            'It will be available for resolution again.',
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: version.isRetracted
-                ? null
-                : FilledButton.styleFrom(backgroundColor: Colors.orange),
-            child: Text(version.isRetracted ? 'Un-retract' : 'Retract'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      if (version.isRetracted) {
-        await _apiClient.unretractPackageVersion(widget.packageName, version.version);
-      } else {
-        await _apiClient.retractPackageVersion(widget.packageName, version.version);
-      }
-      _loadVersions();
-      _loadStats();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              version.isRetracted
-                  ? 'Version ${version.version} un-retracted'
-                  : 'Version ${version.version} retracted',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
             ),
-          ),
-        );
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Un-retract'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      try {
+        await _apiClient.unretractPackageVersion(widget.packageName, version.version);
+        _loadVersions();
+        _loadStats();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Version ${version.version} un-retracted')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    } else {
+      // Retract: dialog with message input
+      final result = await showDialog<String?>(
+        context: context,
+        builder: (ctx) => _RetractionDialog(version: version),
+      );
+
+      // null means cancelled, empty string means retract without message
+      if (result == null) return;
+
+      try {
+        await _apiClient.retractPackageVersion(
+          widget.packageName,
+          version.version,
+          message: result.isEmpty ? null : result,
         );
+        _loadVersions();
+        _loadStats();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Version ${version.version} retracted')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -500,9 +516,7 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                   DataCell(
                     version.isRetracted
                         ? Tooltip(
-                            message: version.retractedAt != null
-                                ? 'Retracted on ${dateFormat.format(version.retractedAt!)}'
-                                : 'Retracted',
+                            message: _buildRetractionTooltip(version, dateFormat),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
@@ -524,6 +538,12 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
+                                  if (version.retractionMessage != null &&
+                                      version.retractionMessage!.isNotEmpty) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.info_outline,
+                                        size: 12, color: Colors.orange.shade700),
+                                  ],
                                 ],
                               ),
                             ),
@@ -714,5 +734,89 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
   String _formatDateShort(String dateStr) {
     final date = DateTime.parse(dateStr);
     return DateFormat('M/d').format(date);
+  }
+
+  String _buildRetractionTooltip(VersionInfo version, DateFormat dateFormat) {
+    final parts = <String>[];
+    if (version.retractedAt != null) {
+      parts.add('Retracted on ${dateFormat.format(version.retractedAt!)}');
+    } else {
+      parts.add('Retracted');
+    }
+    if (version.retractionMessage != null &&
+        version.retractionMessage!.isNotEmpty) {
+      parts.add('');
+      parts.add('Reason: ${version.retractionMessage}');
+    }
+    return parts.join('\n');
+  }
+}
+
+/// Dialog for retracting a version with an optional message.
+class _RetractionDialog extends StatefulWidget {
+  final VersionInfo version;
+
+  const _RetractionDialog({required this.version});
+
+  @override
+  State<_RetractionDialog> createState() => _RetractionDialogState();
+}
+
+class _RetractionDialogState extends State<_RetractionDialog> {
+  final _messageController = TextEditingController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Retract Version'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to retract version ${widget.version.version}?',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Retracted versions are still downloadable but won\'t be selected '
+              'during dependency resolution unless already in use.',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _messageController,
+              decoration: const InputDecoration(
+                labelText: 'Reason for retraction (optional)',
+                hintText: 'e.g., Security vulnerability, breaking change...',
+                border: OutlineInputBorder(),
+                helperText: 'This message will be shown to users',
+              ),
+              maxLines: 3,
+              maxLength: 500,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_messageController.text),
+          style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+          child: const Text('Retract'),
+        ),
+      ],
+    );
   }
 }

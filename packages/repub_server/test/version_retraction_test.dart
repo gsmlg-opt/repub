@@ -1,14 +1,12 @@
-import 'dart:convert';
 import 'package:test/test.dart';
 import 'package:repub_storage/repub_storage.dart';
-import 'package:repub_model/repub_model.dart';
 
 void main() {
   late MetadataStore metadata;
 
   setUp(() async {
     // Create in-memory SQLite database for each test
-    metadata = await SqliteMetadataStore.open(':memory:');
+    metadata = SqliteMetadataStore.open(':memory:');
     await metadata.runMigrations();
 
     // Create a test package with multiple versions
