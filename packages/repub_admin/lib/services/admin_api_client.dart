@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
 
+import '../models/webhook_info.dart';
 import 'url_detector_stub.dart'
     if (dart.library.html) 'url_detector_web.dart';
 
@@ -713,6 +714,146 @@ class AdminApiClient {
 
   void dispose() {
     _client.close();
+  }
+
+  // ============ Webhook Management ============
+
+  /// List all webhooks.
+  Future<List<WebhookInfo>> listWebhooks({bool activeOnly = false}) async {
+    final queryParams = activeOnly ? '?active_only=true' : '';
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/webhooks$queryParams'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to list webhooks: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final webhooks = (json['webhooks'] as List<dynamic>?)
+            ?.map((w) => WebhookInfo.fromJson(w as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return webhooks;
+  }
+
+  /// Create a new webhook.
+  Future<WebhookInfo> createWebhook({
+    required String url,
+    required List<String> events,
+    String? secret,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/admin/api/webhooks'),
+      headers: _headers,
+      body: jsonEncode({
+        'url': url,
+        'events': events,
+        if (secret != null && secret.isNotEmpty) 'secret': secret,
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to create webhook: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return WebhookInfo.fromJson(json['webhook'] as Map<String, dynamic>);
+  }
+
+  /// Update an existing webhook.
+  Future<WebhookInfo> updateWebhook(
+    String id, {
+    String? url,
+    List<String>? events,
+    bool? isActive,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$baseUrl/admin/api/webhooks/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        if (url != null) 'url': url,
+        if (events != null) 'events': events,
+        if (isActive != null) 'is_active': isActive,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to update webhook: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return WebhookInfo.fromJson(json['webhook'] as Map<String, dynamic>);
+  }
+
+  /// Delete a webhook.
+  Future<void> deleteWebhook(String id) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/admin/api/webhooks/$id'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to delete webhook: ${response.body}',
+      );
+    }
+  }
+
+  /// Test a webhook by sending a test event.
+  Future<bool> testWebhook(String id) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/admin/api/webhooks/$id/test'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to test webhook: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['success'] as bool? ?? false;
+  }
+
+  /// Get recent deliveries for a webhook.
+  Future<List<WebhookDeliveryInfo>> getWebhookDeliveries(
+    String webhookId, {
+    int limit = 50,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/webhooks/$webhookId/deliveries?limit=$limit'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch webhook deliveries: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final deliveries = (json['deliveries'] as List<dynamic>?)
+            ?.map((d) => WebhookDeliveryInfo.fromJson(d as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return deliveries;
   }
 }
 

@@ -8,6 +8,7 @@ import 'blocs/packages/packages_bloc.dart';
 import 'blocs/users/users_bloc.dart';
 import 'blocs/admin_users/admin_users_bloc.dart';
 import 'blocs/config/config_bloc.dart';
+import 'blocs/webhooks/webhooks_bloc.dart';
 
 /// Root application widget that provides all BLoCs.
 class RepubAdminApp extends StatelessWidget {
@@ -23,6 +24,7 @@ class RepubAdminApp extends StatelessWidget {
         BlocProvider(create: (context) => UsersBloc()),
         BlocProvider(create: (context) => AdminUsersBloc()),
         BlocProvider(create: (context) => ConfigBloc()),
+        BlocProvider(create: (context) => WebhooksBloc()),
       ],
       child: const RepubAdminRouterApp(),
     );

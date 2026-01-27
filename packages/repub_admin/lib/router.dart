@@ -11,6 +11,7 @@ import 'screens/site_config_screen.dart';
 import 'screens/users_screen.dart';
 import 'screens/admin_users_screen.dart';
 import 'screens/admin_user_detail_screen.dart';
+import 'screens/webhooks_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 
@@ -80,6 +81,10 @@ GoRouter createRouter(BuildContext context) {
           final id = state.pathParameters['id']!;
           return AdminUserDetailScreen(adminUserId: id);
         },
+      ),
+      GoRoute(
+        path: '/webhooks',
+        builder: (context, state) => const WebhooksScreen(),
       ),
     ],
   );

@@ -151,6 +151,13 @@ class AdminLayout extends StatelessWidget {
             path: '/config',
             isPermanent: isPermanent,
           ),
+          _buildNavItem(
+            context,
+            icon: Icons.webhook,
+            title: 'Webhooks',
+            path: '/webhooks',
+            isPermanent: isPermanent,
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.open_in_new),
