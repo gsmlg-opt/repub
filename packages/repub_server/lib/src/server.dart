@@ -62,6 +62,7 @@ Future<void> startServer({Config? config}) async {
   final handler = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(_corsMiddleware())
+      .addMiddleware(_versionMiddleware())
       .addHandler(router.call);
 
   // Start server
@@ -94,6 +95,22 @@ Middleware _corsMiddleware() {
 
       final response = await innerHandler(request);
       return response.change(headers: _corsHeaders);
+    };
+  };
+}
+
+/// Version middleware to inject version info in response headers.
+Middleware _versionMiddleware() {
+  final version = Platform.environment['REPUB_VERSION'] ?? 'unknown';
+  final gitHash = Platform.environment['REPUB_GIT_HASH'] ?? 'unknown';
+
+  return (Handler innerHandler) {
+    return (Request request) async {
+      final response = await innerHandler(request);
+      return response.change(headers: {
+        'X-Repub-Version': version,
+        'X-Repub-Git-Hash': gitHash,
+      });
     };
   };
 }

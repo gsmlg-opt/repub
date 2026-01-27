@@ -222,6 +222,22 @@ class ApiClient {
     );
   }
 
+  /// Get version information
+  Future<Map<String, dynamic>> getVersion() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/version'),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch version: ${response.body}',
+      );
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   void dispose() {
     _client.close();
   }

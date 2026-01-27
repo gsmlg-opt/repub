@@ -1,6 +1,10 @@
 # Build stage
 FROM debian:bookworm-slim AS build
 
+# Build arguments for version information
+ARG VERSION=unknown
+ARG GIT_HASH=unknown
+
 WORKDIR /app
 
 # Install dependencies for both Dart and Flutter
@@ -53,6 +57,10 @@ RUN dart compile exe packages/repub_cli/bin/repub_cli.dart -o bin/repub_cli
 # Runtime stage
 FROM debian:bookworm-slim
 
+# Build arguments for version information (passed from build stage)
+ARG VERSION=unknown
+ARG GIT_HASH=unknown
+
 # Install CA certificates for HTTPS and SQLite
 RUN apt-get update && \
     apt-get install -y ca-certificates libsqlite3-dev && \
@@ -81,6 +89,10 @@ RUN useradd -r -s /bin/false repub && \
 VOLUME /data
 
 USER repub
+
+# Version information
+ENV REPUB_VERSION=${VERSION}
+ENV REPUB_GIT_HASH=${GIT_HASH}
 
 # Default environment: SQLite database and local file storage
 ENV REPUB_DATABASE_URL=sqlite:/data/metadata/repub.db

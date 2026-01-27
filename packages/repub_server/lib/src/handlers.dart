@@ -60,6 +60,19 @@ Router createRouter({
         headers: {'content-type': 'application/json'});
   });
 
+  // Version info
+  router.get('/api/version', (Request req) {
+    final version = Platform.environment['REPUB_VERSION'] ?? 'unknown';
+    final gitHash = Platform.environment['REPUB_GIT_HASH'] ?? 'unknown';
+    return Response.ok(
+      jsonEncode({
+        'version': version,
+        'gitHash': gitHash,
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  });
+
   // Admin authentication endpoints (public)
   router.post('/admin/api/auth/login', handlers.adminLogin);
   router.post('/admin/api/auth/logout', handlers.adminLogout);

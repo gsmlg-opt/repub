@@ -50,9 +50,23 @@ jobs:
         run: |
           TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}"
           if [ "${{ inputs.tag }}" != "latest" ]; then
-            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            TAGS="${TAGS},${ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Extract version information
+        id: version
+        run: |
+          # Get git hash
+          GIT_HASH=$(git rev-parse --short HEAD)
+          echo "git_hash=$GIT_HASH" >> $GITHUB_OUTPUT
+
+          # Extract version from tag (if it's a version tag)
+          VERSION="${{ inputs.tag }}"
+          if [[ "$VERSION" == v* ]]; then
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -60,6 +74,9 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            GIT_HASH=${{ steps.version.outputs.git_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64

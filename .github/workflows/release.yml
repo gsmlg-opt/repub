@@ -182,6 +182,10 @@ jobs:
           VERSION=${{ needs.release.outputs.new_tag }}
           echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
 
+          # Get git hash
+          GIT_HASH=$(git rev-parse --short HEAD)
+          echo "git_hash=$GIT_HASH" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -191,6 +195,9 @@ jobs:
             ghcr.io/gsmlg-dev/repub:${{ needs.release.outputs.new_tag }}
             ghcr.io/gsmlg-dev/repub:${{ steps.version.outputs.version }}
             ghcr.io/gsmlg-dev/repub:latest
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            GIT_HASH=${{ steps.version.outputs.git_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64

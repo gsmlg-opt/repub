@@ -1,6 +1,8 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
+import 'version_display.dart';
+
 // Layout updated: 2026-01-27
 
 /// Main layout wrapper with header and footer
@@ -111,7 +113,13 @@ class Layout extends StatelessComponent {
               classes:
                   'flex items-center justify-between text-sm text-gray-500',
               [
-                span([Component.text('Repub - Private Dart Package Registry')]),
+                div(
+                  [
+                    Component.text('Repub'),
+                    const VersionDisplay(),
+                    Component.text(' - Private Dart Package Registry'),
+                  ],
+                ),
                 span([Component.text('Powered by Jaspr')]),
               ],
             ),
