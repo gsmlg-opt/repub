@@ -25,7 +25,7 @@ Future<int> runMigrations(Connection conn) async {
 
     await conn.runTx((session) async {
       // Split migration into individual statements and execute each
-      final statements = _splitStatements(migration.value);
+      final statements = splitStatements(migration.value);
       for (final statement in statements) {
         if (statement.trim().isNotEmpty) {
           await session.execute(statement);
@@ -47,7 +47,8 @@ Future<int> runMigrations(Connection conn) async {
 
 /// Split SQL into individual statements.
 /// Handles semicolons inside strings and comments.
-List<String> _splitStatements(String sql) {
+/// This is exposed for testing purposes.
+List<String> splitStatements(String sql) {
   final statements = <String>[];
   final buffer = StringBuffer();
   var inSingleQuote = false;
