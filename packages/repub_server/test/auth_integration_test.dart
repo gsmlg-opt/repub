@@ -209,7 +209,8 @@ void main() {
         final adminToken = tokens.firstWhere((t) => t.label == 'Admin Token');
         expect(adminToken.scopes, contains('admin'));
 
-        final publishToken = tokens.firstWhere((t) => t.label == 'Publish Token');
+        final publishToken =
+            tokens.firstWhere((t) => t.label == 'Publish Token');
         expect(publishToken.scopes, contains('publish:pkg:my_package'));
 
         final readToken = tokens.firstWhere((t) => t.label == 'Read Token');
@@ -273,17 +274,25 @@ void main() {
           passwordHash: 'hash',
         );
 
-        await metadata.createToken(userId: userId, label: 'Admin', scopes: ['admin']);
-        await metadata.createToken(userId: userId, label: 'PublishAll', scopes: ['publish:all']);
-        await metadata.createToken(userId: userId, label: 'PublishPkg', scopes: ['publish:pkg:foo']);
-        await metadata.createToken(userId: userId, label: 'ReadAll', scopes: ['read:all']);
+        await metadata
+            .createToken(userId: userId, label: 'Admin', scopes: ['admin']);
+        await metadata.createToken(
+            userId: userId, label: 'PublishAll', scopes: ['publish:all']);
+        await metadata.createToken(
+            userId: userId, label: 'PublishPkg', scopes: ['publish:pkg:foo']);
+        await metadata.createToken(
+            userId: userId, label: 'ReadAll', scopes: ['read:all']);
 
         final tokens = await metadata.listTokens(userId: userId);
 
-        expect(tokens.firstWhere((t) => t.label == 'Admin').canPublishAll, isTrue);
-        expect(tokens.firstWhere((t) => t.label == 'PublishAll').canPublishAll, isTrue);
-        expect(tokens.firstWhere((t) => t.label == 'PublishPkg').canPublishAll, isFalse);
-        expect(tokens.firstWhere((t) => t.label == 'ReadAll').canPublishAll, isFalse);
+        expect(
+            tokens.firstWhere((t) => t.label == 'Admin').canPublishAll, isTrue);
+        expect(tokens.firstWhere((t) => t.label == 'PublishAll').canPublishAll,
+            isTrue);
+        expect(tokens.firstWhere((t) => t.label == 'PublishPkg').canPublishAll,
+            isFalse);
+        expect(tokens.firstWhere((t) => t.label == 'ReadAll').canPublishAll,
+            isFalse);
       });
 
       test('canPublish checks package-specific scopes', () async {
@@ -292,8 +301,10 @@ void main() {
           passwordHash: 'hash',
         );
 
-        await metadata.createToken(userId: userId, label: 'Foo', scopes: ['publish:pkg:foo']);
-        await metadata.createToken(userId: userId, label: 'Bar', scopes: ['publish:pkg:bar']);
+        await metadata.createToken(
+            userId: userId, label: 'Foo', scopes: ['publish:pkg:foo']);
+        await metadata.createToken(
+            userId: userId, label: 'Bar', scopes: ['publish:pkg:bar']);
 
         final tokens = await metadata.listTokens(userId: userId);
         final fooToken = tokens.firstWhere((t) => t.label == 'Foo');
@@ -311,15 +322,19 @@ void main() {
           passwordHash: 'hash',
         );
 
-        await metadata.createToken(userId: userId, label: 'Admin', scopes: ['admin']);
-        await metadata.createToken(userId: userId, label: 'ReadAll', scopes: ['read:all']);
-        await metadata.createToken(userId: userId, label: 'PublishAll', scopes: ['publish:all']);
+        await metadata
+            .createToken(userId: userId, label: 'Admin', scopes: ['admin']);
+        await metadata.createToken(
+            userId: userId, label: 'ReadAll', scopes: ['read:all']);
+        await metadata.createToken(
+            userId: userId, label: 'PublishAll', scopes: ['publish:all']);
 
         final tokens = await metadata.listTokens(userId: userId);
 
         expect(tokens.firstWhere((t) => t.label == 'Admin').canRead, isTrue);
         expect(tokens.firstWhere((t) => t.label == 'ReadAll').canRead, isTrue);
-        expect(tokens.firstWhere((t) => t.label == 'PublishAll').canRead, isFalse);
+        expect(
+            tokens.firstWhere((t) => t.label == 'PublishAll').canRead, isFalse);
       });
     });
 

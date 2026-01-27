@@ -324,7 +324,8 @@ class _TokensPageState extends State<TokensPage> {
                   classes: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded',
                   attributes: {
                     'id': 'scope-publish-all',
-                    if (_selectedScopes.contains('publish:all')) 'checked': 'true',
+                    if (_selectedScopes.contains('publish:all'))
+                      'checked': 'true',
                   },
                   events: {
                     'change': (e) {
@@ -389,7 +390,10 @@ class _TokensPageState extends State<TokensPage> {
                     ),
                     div(
                       classes: 'text-xs text-gray-500',
-                      [Component.text('Download packages (when download auth is required)')],
+                      [
+                        Component.text(
+                            'Download packages (when download auth is required)')
+                      ],
                     ),
                   ],
                 ),
@@ -399,7 +403,8 @@ class _TokensPageState extends State<TokensPage> {
             div(
               classes: 'mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700',
               [
-                Component.text('Note: For package-specific scopes like publish:pkg:<name>, tokens default to no permissions. Use publish:all for general publishing.')
+                Component.text(
+                    'Note: For package-specific scopes like publish:pkg:<name>, tokens default to no permissions. Use publish:all for general publishing.')
               ],
             ),
           ],

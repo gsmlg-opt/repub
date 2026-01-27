@@ -678,9 +678,7 @@ class PostgresMetadataStore extends MetadataStore {
 
     return result.map((row) {
       final scopesRaw = row[3];
-      final scopes = scopesRaw is List
-          ? scopesRaw.cast<String>()
-          : <String>[];
+      final scopes = scopesRaw is List ? scopesRaw.cast<String>() : <String>[];
 
       return AuthToken(
         tokenHash: row[0] as String,
@@ -1906,7 +1904,14 @@ class SqliteMetadataStore extends MetadataStore {
     _db.execute('''
       INSERT INTO auth_tokens (token_hash, user_id, label, scopes, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    ''', [tokenHash, userId, label, scopesJson, now, expiresAt?.toIso8601String()]);
+    ''', [
+      tokenHash,
+      userId,
+      label,
+      scopesJson,
+      now,
+      expiresAt?.toIso8601String()
+    ]);
 
     return token;
   }
@@ -2135,7 +2140,8 @@ class SqliteMetadataStore extends MetadataStore {
 
   @override
   Future<Map<String, int>> getPackagesCreatedPerDay(int days) async {
-    final cutoffDate = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final cutoffDate =
+        DateTime.now().subtract(Duration(days: days)).toIso8601String();
     final result = _db.select('''
       SELECT
         DATE(created_at) as date,
@@ -2153,7 +2159,8 @@ class SqliteMetadataStore extends MetadataStore {
 
   @override
   Future<Map<String, int>> getDownloadsPerHour(int hours) async {
-    final cutoffTime = DateTime.now().subtract(Duration(hours: hours)).toIso8601String();
+    final cutoffTime =
+        DateTime.now().subtract(Duration(hours: hours)).toIso8601String();
     final result = _db.select('''
       SELECT
         STRFTIME('%Y-%m-%d %H:00:00', downloaded_at) as hour,

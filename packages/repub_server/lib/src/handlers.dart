@@ -89,8 +89,8 @@ Router createRouter({
   router.get('/admin/api/stats', handlers.adminGetStats);
   router.get('/admin/api/analytics/packages-created',
       handlers.adminGetPackagesCreatedPerDay);
-  router.get('/admin/api/analytics/downloads',
-      handlers.adminGetDownloadsPerHour);
+  router.get(
+      '/admin/api/analytics/downloads', handlers.adminGetDownloadsPerHour);
   router.get('/admin/api/packages/local', handlers.adminListLocalPackages);
   router.get('/admin/api/packages/cached', handlers.adminListCachedPackages);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);

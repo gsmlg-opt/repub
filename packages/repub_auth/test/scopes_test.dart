@@ -111,7 +111,8 @@ void main() {
         expect(canPublishPackage(publishPkgToken, 'my_package'), isTrue);
       });
 
-      test('returns false for specific package token when package does not match',
+      test(
+          'returns false for specific package token when package does not match',
           () {
         expect(canPublishPackage(publishPkgToken, 'other_package'), isFalse);
       });
@@ -166,18 +167,17 @@ void main() {
 
     group('requirePackagePublishScope', () {
       test('returns null when admin token', () {
-        expect(
-            requirePackagePublishScope(adminToken, 'any_package'), isNull);
+        expect(requirePackagePublishScope(adminToken, 'any_package'), isNull);
       });
 
       test('returns null when publish:all token', () {
-        expect(requirePackagePublishScope(publishAllToken, 'any_package'),
-            isNull);
+        expect(
+            requirePackagePublishScope(publishAllToken, 'any_package'), isNull);
       });
 
       test('returns null when specific package token matches', () {
-        expect(requirePackagePublishScope(publishPkgToken, 'my_package'),
-            isNull);
+        expect(
+            requirePackagePublishScope(publishPkgToken, 'my_package'), isNull);
       });
 
       test('returns 403 when specific package token does not match', () {
@@ -188,7 +188,8 @@ void main() {
       });
 
       test('returns 403 when token has no publish scopes', () {
-        final response = requirePackagePublishScope(readAllToken, 'any_package');
+        final response =
+            requirePackagePublishScope(readAllToken, 'any_package');
         expect(response, isNotNull);
         expect(response!.statusCode, equals(403));
       });
