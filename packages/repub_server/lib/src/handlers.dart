@@ -91,6 +91,7 @@ Router createRouter({
       handlers.adminGetPackagesCreatedPerDay);
   router.get(
       '/admin/api/analytics/downloads', handlers.adminGetDownloadsPerHour);
+  router.get('/admin/api/activity', handlers.adminGetRecentActivity);
   router.get('/admin/api/hosted-packages', handlers.adminListHostedPackages);
   router.get('/admin/api/cached-packages', handlers.adminListCachedPackages);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
@@ -1203,6 +1204,30 @@ class ApiHandlers {
 
     return Response.ok(
       jsonEncode(data),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/activity`
+  Future<Response> adminGetRecentActivity(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '10') ?? 10;
+    final activityType = request.url.queryParameters['type'];
+    final actorType = request.url.queryParameters['actor'];
+
+    final activities = await metadata.getRecentActivity(
+      limit: limit,
+      activityType: activityType,
+      actorType: actorType,
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'activities': activities.map((a) => a.toJson()).toList(),
+      }),
       headers: {'content-type': 'application/json'},
     );
   }

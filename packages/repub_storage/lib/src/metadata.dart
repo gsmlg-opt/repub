@@ -307,6 +307,28 @@ abstract class MetadataStore {
   Future<List<AdminLoginHistory>> getRecentAdminLogins({
     int limit = 100,
   });
+
+  // ============ Activity Log ============
+
+  /// Log an activity event.
+  Future<String> logActivity({
+    required String activityType,
+    required String actorType,
+    String? actorId,
+    String? actorEmail,
+    String? actorUsername,
+    String? targetType,
+    String? targetId,
+    Map<String, dynamic>? metadata,
+    String? ipAddress,
+  });
+
+  /// Get recent activity log entries.
+  Future<List<ActivityLog>> getRecentActivity({
+    int limit = 10,
+    String? activityType,
+    String? actorType,
+  });
 }
 
 /// Metadata storage backed by PostgreSQL.
@@ -1576,6 +1598,96 @@ class PostgresMetadataStore extends MetadataStore {
             ))
         .toList();
   }
+
+  @override
+  Future<String> logActivity({
+    required String activityType,
+    required String actorType,
+    String? actorId,
+    String? actorEmail,
+    String? actorUsername,
+    String? targetType,
+    String? targetId,
+    Map<String, dynamic>? metadata,
+    String? ipAddress,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    await _conn.execute(
+      Sql.named('''
+        INSERT INTO activity_log (
+          id, activity_type, actor_type, actor_id, actor_email, actor_username,
+          target_type, target_id, metadata, ip_address
+        ) VALUES (
+          @id, @activityType, @actorType, @actorId, @actorEmail, @actorUsername,
+          @targetType, @targetId, @metadata, @ipAddress
+        )
+      '''),
+      parameters: {
+        'id': id,
+        'activityType': activityType,
+        'actorType': actorType,
+        'actorId': actorId,
+        'actorEmail': actorEmail,
+        'actorUsername': actorUsername,
+        'targetType': targetType,
+        'targetId': targetId,
+        'metadata': metadata != null ? jsonEncode(metadata) : null,
+        'ipAddress': ipAddress,
+      },
+    );
+    return id;
+  }
+
+  @override
+  Future<List<ActivityLog>> getRecentActivity({
+    int limit = 10,
+    String? activityType,
+    String? actorType,
+  }) async {
+    final whereConditions = <String>[];
+    final parameters = <String, dynamic>{'limit': limit};
+
+    if (activityType != null) {
+      whereConditions.add('activity_type = @activityType');
+      parameters['activityType'] = activityType;
+    }
+    if (actorType != null) {
+      whereConditions.add('actor_type = @actorType');
+      parameters['actorType'] = actorType;
+    }
+
+    final whereClause =
+        whereConditions.isNotEmpty ? 'WHERE ${whereConditions.join(' AND ')}' : '';
+
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT
+          id, timestamp, activity_type, actor_type, actor_id, actor_email,
+          actor_username, target_type, target_id, metadata, ip_address
+        FROM activity_log
+        $whereClause
+        ORDER BY timestamp DESC
+        LIMIT @limit
+      '''),
+      parameters: parameters,
+    );
+
+    return result.map((row) {
+      return ActivityLog.fromRow({
+        'id': row[0] as String,
+        'timestamp': row[1] as DateTime,
+        'activity_type': row[2] as String,
+        'actor_type': row[3] as String,
+        'actor_id': row[4] as String?,
+        'actor_email': row[5] as String?,
+        'actor_username': row[6] as String?,
+        'target_type': row[7] as String?,
+        'target_id': row[8] as String?,
+        'metadata': row[9] as String?,
+        'ip_address': row[10] as String?,
+      });
+    }).toList();
+  }
 }
 
 /// Metadata storage backed by SQLite.
@@ -2708,6 +2820,89 @@ class SqliteMetadataStore extends MetadataStore {
               success: (row['success'] as int) == 1,
             ))
         .toList();
+  }
+
+  @override
+  Future<String> logActivity({
+    required String activityType,
+    required String actorType,
+    String? actorId,
+    String? actorEmail,
+    String? actorUsername,
+    String? targetType,
+    String? targetId,
+    Map<String, dynamic>? metadata,
+    String? ipAddress,
+  }) async {
+    final id = MetadataStore._uuid.v4();
+    _db.execute('''
+      INSERT INTO activity_log (
+        id, activity_type, actor_type, actor_id, actor_email, actor_username,
+        target_type, target_id, metadata, ip_address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', [
+      id,
+      activityType,
+      actorType,
+      actorId,
+      actorEmail,
+      actorUsername,
+      targetType,
+      targetId,
+      metadata != null ? jsonEncode(metadata) : null,
+      ipAddress,
+    ]);
+    return id;
+  }
+
+  @override
+  Future<List<ActivityLog>> getRecentActivity({
+    int limit = 10,
+    String? activityType,
+    String? actorType,
+  }) async {
+    final whereConditions = <String>[];
+    final parameters = <dynamic>[];
+
+    if (activityType != null) {
+      whereConditions.add('activity_type = ?');
+      parameters.add(activityType);
+    }
+    if (actorType != null) {
+      whereConditions.add('actor_type = ?');
+      parameters.add(actorType);
+    }
+
+    final whereClause =
+        whereConditions.isNotEmpty ? 'WHERE ${whereConditions.join(' AND ')}' : '';
+
+    parameters.add(limit);
+
+    final result = _db.select('''
+      SELECT
+        id, timestamp, activity_type, actor_type, actor_id, actor_email,
+        actor_username, target_type, target_id, metadata, ip_address
+      FROM activity_log
+      $whereClause
+      ORDER BY timestamp DESC
+      LIMIT ?
+    ''', parameters);
+
+    return result.map((row) {
+      return ActivityLog.fromRow({
+        'id': row['id'] as String,
+        'timestamp': DateTime.parse(row['timestamp'] as String),
+        'activity_type': row['activity_type'] as String,
+        'actor_type': row['actor_type'] as String,
+        'actor_id': row['actor_id'] as String?,
+        'actor_email': row['actor_email'] as String?,
+        'actor_username': row['actor_username'] as String?,
+        'target_type': row['target_type'] as String?,
+        'target_id': row['target_id'] as String?,
+        'metadata': row['metadata'] as String?,
+        'ip_address': row['ip_address'] as String?,
+      });
+    }).toList();
   }
 }
 

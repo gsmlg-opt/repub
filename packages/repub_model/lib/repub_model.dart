@@ -1,6 +1,7 @@
 /// Shared domain models for repub package registry.
 library;
 
+export 'src/activity_log.dart';
 export 'src/admin_login_history.dart';
 export 'src/admin_user.dart';
 export 'src/config.dart';

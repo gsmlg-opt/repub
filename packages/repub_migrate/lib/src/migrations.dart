@@ -129,6 +129,29 @@ const migrations = <String, String>{
     SET scopes = ARRAY['admin']::TEXT[]
     WHERE scopes = '{}' OR scopes IS NULL;
   ''',
+  '009_activity_log': '''
+    -- Activity log table for tracking user and admin actions
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      activity_type VARCHAR(50) NOT NULL, -- 'package_published', 'user_registered', 'admin_login', 'package_deleted', etc.
+      actor_type VARCHAR(20) NOT NULL, -- 'user', 'admin', 'system'
+      actor_id UUID NULL, -- user_id or admin_user_id
+      actor_email VARCHAR(255) NULL, -- email for display
+      actor_username VARCHAR(255) NULL, -- username for admins
+      target_type VARCHAR(50) NULL, -- 'package', 'user', 'config', etc.
+      target_id VARCHAR(255) NULL, -- package name, user id, etc.
+      metadata JSONB NULL, -- additional context (version, ip, etc.)
+      ip_address VARCHAR(45) NULL
+    );
+
+    -- Index for recent activity queries
+    CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp DESC);
+    -- Index for filtering by type
+    CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
+    -- Index for actor-based queries
+    CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.
