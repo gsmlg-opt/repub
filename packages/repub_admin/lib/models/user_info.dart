@@ -55,45 +55,47 @@ class UserInfo extends Equatable {
 
 /// Represents an API token for a user.
 class TokenInfo extends Equatable {
-  final String id;
-  final String name;
+  final String label;
   final List<String> scopes;
   final DateTime createdAt;
+  final DateTime? lastUsedAt;
   final DateTime? expiresAt;
 
   const TokenInfo({
-    required this.id,
-    required this.name,
+    required this.label,
     required this.scopes,
     required this.createdAt,
+    this.lastUsedAt,
     this.expiresAt,
   });
 
   factory TokenInfo.fromJson(Map<String, dynamic> json) {
     return TokenInfo(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      label: json['label'] as String,
       scopes: (json['scopes'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
-      createdAt: DateTime.parse(json['created_at'] as String),
-      expiresAt: json['expires_at'] != null
-          ? DateTime.parse(json['expires_at'] as String)
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      lastUsedAt: json['lastUsedAt'] != null
+          ? DateTime.parse(json['lastUsedAt'] as String)
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.parse(json['expiresAt'] as String)
           : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'name': name,
+      'label': label,
       'scopes': scopes,
-      'created_at': createdAt.toIso8601String(),
-      'expires_at': expiresAt?.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'lastUsedAt': lastUsedAt?.toIso8601String(),
+      'expiresAt': expiresAt?.toIso8601String(),
     };
   }
 
   @override
-  List<Object?> get props => [id, name, scopes, createdAt, expiresAt];
+  List<Object?> get props => [label, scopes, createdAt, lastUsedAt, expiresAt];
 }

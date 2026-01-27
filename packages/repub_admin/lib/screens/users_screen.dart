@@ -643,14 +643,14 @@ class _UsersScreenState extends State<UsersScreen> {
               : SingleChildScrollView(
                   child: DataTable(
                     columns: const [
-                      DataColumn(label: Text('Name')),
+                      DataColumn(label: Text('Label')),
                       DataColumn(label: Text('Scopes')),
                       DataColumn(label: Text('Created')),
                     ],
                     rows: state.tokens.map((token) {
                       return DataRow(
                         cells: [
-                          DataCell(Text(token.name)),
+                          DataCell(Text(token.label)),
                           DataCell(
                             Wrap(
                               spacing: 4,

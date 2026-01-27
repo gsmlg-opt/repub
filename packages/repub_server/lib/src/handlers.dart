@@ -91,8 +91,8 @@ Router createRouter({
       handlers.adminGetPackagesCreatedPerDay);
   router.get(
       '/admin/api/analytics/downloads', handlers.adminGetDownloadsPerHour);
-  router.get('/admin/api/packages/local', handlers.adminListLocalPackages);
-  router.get('/admin/api/packages/cached', handlers.adminListCachedPackages);
+  router.get('/admin/api/hosted-packages', handlers.adminListHostedPackages);
+  router.get('/admin/api/cached-packages', handlers.adminListCachedPackages);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
   router.delete('/admin/api/packages/<name>/versions/<version>',
       handlers.adminDeletePackageVersion);
@@ -103,6 +103,7 @@ Router createRouter({
   router.post('/admin/api/users', handlers.adminCreateUser);
   router.put('/admin/api/users/<id>', handlers.adminUpdateUser);
   router.delete('/admin/api/users/<id>', handlers.adminDeleteUser);
+  router.get('/admin/api/users/<id>/tokens', handlers.adminListUserTokens);
   router.get('/admin/api/config', handlers.adminGetAllConfig);
   router.put('/admin/api/config/<name>', handlers.adminSetConfig);
 
@@ -1203,8 +1204,8 @@ class ApiHandlers {
     );
   }
 
-  /// GET `/api/admin/packages/local`
-  Future<Response> adminListLocalPackages(Request request) async {
+  /// GET `/admin/api/hosted-packages`
+  Future<Response> adminListHostedPackages(Request request) async {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
@@ -1224,7 +1225,7 @@ class ApiHandlers {
     );
   }
 
-  /// GET `/api/admin/packages/cached`
+  /// GET `/admin/api/cached-packages`
   Future<Response> adminListCachedPackages(Request request) async {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
@@ -1559,6 +1560,29 @@ class ApiHandlers {
     return Response.ok(
       jsonEncode({
         'success': {'message': 'User deleted successfully'}
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/users/<id>/tokens`
+  Future<Response> adminListUserTokens(Request request, String id) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    // Check if user exists
+    final user = await metadata.getUser(id);
+    if (user == null) {
+      return Response(404,
+          body: jsonEncode({'error': 'User not found'}),
+          headers: {'content-type': 'application/json'});
+    }
+
+    final tokens = await metadata.listTokens(userId: id);
+
+    return Response.ok(
+      jsonEncode({
+        'tokens': tokens.map((t) => t.toJson()).toList(),
       }),
       headers: {'content-type': 'application/json'},
     );

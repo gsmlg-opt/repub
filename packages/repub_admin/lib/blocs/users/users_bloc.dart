@@ -154,11 +154,22 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     Emitter<UsersState> emit,
   ) async {
     try {
-      // TODO: Implement getUserTokens API method
-      // For now, return empty list
+      final apiTokens = await _apiClient.getUserTokens(event.userId);
+
+      // Convert API tokens to TokenInfo model
+      final tokens = apiTokens
+          .map((t) => TokenInfo(
+                label: t.label,
+                scopes: t.scopes,
+                createdAt: t.createdAt,
+                lastUsedAt: t.lastUsedAt,
+                expiresAt: t.expiresAt,
+              ))
+          .toList();
+
       emit(UserTokensLoaded(
         userId: event.userId,
-        tokens: const [],
+        tokens: tokens,
       ));
     } catch (e) {
       emit(UserOperationError('Failed to load user tokens: $e'));

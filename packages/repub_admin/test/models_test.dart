@@ -230,31 +230,31 @@ void main() {
   group('TokenInfo', () {
     test('fromJson parses correctly', () {
       final json = {
-        'id': 'token-123',
-        'name': 'My Token',
+        'label': 'My Token',
         'scopes': ['admin', 'publish:all'],
-        'created_at': '2024-01-01T00:00:00.000Z',
-        'expires_at': '2025-01-01T00:00:00.000Z',
+        'createdAt': '2024-01-01T00:00:00.000Z',
+        'lastUsedAt': '2024-06-15T12:00:00.000Z',
+        'expiresAt': '2025-01-01T00:00:00.000Z',
       };
 
       final token = TokenInfo.fromJson(json);
 
-      expect(token.id, 'token-123');
-      expect(token.name, 'My Token');
+      expect(token.label, 'My Token');
       expect(token.scopes, ['admin', 'publish:all']);
+      expect(token.lastUsedAt, isNotNull);
       expect(token.expiresAt, isNotNull);
     });
 
-    test('handles missing expiration', () {
+    test('handles missing expiration and lastUsedAt', () {
       final json = {
-        'id': 'token-123',
-        'name': 'Permanent Token',
+        'label': 'Permanent Token',
         'scopes': <String>[],
-        'created_at': '2024-01-01T00:00:00.000Z',
+        'createdAt': '2024-01-01T00:00:00.000Z',
       };
 
       final token = TokenInfo.fromJson(json);
 
+      expect(token.lastUsedAt, isNull);
       expect(token.expiresAt, isNull);
     });
   });

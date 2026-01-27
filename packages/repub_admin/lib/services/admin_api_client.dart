@@ -179,31 +179,33 @@ class AdminApiClient {
     return json.map((key, value) => MapEntry(key, value as int));
   }
 
-  Future<PackageListResponse> listLocalPackages({
+  /// List hosted packages (packages published directly to this registry).
+  Future<PackageListResponse> listHostedPackages({
     int page = 1,
     int limit = 20,
   }) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/admin/api/packages/local?page=$page&limit=$limit'),
+      Uri.parse('$baseUrl/admin/api/hosted-packages?page=$page&limit=$limit'),
       headers: _headers,
     );
 
     if (response.statusCode != 200) {
       throw AdminApiException(
         statusCode: response.statusCode,
-        message: 'Failed to list local packages: ${response.body}',
+        message: 'Failed to list hosted packages: ${response.body}',
       );
     }
 
     return _parsePackageListResponse(response.body, page, limit);
   }
 
+  /// List cached packages (packages cached from upstream registry).
   Future<PackageListResponse> listCachedPackages({
     int page = 1,
     int limit = 20,
   }) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/admin/api/packages/cached?page=$page&limit=$limit'),
+      Uri.parse('$baseUrl/admin/api/cached-packages?page=$page&limit=$limit'),
       headers: _headers,
     );
 
@@ -501,6 +503,35 @@ class AdminApiClient {
     }
   }
 
+  Future<List<UserToken>> getUserTokens(String userId) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/users/$userId/tokens'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 404) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'User not found',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch user tokens: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final tokens = (json['tokens'] as List<dynamic>?)
+            ?.map((t) => UserToken.fromJson(t as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return tokens;
+  }
+
   Future<List<AdminUser>> listAdminUsers() async {
     final response = await _client.get(
       Uri.parse('$baseUrl/admin/api/admin-users'),
@@ -582,4 +613,40 @@ class AdminUserDetail {
     required this.adminUser,
     required this.recentLogins,
   });
+}
+
+/// Represents an API token for a user (admin view).
+class UserToken {
+  final String label;
+  final List<String> scopes;
+  final DateTime createdAt;
+  final DateTime? lastUsedAt;
+  final DateTime? expiresAt;
+
+  const UserToken({
+    required this.label,
+    required this.scopes,
+    required this.createdAt,
+    this.lastUsedAt,
+    this.expiresAt,
+  });
+
+  factory UserToken.fromJson(Map<String, dynamic> json) {
+    return UserToken(
+      label: json['label'] as String,
+      scopes: (json['scopes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      lastUsedAt: json['lastUsedAt'] != null
+          ? DateTime.parse(json['lastUsedAt'] as String)
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.parse(json['expiresAt'] as String)
+          : null,
+    );
+  }
+
+  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 }
