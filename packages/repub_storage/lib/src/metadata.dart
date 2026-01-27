@@ -3188,6 +3188,45 @@ const _sqliteMigrations = <String, String>{
     -- Add must_change_password flag for forcing password change on first login
     ALTER TABLE admin_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0;
   ''',
+  '007_package_downloads': '''
+    -- Create downloads table to track package downloads
+    CREATE TABLE IF NOT EXISTS package_downloads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      package_name TEXT NOT NULL REFERENCES packages(name) ON DELETE CASCADE,
+      version TEXT NOT NULL,
+      downloaded_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      ip_address TEXT
+    );
+
+    -- Index for analytics queries
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_package ON package_downloads(package_name);
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_time ON package_downloads(downloaded_at);
+  ''',
+  '008_add_default_token_scopes': '''
+    -- No-op migration for SQLite - scopes column already exists with TEXT storage
+  ''',
+  '009_activity_log': '''
+    -- Create activity log table for tracking user and admin actions
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+      activity_type TEXT NOT NULL,
+      actor_type TEXT NOT NULL,
+      actor_id TEXT,
+      actor_email TEXT,
+      actor_username TEXT,
+      target_type TEXT,
+      target_id TEXT,
+      metadata TEXT,
+      ip_address TEXT
+    );
+
+    -- Index for faster queries
+    CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
+  ''',
 };
 
 /// Split SQL into individual statements.
