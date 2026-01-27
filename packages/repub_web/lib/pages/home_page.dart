@@ -46,7 +46,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Component build(BuildContext context) {
     if (_loading) {
-      return Layout(
+      return buildLayout(
         children: [
           _buildHero(),
           _buildLoadingState(),
@@ -55,7 +55,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (_error != null) {
-      return Layout(
+      return buildLayout(
         children: [
           _buildHero(),
           _buildErrorState(_error!),
@@ -63,7 +63,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    return Layout(
+    return buildLayout(
       children: [
         _buildHero(),
         _buildPackageList(_response!),

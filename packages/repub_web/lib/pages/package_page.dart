@@ -48,18 +48,18 @@ class _PackagePageState extends State<PackagePage> {
   @override
   Component build(BuildContext context) {
     if (_loading) {
-      return Layout(children: [_buildLoadingState()]);
+      return buildLayout(children: [_buildLoadingState()]);
     }
 
     if (_error != null) {
-      return Layout(children: [_buildErrorState(_error!)]);
+      return buildLayout(children: [_buildErrorState(_error!)]);
     }
 
     if (_packageInfo == null) {
-      return Layout(children: [_buildNotFoundState()]);
+      return buildLayout(children: [_buildNotFoundState()]);
     }
 
-    return Layout(children: [_buildPackageDetail(_packageInfo!)]);
+    return buildLayout(children: [_buildPackageDetail(_packageInfo!)]);
   }
 
   Component _buildLoadingState() {

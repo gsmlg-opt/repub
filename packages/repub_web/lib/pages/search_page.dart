@@ -83,22 +83,22 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Component build(BuildContext context) {
     if (component.query.isEmpty) {
-      return Layout(children: [_buildEmptySearch()]);
+      return buildLayout(children: [_buildEmptySearch()]);
     }
 
     if (_localLoading) {
-      return Layout(
+      return buildLayout(
         children: [_buildSearchHeader(), _buildLoadingState()],
       );
     }
 
     if (_error != null) {
-      return Layout(
+      return buildLayout(
         children: [_buildSearchHeader(), _buildErrorState(_error!)],
       );
     }
 
-    return Layout(
+    return buildLayout(
       children: [
         _buildSearchHeader(),
         _buildSearchResults(

@@ -9,7 +9,7 @@ class DocsPage extends StatelessComponent {
 
   @override
   Component build(BuildContext context) {
-    return Layout(
+    return buildLayout(
       children: [
         // Header
         div(

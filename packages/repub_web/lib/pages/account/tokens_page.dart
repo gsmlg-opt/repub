@@ -121,7 +121,7 @@ class _TokensPageState extends State<TokensPage> {
 
   @override
   Component build(BuildContext context) {
-    return Layout(
+    return buildLayout(
       children: [
         div(
           classes: 'max-w-2xl mx-auto',

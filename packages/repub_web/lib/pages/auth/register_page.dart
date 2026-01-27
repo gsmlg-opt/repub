@@ -69,7 +69,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Component build(BuildContext context) {
-    return Layout(
+    return buildLayout(
       children: [
         div(
           classes: 'max-w-md mx-auto',
