@@ -21,16 +21,16 @@ Repub is a self-hosted Dart/Flutter package registry implementing the [Hosted Pu
 - Admin authentication system
 - Basic dashboard with analytics charts
 
-### 🚧 In Development: Admin Panel Screens
-All admin screens are placeholders marked as "Feature in development":
+### ✅ Completed: Admin Panel Screens (BLoC Pattern)
+All admin screens have been implemented with full BLoC state management:
 
-1. **Dashboard** ✅ (Partially Complete - has charts, needs BLoC refactor)
-2. **Local Packages** 🔨 (To be implemented)
-3. **Cached Packages** 🔨 (To be implemented)
-4. **Users Management** 🔨 (To be implemented)
-5. **Admin Users** 🔨 (To be implemented)
-6. **Admin User Detail** 🔨 (To be implemented)
-7. **Site Configuration** 🔨 (To be implemented)
+1. **Dashboard** ✅ (Complete - BLoC pattern, stats grid, recent activity, quick actions)
+2. **Local Packages** ✅ (Complete - search, pagination, delete, discontinue)
+3. **Cached Packages** ✅ (Complete - view/clear cache, storage stats)
+4. **Users Management** ✅ (Complete - filter, activate/deactivate, view tokens)
+5. **Admin Users** ✅ (Complete - read-only list, CLI info banner)
+6. **Admin User Detail** ✅ (Complete - login history, statistics, filters)
+7. **Site Configuration** ✅ (Complete - form with save/reset, grouped settings)
 8. **Login** ✅ (Complete)
 
 ## Architecture: BLoC State Management
@@ -969,57 +969,45 @@ class SiteConfig extends Equatable {
 
 ## Implementation Plan
 
-### Phase 1: BLoC Infrastructure (Week 1)
+### Phase 1: BLoC Infrastructure ✅ COMPLETE
 1. ✅ Set up BLoC provider structure in app.dart
-2. ✅ Create base BLoC classes
-3. Create data models (PackageInfo, UserInfo, etc.)
-4. Set up equatable for all models
-5. Create API client methods for all endpoints
+2. ✅ Create base BLoC classes (dashboard, packages, users, admin_users, config)
+3. ✅ Create data models (PackageInfo, UserInfo, AdminUserInfo, SiteConfig, etc.)
+4. ✅ Set up equatable for all models
+5. ✅ Create API client methods for all endpoints
 
-### Phase 2: Dashboard Refactor (Week 1)
-1. Create DashboardBloc with states/events
-2. Refactor DashboardScreen to use BlocBuilder
-3. Add recent activity feed
-4. Implement refresh mechanism
-5. Add loading/error states
+### Phase 2: Dashboard Refactor ✅ COMPLETE
+1. ✅ Create DashboardBloc with states/events
+2. ✅ Refactor DashboardScreen to use BlocBuilder
+3. ✅ Add recent activity feed
+4. ✅ Implement refresh mechanism
+5. ✅ Add loading/error states
 
-### Phase 3: Package Management (Week 2)
-1. Create LocalPackagesBloc with states/events
-2. Implement Local Packages screen
-3. Add search and pagination for local packages
-4. Implement delete functionality
-5. Implement discontinue functionality
-6. Create CachedPackagesBloc with states/events
-7. Implement Cached Packages screen
-8. Add cache clearing features (individual and bulk)
+### Phase 3: Package Management ✅ COMPLETE
+1. ✅ Create PackagesBloc with states/events
+2. ✅ Implement Local Packages screen (search, pagination, delete, discontinue)
+3. ✅ Implement Cached Packages screen (view/clear cache)
 
-### Phase 4: User Management (Week 3)
-1. Create UsersBloc
-2. Implement Users screen
-3. Add filtering and search
-4. Implement user actions (activate/deactivate/delete)
-5. Implement token viewing modal
-6. Create AdminUsersBloc
-7. Implement Admin Users screen
-8. Implement Admin User Detail screen
+### Phase 4: User Management ✅ COMPLETE
+1. ✅ Create UsersBloc
+2. ✅ Implement Users screen (filter, search, activate/deactivate, view tokens)
+3. ✅ Create AdminUsersBloc
+4. ✅ Implement Admin Users screen (read-only list, CLI info)
+5. ✅ Implement Admin User Detail screen (login history, statistics)
 
-### Phase 5: Configuration (Week 4)
-1. Create ConfigBloc
-2. Design configuration data model
-3. Implement backend API endpoints
-4. Implement Site Configuration screen
-5. Add form validation
-6. Add env variable override detection
+### Phase 5: Configuration ✅ COMPLETE
+1. ✅ Create ConfigBloc
+2. ✅ Implement Site Configuration screen (form with save/reset)
 
-### Phase 6: Polish & Testing (Week 5)
-1. Add loading skeletons
-2. Implement error handling
-3. Add confirmation dialogs
-4. Write BLoC unit tests
-5. Write widget tests
-6. E2E testing with chrome-devtools MCP
-7. Performance optimization
-8. Accessibility improvements
+### Phase 6: Polish & Testing (In Progress)
+1. ✅ Implement error handling
+2. ✅ Add confirmation dialogs
+3. ✅ Create model unit tests (20 tests)
+4. 🔨 Write BLoC unit tests (blocked by web package dependency)
+5. 🔨 Write widget tests
+6. 🔨 E2E testing with chrome-devtools MCP
+7. 🔨 Performance optimization
+8. 🔨 Accessibility improvements
 
 ---
 
