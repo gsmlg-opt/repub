@@ -165,6 +165,14 @@ abstract class MetadataStore {
   /// Mark a package as discontinued.
   Future<bool> discontinuePackage(String name, {String? replacedBy});
 
+  /// Transfer package ownership to a new owner.
+  /// Returns true if the transfer was successful.
+  /// Returns false if the package doesn't exist or the new owner doesn't exist.
+  Future<bool> transferPackageOwnership(
+    String packageName,
+    String newOwnerId,
+  );
+
   /// Delete all upstream-cached packages. Returns package count deleted.
   Future<int> clearAllCachedPackages();
 
@@ -1015,6 +1023,29 @@ class PostgresMetadataStore extends MetadataStore {
         WHERE name = @name
       '''),
       parameters: {'name': name, 'replaced': replacedBy},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> transferPackageOwnership(
+    String packageName,
+    String newOwnerId,
+  ) async {
+    // Check if new owner exists (unless it's the anonymous user)
+    if (newOwnerId != User.anonymousId) {
+      final userExists = await getUser(newOwnerId);
+      if (userExists == null) return false;
+    }
+
+    // Transfer ownership
+    final result = await _conn.execute(
+      Sql.named('''
+        UPDATE packages
+        SET owner_id = @newOwner, updated_at = NOW()
+        WHERE name = @name
+      '''),
+      parameters: {'name': packageName, 'newOwner': newOwnerId},
     );
     return result.affectedRows > 0;
   }
@@ -2853,6 +2884,26 @@ class SqliteMetadataStore extends MetadataStore {
       SET is_discontinued = 1, replaced_by = ?
       WHERE name = ?
     ''', [replacedBy, name]);
+    return _db.updatedRows > 0;
+  }
+
+  @override
+  Future<bool> transferPackageOwnership(
+    String packageName,
+    String newOwnerId,
+  ) async {
+    // Check if new owner exists (unless it's the anonymous user)
+    if (newOwnerId != User.anonymousId) {
+      final userExists = await getUser(newOwnerId);
+      if (userExists == null) return false;
+    }
+
+    // Transfer ownership
+    _db.execute('''
+      UPDATE packages
+      SET owner_id = ?, updated_at = datetime('now')
+      WHERE name = ?
+    ''', [newOwnerId, packageName]);
     return _db.updatedRows > 0;
   }
 

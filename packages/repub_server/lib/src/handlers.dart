@@ -122,6 +122,8 @@ Router createRouter({
       handlers.adminUnretractPackageVersion);
   router.get('/admin/api/packages/<name>/dependencies',
       handlers.adminGetPackageDependencies);
+  router.post('/admin/api/packages/<name>/transfer',
+      handlers.adminTransferPackageOwnership);
   router.post('/admin/api/packages/<name>/discontinue',
       handlers.adminDiscontinuePackage);
   router.delete('/admin/api/cache', handlers.adminClearCache);
@@ -1805,6 +1807,108 @@ class ApiHandlers {
     }
 
     return tree;
+  }
+
+  /// POST `/admin/api/packages/<name>/transfer`
+  ///
+  /// Transfer package ownership to a new user.
+  /// Request body: {"newOwnerId": "user-uuid"}
+  Future<Response> adminTransferPackageOwnership(
+    Request request,
+    String name,
+  ) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    // Parse body for newOwnerId
+    String? newOwnerId;
+    try {
+      final bodyBytes = await request.read().expand((x) => x).toList();
+      if (bodyBytes.isNotEmpty) {
+        final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+        newOwnerId = body['newOwnerId'] as String?;
+      }
+    } catch (e) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {'code': 'bad_request', 'message': 'Invalid request body'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    if (newOwnerId == null || newOwnerId.isEmpty) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'bad_request',
+            'message': 'newOwnerId is required',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Get current package info for logging
+    final existingPackage = await metadata.getPackage(name);
+    if (existingPackage == null) {
+      return Response.notFound(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final oldOwnerId = existingPackage.ownerId;
+
+    // Perform transfer
+    final success =
+        await metadata.transferPackageOwnership(name, newOwnerId);
+
+    if (!success) {
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': {
+            'code': 'transfer_failed',
+            'message': 'Failed to transfer ownership. Check that the new owner exists.',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Log activity
+    final adminUser = request.context['adminUser'] as Map<String, dynamic>?;
+    await metadata.logActivity(
+      activityType: 'package_ownership_transferred',
+      actorType: 'admin',
+      actorId: adminUser?['username'] as String? ?? 'unknown',
+      targetType: 'package',
+      targetId: name,
+      metadata: {
+        'package': name,
+        'oldOwnerId': oldOwnerId,
+        'newOwnerId': newOwnerId,
+      },
+      ipAddress: request.headers['x-forwarded-for'] ??
+          request.headers['x-real-ip'],
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'success': {
+          'message': 'Package ownership transferred',
+          'package': name,
+          'oldOwnerId': oldOwnerId,
+          'newOwnerId': newOwnerId,
+        },
+      }),
+      headers: {'content-type': 'application/json'},
+    );
   }
 
   /// POST `/api/admin/packages/<name>/discontinue`
