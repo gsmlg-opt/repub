@@ -6,6 +6,7 @@ import '../src/components/layout.dart';
 import '../src/services/api_client.dart';
 
 /// Upstream package detail page showing package info from pub.dev
+@client
 class UpstreamPackagePage extends StatefulComponent {
   final String packageName;
 

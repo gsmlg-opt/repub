@@ -6,6 +6,7 @@ import '../../src/components/layout.dart';
 import '../../src/services/auth_api_client.dart';
 
 /// Login page for user authentication.
+@client
 class LoginPage extends StatefulComponent {
   const LoginPage({super.key});
 

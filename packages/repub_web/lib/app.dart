@@ -11,6 +11,7 @@ import 'pages/package_page.dart';
 import 'pages/search_page.dart';
 import 'pages/upstream_package_page.dart';
 
+@client
 class App extends StatelessComponent {
   const App({super.key});
 

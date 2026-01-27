@@ -6,6 +6,7 @@ import '../../src/components/layout.dart';
 import '../../src/services/auth_api_client.dart';
 
 /// Register page for new user registration.
+@client
 class RegisterPage extends StatefulComponent {
   const RegisterPage({super.key});
 

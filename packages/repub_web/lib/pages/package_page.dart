@@ -6,6 +6,7 @@ import '../src/components/layout.dart';
 import '../src/services/api_client.dart';
 
 /// Package detail page showing versions and metadata
+@client
 class PackagePage extends StatefulComponent {
   final String packageName;
 
