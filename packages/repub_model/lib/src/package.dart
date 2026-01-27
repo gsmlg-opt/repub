@@ -149,12 +149,18 @@ class AdminStats {
   final int localPackages;
   final int cachedPackages;
   final int totalVersions;
+  final int totalUsers;
+  final int activeTokens;
+  final int totalDownloads;
 
   const AdminStats({
     required this.totalPackages,
     required this.localPackages,
     required this.cachedPackages,
     required this.totalVersions,
+    this.totalUsers = 0,
+    this.activeTokens = 0,
+    this.totalDownloads = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -162,6 +168,9 @@ class AdminStats {
         'localPackages': localPackages,
         'cachedPackages': cachedPackages,
         'totalVersions': totalVersions,
+        'totalUsers': totalUsers,
+        'activeTokens': activeTokens,
+        'totalDownloads': totalDownloads,
       };
 
   factory AdminStats.fromJson(Map<String, dynamic> json) => AdminStats(
@@ -169,6 +178,9 @@ class AdminStats {
         localPackages: json['localPackages'] as int,
         cachedPackages: json['cachedPackages'] as int,
         totalVersions: json['totalVersions'] as int,
+        totalUsers: json['totalUsers'] as int? ?? 0,
+        activeTokens: json['activeTokens'] as int? ?? 0,
+        totalDownloads: json['totalDownloads'] as int? ?? 0,
       );
 }
 

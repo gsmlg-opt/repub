@@ -1075,6 +1075,10 @@ class PostgresMetadataStore extends MetadataStore {
       _conn.execute(
           'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = TRUE'),
       _conn.execute('SELECT COUNT(*) FROM package_versions'),
+      _conn.execute('SELECT COUNT(*) FROM users'),
+      _conn.execute(
+          'SELECT COUNT(*) FROM auth_tokens WHERE expires_at IS NULL OR expires_at > NOW()'),
+      _conn.execute('SELECT COUNT(*) FROM package_downloads'),
     ]);
 
     return AdminStats(
@@ -1082,6 +1086,9 @@ class PostgresMetadataStore extends MetadataStore {
       localPackages: results[1].first[0] as int,
       cachedPackages: results[2].first[0] as int,
       totalVersions: results[3].first[0] as int,
+      totalUsers: results[4].first[0] as int,
+      activeTokens: results[5].first[0] as int,
+      totalDownloads: (results[6].first[0] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -2931,12 +2938,22 @@ class SqliteMetadataStore extends MetadataStore {
       'SELECT COUNT(*) FROM packages WHERE is_upstream_cache = 1',
     );
     final versionsResult = _db.select('SELECT COUNT(*) FROM package_versions');
+    final usersResult = _db.select('SELECT COUNT(*) FROM users');
+    final tokensResult = _db.select(
+      "SELECT COUNT(*) FROM auth_tokens WHERE expires_at IS NULL OR expires_at > datetime('now')",
+    );
+    final downloadsResult = _db.select(
+      'SELECT COUNT(*) FROM package_downloads',
+    );
 
     return AdminStats(
       totalPackages: totalResult.first.values.first as int,
       localPackages: localResult.first.values.first as int,
       cachedPackages: cachedResult.first.values.first as int,
       totalVersions: versionsResult.first.values.first as int,
+      totalUsers: usersResult.first.values.first as int,
+      activeTokens: tokensResult.first.values.first as int,
+      totalDownloads: (downloadsResult.first.values.first as num?)?.toInt() ?? 0,
     );
   }
 
