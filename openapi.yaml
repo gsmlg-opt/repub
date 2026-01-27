@@ -50,6 +50,8 @@ tags:
     description: User authentication
   - name: tokens
     description: API token management
+  - name: feeds
+    description: RSS/Atom feeds for package updates
   - name: health
     description: Health and version checks
   - name: admin-auth
@@ -350,6 +352,85 @@ paths:
           description: Authentication required (if REPUB_REQUIRE_DOWNLOAD_AUTH=true)
         '404':
           description: Package or version not found
+
+  # ============================================================================
+  # RSS/Atom Feeds
+  # ============================================================================
+  /feed.rss:
+    get:
+      tags: [feeds]
+      summary: Global RSS feed
+      description: Returns RSS 2.0 feed of recent package updates across all packages
+      operationId: globalRssFeed
+      responses:
+        '200':
+          description: RSS feed
+          content:
+            application/rss+xml:
+              schema:
+                type: string
+                description: RSS 2.0 XML document
+
+  /feed.atom:
+    get:
+      tags: [feeds]
+      summary: Global Atom feed
+      description: Returns Atom 1.0 feed of recent package updates across all packages
+      operationId: globalAtomFeed
+      responses:
+        '200':
+          description: Atom feed
+          content:
+            application/atom+xml:
+              schema:
+                type: string
+                description: Atom 1.0 XML document
+
+  /packages/{name}/feed.rss:
+    get:
+      tags: [feeds]
+      summary: Package RSS feed
+      description: Returns RSS 2.0 feed of version updates for a specific package
+      operationId: packageRssFeed
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Package name
+      responses:
+        '200':
+          description: RSS feed
+          content:
+            application/rss+xml:
+              schema:
+                type: string
+        '404':
+          description: Package not found
+
+  /packages/{name}/feed.atom:
+    get:
+      tags: [feeds]
+      summary: Package Atom feed
+      description: Returns Atom 1.0 feed of version updates for a specific package
+      operationId: packageAtomFeed
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Package name
+      responses:
+        '200':
+          description: Atom feed
+          content:
+            application/atom+xml:
+              schema:
+                type: string
+        '404':
+          description: Package not found
 
   # ============================================================================
   # Health & Version

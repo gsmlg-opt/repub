@@ -318,6 +318,24 @@ GET /health
 
 Returns `{"status": "ok"}`.
 
+### RSS/Atom Feeds
+
+Subscribe to package updates via RSS or Atom feeds:
+
+**Global feeds** (all recent package updates):
+```
+GET /feed.rss       # RSS 2.0 feed
+GET /feed.atom      # Atom 1.0 feed
+```
+
+**Per-package feeds** (updates for specific package):
+```
+GET /packages/{name}/feed.rss    # RSS 2.0 feed
+GET /packages/{name}/feed.atom   # Atom 1.0 feed
+```
+
+Feeds include the 20 most recent package version releases. Response is cached for 5 minutes.
+
 ### Admin API Endpoints
 
 All admin endpoints require admin session authentication (cookie-based).

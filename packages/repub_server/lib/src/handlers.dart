@@ -11,6 +11,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
+import 'feed.dart';
 import 'logger.dart';
 import 'publish.dart';
 import 'upstream.dart';
@@ -54,6 +55,14 @@ Router createRouter({
   // Download endpoint (legacy format)
   router.get(
       '/packages/<name>/versions/<version>.tar.gz', handlers.downloadPackage);
+
+  // RSS/Atom feeds - global (all recent package updates)
+  router.get('/feed.rss', handlers.globalRssFeed);
+  router.get('/feed.atom', handlers.globalAtomFeed);
+
+  // RSS/Atom feeds - per package
+  router.get('/packages/<name>/feed.rss', handlers.packageRssFeed);
+  router.get('/packages/<name>/feed.atom', handlers.packageAtomFeed);
 
   // Health check - basic (for load balancer probes)
   router.get('/health', (Request req) {
@@ -2735,6 +2744,94 @@ class ApiHandlers {
     return Response.ok(
       buffer.toString(),
       headers: {'content-type': 'text/plain; version=0.0.4; charset=utf-8'},
+    );
+  }
+
+  // ============ Feed Endpoints ============
+
+  /// GET `/feed.rss` - Global RSS feed for recent package updates.
+  Future<Response> globalRssFeed(Request request) async {
+    final result = await metadata.listPackages(page: 1, limit: 100);
+
+    final feed = FeedGenerator(
+      baseUrl: config.baseUrl,
+      title: 'Package Updates',
+      description: 'Recent package updates and releases',
+    );
+
+    final rss = feed.generateRss(result.packages, limit: 20);
+
+    return Response.ok(
+      rss,
+      headers: {
+        'content-type': 'application/rss+xml; charset=utf-8',
+        'cache-control': 'public, max-age=300', // Cache for 5 minutes
+      },
+    );
+  }
+
+  /// GET `/feed.atom` - Global Atom feed for recent package updates.
+  Future<Response> globalAtomFeed(Request request) async {
+    final result = await metadata.listPackages(page: 1, limit: 100);
+
+    final feed = FeedGenerator(
+      baseUrl: config.baseUrl,
+      title: 'Package Updates',
+      description: 'Recent package updates and releases',
+    );
+
+    final atom = feed.generateAtom(result.packages, limit: 20);
+
+    return Response.ok(
+      atom,
+      headers: {
+        'content-type': 'application/atom+xml; charset=utf-8',
+        'cache-control': 'public, max-age=300', // Cache for 5 minutes
+      },
+    );
+  }
+
+  /// GET `/packages/<name>/feed.rss` - RSS feed for a specific package.
+  Future<Response> packageRssFeed(Request request, String name) async {
+    final pkg = await metadata.getPackageInfo(name);
+    if (pkg == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Package not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final feed = FeedGenerator(baseUrl: config.baseUrl);
+    final rss = feed.generatePackageRss(pkg);
+
+    return Response.ok(
+      rss,
+      headers: {
+        'content-type': 'application/rss+xml; charset=utf-8',
+        'cache-control': 'public, max-age=300', // Cache for 5 minutes
+      },
+    );
+  }
+
+  /// GET `/packages/<name>/feed.atom` - Atom feed for a specific package.
+  Future<Response> packageAtomFeed(Request request, String name) async {
+    final pkg = await metadata.getPackageInfo(name);
+    if (pkg == null) {
+      return Response.notFound(
+        jsonEncode({'error': {'code': 'not_found', 'message': 'Package not found'}}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final feed = FeedGenerator(baseUrl: config.baseUrl);
+    final atom = feed.generatePackageAtom(pkg);
+
+    return Response.ok(
+      atom,
+      headers: {
+        'content-type': 'application/atom+xml; charset=utf-8',
+        'cache-control': 'public, max-age=300', // Cache for 5 minutes
+      },
     );
   }
 }
