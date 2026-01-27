@@ -257,6 +257,43 @@ repub_auth ← repub_storage
 - **Auth**: Bearer tokens (API) + sessions (web)
 - **Build**: Melos for monorepo management
 - **Deployment**: Docker with multi-arch support
+- **E2E Testing**: chrome-devtools MCP (preferred tool for browser automation and testing)
+
+### Testing Strategy
+
+**Unit Testing**
+- Dart test framework for package-level unit tests
+- Target: >70% code coverage
+- Focus on business logic, models, and storage operations
+
+**Integration Testing**
+- API endpoint testing with real database connections
+- Package publish/download flow validation
+- Authentication and authorization checks
+
+**End-to-End Testing (chrome-devtools MCP)**
+- **Preferred Tool**: chrome-devtools MCP for all browser-based E2E tests
+- **Why chrome-devtools MCP**:
+  - Direct Chrome DevTools Protocol integration for reliable automation
+  - Screenshot capabilities for visual regression testing
+  - Console error detection for JavaScript issues
+  - Network request monitoring for API validation
+  - Performance metrics collection (FCP, LCP, CLS)
+  - Responsive layout testing across viewport sizes
+- **Test Coverage**:
+  - Web UI navigation and package browsing
+  - Admin UI dashboard and package management
+  - User authentication flows (login, registration, logout)
+  - Package search and filtering
+  - Form validation and error states
+  - Visual regression across major viewports (mobile, tablet, desktop)
+- **Best Practices**:
+  - Always use `fullPage: false` for screenshots to avoid dimension limits
+  - Wait after navigation (minimum 1000ms) for JS execution
+  - Save large screenshots to filesystem instead of API submission
+  - Test multiple viewport sizes for responsive validation
+  - Capture console errors and network failures
+  - Check for layout issues (horizontal overflow, elements outside viewport)
 
 ## User Flows
 
@@ -416,6 +453,7 @@ All configuration via environment variables:
 - Build time for Docker images
 - Zero critical security vulnerabilities
 - Test coverage > 70%
+- E2E test coverage for critical user flows using chrome-devtools MCP
 
 ### User Satisfaction
 - GitHub issues resolved within 7 days
