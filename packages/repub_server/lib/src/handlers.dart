@@ -316,6 +316,21 @@ class ApiHandlers {
     return null; // Success - no error
   }
 
+  /// Get admin user from session (for activity logging).
+  Future<AdminUser?> _getAdminFromSession(Request request) async {
+    final result = await getAdminSession(
+      request,
+      lookupSession: metadata.getAdminSession,
+    );
+
+    if (result is! AdminSessionValid) {
+      return null;
+    }
+
+    final session = result.session;
+    return await metadata.getAdminUser(session.userId);
+  }
+
   /// Get the upstream client (lazy initialization).
   UpstreamClient? get upstream {
     if (!config.enableUpstreamProxy) return null;
@@ -883,6 +898,20 @@ class ApiHandlers {
     // Mark session complete
     await metadata.completeUploadSession(sessionId);
 
+    // Log activity
+    final user = token != null ? await metadata.getUser(token.userId) : null;
+    await metadata.logActivity(
+      activityType: 'package_published',
+      actorType: user != null ? 'user' : 'system',
+      actorId: user?.id,
+      actorEmail: user?.email,
+      targetType: 'package',
+      targetId: success.packageName,
+      metadata: {'version': success.version},
+      ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
+          request.headers['x-real-ip'],
+    );
+
     // Clean up
     _uploadData.remove(sessionId);
 
@@ -1307,6 +1336,20 @@ class ApiHandlers {
         print('Warning: Failed to delete blob $key: $e');
       }
     }
+
+    // Log activity
+    final adminUser = await _getAdminFromSession(request);
+    await metadata.logActivity(
+      activityType: isCache ? 'cache_cleared' : 'package_deleted',
+      actorType: 'admin',
+      actorId: adminUser?.id,
+      actorUsername: adminUser?.username,
+      targetType: 'package',
+      targetId: name,
+      metadata: {'versionCount': versionCount},
+      ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
+          request.headers['x-real-ip'],
+    );
 
     return Response.ok(
       jsonEncode({
@@ -1744,6 +1787,18 @@ class ApiHandlers {
         email: email,
         passwordHash: passwordHash,
         name: name,
+      );
+
+      // Log activity
+      await metadata.logActivity(
+        activityType: 'user_registered',
+        actorType: 'user',
+        actorId: userId,
+        actorEmail: email,
+        targetType: 'user',
+        targetId: userId,
+        ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
+            request.headers['x-real-ip'],
       );
 
       // Create session
@@ -2258,6 +2313,17 @@ class ApiHandlers {
         ipAddress: ipAddress,
         userAgent: userAgent,
         success: true,
+      );
+
+      // Log activity
+      await metadata.logActivity(
+        activityType: 'admin_login',
+        actorType: 'admin',
+        actorId: adminUser.id,
+        actorUsername: adminUser.username,
+        targetType: 'admin',
+        targetId: adminUser.id,
+        ipAddress: ipAddress,
       );
 
       // Create admin session (8-hour TTL)
