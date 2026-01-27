@@ -25,6 +25,8 @@ void main() {
         signedUrlTtlSeconds: 3600,
         upstreamUrl: 'https://pub.dev',
         enableUpstreamProxy: false,
+        rateLimitRequests: 100,
+        rateLimitWindowSeconds: 60,
       );
 
       metadata = await MetadataStore.create(config);

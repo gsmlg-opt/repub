@@ -35,6 +35,12 @@ class Config {
   /// Whether to enable upstream proxy/caching.
   final bool enableUpstreamProxy;
 
+  /// Rate limiting: max requests per window.
+  final int rateLimitRequests;
+
+  /// Rate limiting: window duration in seconds.
+  final int rateLimitWindowSeconds;
+
   const Config({
     required this.listenAddr,
     required this.listenPort,
@@ -52,6 +58,8 @@ class Config {
     required this.signedUrlTtlSeconds,
     required this.upstreamUrl,
     required this.enableUpstreamProxy,
+    required this.rateLimitRequests,
+    required this.rateLimitWindowSeconds,
   });
 
   /// Get the database type based on the URL scheme.
@@ -116,6 +124,8 @@ class Config {
       signedUrlTtlSeconds: _envInt('REPUB_SIGNED_URL_TTL_SECONDS', 3600),
       upstreamUrl: _env('REPUB_UPSTREAM_URL', 'https://pub.dev'),
       enableUpstreamProxy: _envBool('REPUB_ENABLE_UPSTREAM_PROXY', true),
+      rateLimitRequests: _envInt('REPUB_RATE_LIMIT_REQUESTS', 100),
+      rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
     );
   }
 

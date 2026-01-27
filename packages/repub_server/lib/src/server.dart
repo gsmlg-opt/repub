@@ -7,6 +7,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'handlers.dart';
+import 'rate_limit.dart';
 
 /// Start the repub server.
 Future<void> startServer({Config? config}) async {
@@ -58,11 +59,19 @@ Future<void> startServer({Config? config}) async {
     cacheBlobs: cacheBlobs,
   );
 
-  // Add logging middleware
+  // Add middleware pipeline
   final handler = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(_corsMiddleware())
       .addMiddleware(_versionMiddleware())
+      .addMiddleware(rateLimitMiddleware(
+        keyExtractor: extractCompositeKey,
+        config: RateLimitConfig(
+          maxRequests: cfg.rateLimitRequests,
+          windowSeconds: cfg.rateLimitWindowSeconds,
+        ),
+        excludePaths: ['health', 'metrics'],
+      ))
       .addHandler(router.call);
 
   // Start server

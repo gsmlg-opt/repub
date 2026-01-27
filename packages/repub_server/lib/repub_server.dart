@@ -3,4 +3,5 @@ library;
 
 export 'src/handlers.dart';
 export 'src/publish.dart';
+export 'src/rate_limit.dart';
 export 'src/server.dart';
