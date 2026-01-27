@@ -263,9 +263,18 @@ export REPUB_S3_SECRET_KEY=minioadmin
 export REPUB_S3_BUCKET=repub
 ```
 
-## API Endpoints
+## API Documentation
 
-### Package Info
+**Full API specification**: See [`openapi.yaml`](./openapi.yaml) for the complete OpenAPI 3.0 specification.
+
+View the spec with:
+- [Swagger UI](https://editor.swagger.io/) - paste the openapi.yaml content
+- [Redocly](https://redocly.github.io/redoc/) - interactive documentation
+- Any OpenAPI-compatible tool
+
+### Quick Reference
+
+#### Package Info
 
 ```
 GET /api/packages/<name>
@@ -273,7 +282,7 @@ GET /api/packages/<name>
 
 Returns package metadata with all versions.
 
-### Publish Flow
+#### Publish Flow
 
 ```
 GET /api/packages/versions/new
@@ -291,9 +300,9 @@ Upload the package tarball.
 GET /api/packages/versions/finalize/<session>
 ```
 
-Validate and complete the publish.
+Validate and complete the publish. Requires appropriate scope (admin, publish:all, or publish:pkg:<name>).
 
-### Download
+#### Download
 
 ```
 GET /packages/<name>/versions/<version>.tar.gz

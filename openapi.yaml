@@ -1,0 +1,1611 @@
+openapi: 3.0.3
+info:
+  title: Repub - Self-hosted Dart/Flutter Package Registry
+  description: |
+    Repub is a self-hosted package registry implementing the Hosted Pub Repository Specification v2.
+
+    ## Authentication
+
+    ### Regular Users (API Tokens)
+    - Used for package publishing and downloading
+    - Bearer token authentication in `Authorization` header
+    - Token scopes: `admin`, `publish:all`, `publish:pkg:<name>`, `read:all`
+    - Manage tokens via `/api/tokens` endpoints (requires session auth)
+
+    ### Admin Users (Sessions)
+    - Used for admin panel access
+    - Cookie-based session authentication
+    - Login via `/admin/api/auth/login`
+    - All `/admin/api/*` endpoints require admin session (except auth endpoints)
+
+    ## Security Schemes
+    - `bearerAuth`: Bearer token for API operations
+    - `sessionAuth`: Session cookie for admin panel and user account management
+  version: 1.0.0
+  contact:
+    name: Repub Repository
+    url: https://github.com/gsmlg-dev/repub
+  license:
+    name: MIT
+    url: https://github.com/gsmlg-dev/repub/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:4920
+    description: Development server
+  - url: https://pub.example.com
+    description: Production server (configure REPUB_BASE_URL)
+
+tags:
+  - name: packages
+    description: Package listing and metadata
+  - name: publish
+    description: Package publishing workflow
+  - name: download
+    description: Package download
+  - name: search
+    description: Package search
+  - name: upstream
+    description: Upstream proxy (pub.dev)
+  - name: auth
+    description: User authentication
+  - name: tokens
+    description: API token management
+  - name: health
+    description: Health and version checks
+  - name: admin-auth
+    description: Admin authentication
+  - name: admin-packages
+    description: Admin package management
+  - name: admin-users
+    description: Admin user management
+  - name: admin-analytics
+    description: Admin analytics and statistics
+  - name: admin-config
+    description: Admin configuration
+
+paths:
+  # ============================================================================
+  # Public API - Packages
+  # ============================================================================
+  /api/packages:
+    get:
+      tags: [packages]
+      summary: List all packages
+      description: Returns a list of all packages available in the registry (both hosted and cached)
+      operationId: listPackages
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PackageSummary'
+                  totalCount:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /api/packages/search:
+    get:
+      tags: [search]
+      summary: Search packages
+      description: Search for packages by name or description
+      operationId: searchPackages
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PackageSummary'
+
+  /api/packages/search/upstream:
+    get:
+      tags: [search, upstream]
+      summary: Search upstream packages
+      description: Search for packages on pub.dev
+      operationId: searchPackagesUpstream
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Upstream search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packages:
+                    type: array
+                    items:
+                      type: object
+
+  /api/packages/{name}:
+    get:
+      tags: [packages]
+      summary: Get package metadata
+      description: Returns metadata for a specific package including all versions
+      operationId: getPackage
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+      responses:
+        '200':
+          description: Package metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+        '404':
+          description: Package not found
+
+  /api/packages/{name}/versions/{version}:
+    get:
+      tags: [packages]
+      summary: Get package version metadata
+      description: Returns metadata for a specific version of a package
+      operationId: getVersion
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+        - $ref: '#/components/parameters/versionNumber'
+      responses:
+        '200':
+          description: Version metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageVersion'
+        '404':
+          description: Package or version not found
+
+  /api/upstream/packages/{name}:
+    get:
+      tags: [upstream]
+      summary: Get upstream package info
+      description: Proxy request to pub.dev for package information
+      operationId: getUpstreamPackage
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+      responses:
+        '200':
+          description: Upstream package info
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Package not found on upstream
+
+  # ============================================================================
+  # Publish Flow
+  # ============================================================================
+  /api/packages/versions/new:
+    get:
+      tags: [publish]
+      summary: Initiate package upload
+      description: Start the package publishing workflow. Returns upload URL and fields.
+      operationId: initiateUpload
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Upload session initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Upload URL
+                  fields:
+                    type: object
+                    description: Additional form fields (empty in this implementation)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/packages/versions/upload/{sessionId}:
+    post:
+      tags: [publish]
+      summary: Upload package tarball
+      description: Upload the package .tar.gz file for the given session
+      operationId: uploadPackage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Package uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+        '400':
+          description: Invalid package
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/packages/versions/finalize/{sessionId}:
+    get:
+      tags: [publish]
+      summary: Finalize package upload
+      description: Complete the publishing process and make the package available. Requires appropriate scope (admin, publish:all, or publish:pkg:<name>).
+      operationId: finalizeUpload
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Package published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Successfully published example_package 1.0.0"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions (missing required scope)
+        '404':
+          description: Upload session not found
+
+  # ============================================================================
+  # Download
+  # ============================================================================
+  /packages/{name}/versions/{version}.tar.gz:
+    get:
+      tags: [download]
+      summary: Download package
+      description: Download a specific version of a package as a .tar.gz archive
+      operationId: downloadPackage
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+        - $ref: '#/components/parameters/versionNumber'
+      responses:
+        '200':
+          description: Package tarball
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Authentication required (if REPUB_REQUIRE_DOWNLOAD_AUTH=true)
+        '404':
+          description: Package or version not found
+
+  # ============================================================================
+  # Health & Version
+  # ============================================================================
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Returns service health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/version:
+    get:
+      tags: [health]
+      summary: Get version information
+      description: Returns version and git hash of the server
+      operationId: getVersion
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  gitHash:
+                    type: string
+                    example: "a706bca"
+
+  # ============================================================================
+  # User Authentication
+  # ============================================================================
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: Register new user
+      description: Create a new user account (if registration is enabled)
+      operationId: authRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                name:
+                  type: string
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request or email already exists
+        '403':
+          description: Registration disabled
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Login user
+      description: Authenticate user and create session
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: session=abc123; Path=/; HttpOnly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Logout user
+      description: Destroy user session
+      operationId: authLogout
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: Get current user
+      description: Returns current authenticated user information
+      operationId: authMe
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: User information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [auth]
+      summary: Update current user
+      description: Update current user profile
+      operationId: authUpdateMe
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # Token Management
+  # ============================================================================
+  /api/tokens:
+    get:
+      tags: [tokens]
+      summary: List user tokens
+      description: Returns all API tokens for the current user
+      operationId: listUserTokens
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TokenInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [tokens]
+      summary: Create API token
+      description: Create a new API token with specified scopes
+      operationId: createUserToken
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - label
+                - scopes
+              properties:
+                label:
+                  type: string
+                  description: Human-readable token label
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                  description: Token scopes
+                  example: ["publish:all"]
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: Optional expiration date
+      responses:
+        '200':
+          description: Token created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: The actual token value (only shown once)
+                  info:
+                    $ref: '#/components/schemas/TokenInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/tokens/{label}:
+    delete:
+      tags: [tokens]
+      summary: Delete API token
+      description: Delete an API token by label
+      operationId: deleteUserToken
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: label
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token not found
+
+  # ============================================================================
+  # Admin Authentication
+  # ============================================================================
+  /admin/api/auth/login:
+    post:
+      tags: [admin-auth]
+      summary: Admin login
+      description: Authenticate admin user and create session
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: admin_session=xyz789; Path=/admin; HttpOnly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '401':
+          description: Invalid credentials
+
+  /admin/api/auth/logout:
+    post:
+      tags: [admin-auth]
+      summary: Admin logout
+      description: Destroy admin session
+      operationId: adminLogout
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Logout successful
+
+  /admin/api/auth/me:
+    get:
+      tags: [admin-auth]
+      summary: Get current admin user
+      description: Returns current authenticated admin user information
+      operationId: adminMe
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Admin user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/auth/change-password:
+    post:
+      tags: [admin-auth]
+      summary: Change admin password
+      description: Change password for current admin user
+      operationId: adminChangePassword
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password changed successfully
+        '401':
+          description: Invalid current password
+
+  # ============================================================================
+  # Admin - Statistics & Analytics
+  # ============================================================================
+  /admin/api/stats:
+    get:
+      tags: [admin-analytics]
+      summary: Get dashboard statistics
+      description: Returns overall statistics for the admin dashboard
+      operationId: adminGetStats
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/analytics/packages-created:
+    get:
+      tags: [admin-analytics]
+      summary: Get packages created per day
+      description: Returns number of packages created per day for the specified period
+      operationId: adminGetPackagesCreatedPerDay
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+      responses:
+        '200':
+          description: Packages created data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                example:
+                  "2026-01-27": 5
+                  "2026-01-26": 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/analytics/downloads:
+    get:
+      tags: [admin-analytics]
+      summary: Get downloads per hour
+      description: Returns download count per hour for the specified period
+      operationId: adminGetDownloadsPerHour
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: hours
+          in: query
+          schema:
+            type: integer
+            default: 24
+            minimum: 1
+            maximum: 168
+      responses:
+        '200':
+          description: Downloads data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                example:
+                  "2026-01-27T14:00:00Z": 12
+                  "2026-01-27T15:00:00Z": 8
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # Admin - Package Management
+  # ============================================================================
+  /admin/api/hosted-packages:
+    get:
+      tags: [admin-packages]
+      summary: List locally hosted packages
+      description: Returns list of packages hosted on this registry (not cached from upstream)
+      operationId: adminListHostedPackages
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of hosted packages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminPackageInfo'
+                  totalCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/cached-packages:
+    get:
+      tags: [admin-packages]
+      summary: List cached packages
+      description: Returns list of packages cached from upstream (pub.dev)
+      operationId: adminListCachedPackages
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of cached packages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminPackageInfo'
+                  totalCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [admin-packages]
+      summary: Clear all cached packages
+      description: Delete all cached packages from upstream
+      operationId: adminClearAllCache
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: All cache cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  deletedCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/cached-packages/{name}:
+    delete:
+      tags: [admin-packages]
+      summary: Clear cached package
+      description: Delete a specific cached package from upstream
+      operationId: adminClearCachedPackage
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+      responses:
+        '200':
+          description: Cached package cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Cached package not found
+
+  /admin/api/packages/{name}:
+    delete:
+      tags: [admin-packages]
+      summary: Delete package
+      description: Permanently delete a package and all its versions
+      operationId: adminDeletePackage
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+      responses:
+        '200':
+          description: Package deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Package not found
+
+  /admin/api/packages/{name}/versions/{version}:
+    delete:
+      tags: [admin-packages]
+      summary: Delete package version
+      description: Delete a specific version of a package
+      operationId: adminDeletePackageVersion
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+        - $ref: '#/components/parameters/versionNumber'
+      responses:
+        '200':
+          description: Version deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Package or version not found
+
+  /admin/api/packages/{name}/discontinue:
+    post:
+      tags: [admin-packages]
+      summary: Discontinue package
+      description: Mark a package as discontinued
+      operationId: adminDiscontinuePackage
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/packageName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isDiscontinued:
+                  type: boolean
+                replacedBy:
+                  type: string
+                  description: Name of replacement package
+      responses:
+        '200':
+          description: Package discontinuation status updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Package not found
+
+  # ============================================================================
+  # Admin - User Management
+  # ============================================================================
+  /admin/api/users:
+    get:
+      tags: [admin-users]
+      summary: List users
+      description: Returns list of registered users
+      operationId: adminListUsers
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, active, inactive]
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUserInfo'
+                  totalCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [admin-users]
+      summary: Create user (admin)
+      description: Create a new user account (admin operation)
+      operationId: adminCreateUser
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '200':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/users/{id}:
+    put:
+      tags: [admin-users]
+      summary: Update user
+      description: Update user information (admin operation)
+      operationId: adminUpdateUser
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found
+    delete:
+      tags: [admin-users]
+      summary: Delete user
+      description: Permanently delete a user account
+      operationId: adminDeleteUser
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found
+
+  /admin/api/users/{id}/tokens:
+    get:
+      tags: [admin-users]
+      summary: List user tokens (admin)
+      description: Returns all API tokens for a specific user
+      operationId: adminListUserTokens
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of user tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TokenInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found
+
+  # ============================================================================
+  # Admin - Admin User Management (Read-Only)
+  # ============================================================================
+  /admin/api/admin-users:
+    get:
+      tags: [admin-users]
+      summary: List admin users
+      description: Returns list of admin users (read-only, managed via CLI)
+      operationId: adminListAdminUsers
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of admin users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  adminUsers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/admin-users/{id}:
+    get:
+      tags: [admin-users]
+      summary: Get admin user details
+      description: Returns detailed information about an admin user
+      operationId: adminGetAdminUser
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Admin user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Admin user not found
+
+  /admin/api/admin-users/{id}/login-history:
+    get:
+      tags: [admin-users]
+      summary: Get admin login history
+      description: Returns login history for an admin user
+      operationId: adminGetLoginHistory
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Login history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loginAttempts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoginAttempt'
+                  totalCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Admin user not found
+
+  # ============================================================================
+  # Admin - Configuration
+  # ============================================================================
+  /admin/api/config:
+    get:
+      tags: [admin-config]
+      summary: Get all configuration
+      description: Returns all configuration settings
+      operationId: adminGetAllConfig
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Configuration settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/config/{name}:
+    put:
+      tags: [admin-config]
+      summary: Update configuration
+      description: Update a specific configuration setting
+      operationId: adminSetConfig
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - value
+              properties:
+                value:
+                  type: string
+      responses:
+        '200':
+          description: Configuration updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ==============================================================================
+# Components
+# ==============================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token for API operations (package publish/download)
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Session cookie for admin panel and user account management
+
+  parameters:
+    packageName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Package name
+      example: example_package
+
+    versionNumber:
+      name: version
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Package version
+      example: 1.0.0
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Forbidden
+
+  schemas:
+    # ========================================================================
+    # Package Schemas
+    # ========================================================================
+    PackageSummary:
+      type: object
+      properties:
+        name:
+          type: string
+        latestVersion:
+          type: string
+        description:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        publisher:
+          type: string
+          description: Publisher email
+        downloadCount:
+          type: integer
+
+    Package:
+      type: object
+      properties:
+        name:
+          type: string
+        latest:
+          $ref: '#/components/schemas/PackageVersion'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageVersion'
+
+    PackageVersion:
+      type: object
+      properties:
+        version:
+          type: string
+        pubspec:
+          type: object
+          description: The pubspec.yaml content
+        archive_url:
+          type: string
+          format: uri
+        archive_sha256:
+          type: string
+        published:
+          type: string
+          format: date-time
+
+    AdminPackageInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        latestVersion:
+          type: string
+        versionCount:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+        publisher:
+          type: string
+        downloadCount:
+          type: integer
+        isDiscontinued:
+          type: boolean
+        replacedBy:
+          type: string
+          nullable: true
+
+    # ========================================================================
+    # User Schemas
+    # ========================================================================
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminUserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        tokenCount:
+          type: integer
+        packageCount:
+          type: integer
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        loginCount:
+          type: integer
+
+    AdminUserDetail:
+      allOf:
+        - $ref: '#/components/schemas/AdminUser'
+        - type: object
+          properties:
+            failedLoginCount:
+              type: integer
+            successfulLoginCount:
+              type: integer
+
+    LoginAttempt:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        success:
+          type: boolean
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+        location:
+          type: string
+          nullable: true
+
+    # ========================================================================
+    # Token Schemas
+    # ========================================================================
+    TokenInfo:
+      type: object
+      properties:
+        label:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Token scopes (admin, publish:all, publish:pkg:<name>, read:all)
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ========================================================================
+    # Statistics Schemas
+    # ========================================================================
+    AdminStats:
+      type: object
+      properties:
+        totalPackages:
+          type: integer
+        totalUsers:
+          type: integer
+        totalAdminUsers:
+          type: integer
+        totalDownloads:
+          type: integer
+        cachedPackages:
+          type: integer
+        storageUsedBytes:
+          type: integer
