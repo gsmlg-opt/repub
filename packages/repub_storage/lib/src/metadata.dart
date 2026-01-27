@@ -1753,6 +1753,214 @@ class PostgresMetadataStore extends MetadataStore {
       });
     }).toList();
   }
+
+  // ============ Backup Export Methods ============
+
+  /// Export all packages for backup.
+  Future<List<Map<String, dynamic>>> exportPackages() async {
+    final result = await _conn.execute('SELECT * FROM packages');
+    return result.map((row) => row.toColumnMap()).toList();
+  }
+
+  /// Export all package versions for backup.
+  Future<List<Map<String, dynamic>>> exportPackageVersions() async {
+    final result = await _conn.execute('SELECT * FROM package_versions');
+    return result.map((row) => row.toColumnMap()).toList();
+  }
+
+  /// Export all users for backup.
+  Future<List<Map<String, dynamic>>> exportUsers() async {
+    final result = await _conn.execute('SELECT * FROM users');
+    return result.map((row) => row.toColumnMap()).toList();
+  }
+
+  /// Export all admin users for backup.
+  Future<List<Map<String, dynamic>>> exportAdminUsers() async {
+    final result = await _conn.execute('SELECT * FROM admin_users');
+    return result.map((row) => row.toColumnMap()).toList();
+  }
+
+  /// Export all auth tokens for backup.
+  Future<List<Map<String, dynamic>>> exportAuthTokens() async {
+    final result = await _conn.execute('SELECT * FROM auth_tokens');
+    return result.map((row) => row.toColumnMap()).toList();
+  }
+
+  /// Export all activity log for backup.
+  Future<List<Map<String, dynamic>>> exportActivityLog() async {
+    final result = await _conn.execute('SELECT * FROM activity_log');
+    return result.map((row) => row.toColumnMap()).toList();
+  }
+
+  // ============ Backup Import Methods ============
+
+  /// Import packages from backup.
+  Future<void> importPackages(List<Map<String, dynamic>> packages) async {
+    for (final pkg in packages) {
+      await _conn.execute(
+        Sql.named('''
+          INSERT INTO packages (name, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache, owner_id)
+          VALUES (@name, @created_at, @updated_at, @is_discontinued, @replaced_by, @is_upstream_cache, @owner_id)
+          ON CONFLICT (name) DO UPDATE SET
+            created_at = EXCLUDED.created_at,
+            updated_at = EXCLUDED.updated_at,
+            is_discontinued = EXCLUDED.is_discontinued,
+            replaced_by = EXCLUDED.replaced_by,
+            is_upstream_cache = EXCLUDED.is_upstream_cache,
+            owner_id = EXCLUDED.owner_id
+        '''),
+        parameters: {
+          'name': pkg['name'],
+          'created_at': pkg['created_at'],
+          'updated_at': pkg['updated_at'],
+          'is_discontinued': pkg['is_discontinued'],
+          'replaced_by': pkg['replaced_by'],
+          'is_upstream_cache': pkg['is_upstream_cache'],
+          'owner_id': pkg['owner_id'],
+        },
+      );
+    }
+  }
+
+  /// Import package versions from backup.
+  Future<void> importPackageVersions(List<Map<String, dynamic>> versions) async {
+    for (final v in versions) {
+      await _conn.execute(
+        Sql.named('''
+          INSERT INTO package_versions (id, package_name, version, pubspec_json, archive_key, archive_sha256, published_at)
+          VALUES (@id, @package_name, @version, @pubspec_json, @archive_key, @archive_sha256, @published_at)
+          ON CONFLICT (package_name, version) DO UPDATE SET
+            pubspec_json = EXCLUDED.pubspec_json,
+            archive_key = EXCLUDED.archive_key,
+            archive_sha256 = EXCLUDED.archive_sha256,
+            published_at = EXCLUDED.published_at
+        '''),
+        parameters: {
+          'id': v['id'],
+          'package_name': v['package_name'],
+          'version': v['version'],
+          'pubspec_json': v['pubspec_json'],
+          'archive_key': v['archive_key'],
+          'archive_sha256': v['archive_sha256'],
+          'published_at': v['published_at'],
+        },
+      );
+    }
+  }
+
+  /// Import users from backup.
+  Future<void> importUsers(List<Map<String, dynamic>> users) async {
+    for (final u in users) {
+      await _conn.execute(
+        Sql.named('''
+          INSERT INTO users (id, email, password_hash, name, is_active, created_at, last_login_at)
+          VALUES (@id, @email, @password_hash, @name, @is_active, @created_at, @last_login_at)
+          ON CONFLICT (id) DO UPDATE SET
+            email = EXCLUDED.email,
+            password_hash = EXCLUDED.password_hash,
+            name = EXCLUDED.name,
+            is_active = EXCLUDED.is_active,
+            created_at = EXCLUDED.created_at,
+            last_login_at = EXCLUDED.last_login_at
+        '''),
+        parameters: {
+          'id': u['id'],
+          'email': u['email'],
+          'password_hash': u['password_hash'],
+          'name': u['name'],
+          'is_active': u['is_active'],
+          'created_at': u['created_at'],
+          'last_login_at': u['last_login_at'],
+        },
+      );
+    }
+  }
+
+  /// Import admin users from backup.
+  Future<void> importAdminUsers(List<Map<String, dynamic>> adminUsers) async {
+    for (final a in adminUsers) {
+      await _conn.execute(
+        Sql.named('''
+          INSERT INTO admin_users (id, username, password_hash, name, is_active, created_at, last_login_at, must_change_password)
+          VALUES (@id, @username, @password_hash, @name, @is_active, @created_at, @last_login_at, @must_change_password)
+          ON CONFLICT (id) DO UPDATE SET
+            username = EXCLUDED.username,
+            password_hash = EXCLUDED.password_hash,
+            name = EXCLUDED.name,
+            is_active = EXCLUDED.is_active,
+            created_at = EXCLUDED.created_at,
+            last_login_at = EXCLUDED.last_login_at,
+            must_change_password = EXCLUDED.must_change_password
+        '''),
+        parameters: {
+          'id': a['id'],
+          'username': a['username'],
+          'password_hash': a['password_hash'],
+          'name': a['name'],
+          'is_active': a['is_active'],
+          'created_at': a['created_at'],
+          'last_login_at': a['last_login_at'],
+          'must_change_password': a['must_change_password'],
+        },
+      );
+    }
+  }
+
+  /// Import auth tokens from backup.
+  Future<void> importAuthTokens(List<Map<String, dynamic>> tokens) async {
+    for (final t in tokens) {
+      await _conn.execute(
+        Sql.named('''
+          INSERT INTO auth_tokens (token_hash, label, scopes, created_at, last_used_at, user_id, expires_at)
+          VALUES (@token_hash, @label, @scopes, @created_at, @last_used_at, @user_id, @expires_at)
+          ON CONFLICT (token_hash) DO UPDATE SET
+            label = EXCLUDED.label,
+            scopes = EXCLUDED.scopes,
+            created_at = EXCLUDED.created_at,
+            last_used_at = EXCLUDED.last_used_at,
+            user_id = EXCLUDED.user_id,
+            expires_at = EXCLUDED.expires_at
+        '''),
+        parameters: {
+          'token_hash': t['token_hash'],
+          'label': t['label'],
+          'scopes': t['scopes'],
+          'created_at': t['created_at'],
+          'last_used_at': t['last_used_at'],
+          'user_id': t['user_id'],
+          'expires_at': t['expires_at'],
+        },
+      );
+    }
+  }
+
+  /// Import activity log from backup.
+  Future<void> importActivityLog(List<Map<String, dynamic>> activities) async {
+    for (final a in activities) {
+      await _conn.execute(
+        Sql.named('''
+          INSERT INTO activity_log (id, timestamp, activity_type, actor_type, actor_id, actor_email,
+            actor_username, target_type, target_id, metadata, ip_address)
+          VALUES (@id, @timestamp, @activity_type, @actor_type, @actor_id, @actor_email,
+            @actor_username, @target_type, @target_id, @metadata, @ip_address)
+          ON CONFLICT (id) DO NOTHING
+        '''),
+        parameters: {
+          'id': a['id'],
+          'timestamp': a['timestamp'],
+          'activity_type': a['activity_type'],
+          'actor_type': a['actor_type'],
+          'actor_id': a['actor_id'],
+          'actor_email': a['actor_email'],
+          'actor_username': a['actor_username'],
+          'target_type': a['target_type'],
+          'target_id': a['target_id'],
+          'metadata': a['metadata'],
+          'ip_address': a['ip_address'],
+        },
+      );
+    }
+  }
 }
 
 /// Metadata storage backed by SQLite.
@@ -3023,6 +3231,166 @@ class SqliteMetadataStore extends MetadataStore {
         'ip_address': row['ip_address'] as String?,
       });
     }).toList();
+  }
+
+  // ============ Backup Export Methods ============
+
+  /// Export all packages for backup.
+  Future<List<Map<String, dynamic>>> exportPackages() async {
+    final result = _db.select('SELECT * FROM packages');
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  /// Export all package versions for backup.
+  Future<List<Map<String, dynamic>>> exportPackageVersions() async {
+    final result = _db.select('SELECT * FROM package_versions');
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  /// Export all users for backup.
+  Future<List<Map<String, dynamic>>> exportUsers() async {
+    final result = _db.select('SELECT * FROM users');
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  /// Export all admin users for backup.
+  Future<List<Map<String, dynamic>>> exportAdminUsers() async {
+    final result = _db.select('SELECT * FROM admin_users');
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  /// Export all auth tokens for backup.
+  Future<List<Map<String, dynamic>>> exportAuthTokens() async {
+    final result = _db.select('SELECT * FROM auth_tokens');
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  /// Export all activity log for backup.
+  Future<List<Map<String, dynamic>>> exportActivityLog() async {
+    final result = _db.select('SELECT * FROM activity_log');
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  // ============ Backup Import Methods ============
+
+  /// Import packages from backup.
+  Future<void> importPackages(List<Map<String, dynamic>> packages) async {
+    for (final pkg in packages) {
+      _db.execute('''
+        INSERT OR REPLACE INTO packages (
+          name, created_at, updated_at, is_discontinued, replaced_by, is_upstream_cache, owner_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        pkg['name'],
+        pkg['created_at'],
+        pkg['updated_at'],
+        pkg['is_discontinued'],
+        pkg['replaced_by'],
+        pkg['is_upstream_cache'],
+        pkg['owner_id'],
+      ]);
+    }
+  }
+
+  /// Import package versions from backup.
+  Future<void> importPackageVersions(List<Map<String, dynamic>> versions) async {
+    for (final v in versions) {
+      _db.execute('''
+        INSERT OR REPLACE INTO package_versions (
+          id, package_name, version, pubspec_json, archive_key, archive_sha256, published_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        v['id'],
+        v['package_name'],
+        v['version'],
+        v['pubspec_json'],
+        v['archive_key'],
+        v['archive_sha256'],
+        v['published_at'],
+      ]);
+    }
+  }
+
+  /// Import users from backup.
+  Future<void> importUsers(List<Map<String, dynamic>> users) async {
+    for (final u in users) {
+      _db.execute('''
+        INSERT OR REPLACE INTO users (
+          id, email, password_hash, name, is_active, created_at, last_login_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        u['id'],
+        u['email'],
+        u['password_hash'],
+        u['name'],
+        u['is_active'],
+        u['created_at'],
+        u['last_login_at'],
+      ]);
+    }
+  }
+
+  /// Import admin users from backup.
+  Future<void> importAdminUsers(List<Map<String, dynamic>> adminUsers) async {
+    for (final a in adminUsers) {
+      _db.execute('''
+        INSERT OR REPLACE INTO admin_users (
+          id, username, password_hash, name, is_active, created_at, last_login_at, must_change_password
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        a['id'],
+        a['username'],
+        a['password_hash'],
+        a['name'],
+        a['is_active'],
+        a['created_at'],
+        a['last_login_at'],
+        a['must_change_password'],
+      ]);
+    }
+  }
+
+  /// Import auth tokens from backup.
+  Future<void> importAuthTokens(List<Map<String, dynamic>> tokens) async {
+    for (final t in tokens) {
+      _db.execute('''
+        INSERT OR REPLACE INTO auth_tokens (
+          token_hash, label, scopes, created_at, last_used_at, user_id, expires_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        t['token_hash'],
+        t['label'],
+        t['scopes'],
+        t['created_at'],
+        t['last_used_at'],
+        t['user_id'],
+        t['expires_at'],
+      ]);
+    }
+  }
+
+  /// Import activity log from backup.
+  Future<void> importActivityLog(List<Map<String, dynamic>> activities) async {
+    for (final a in activities) {
+      _db.execute('''
+        INSERT OR REPLACE INTO activity_log (
+          id, timestamp, activity_type, actor_type, actor_id, actor_email,
+          actor_username, target_type, target_id, metadata, ip_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        a['id'],
+        a['timestamp'],
+        a['activity_type'],
+        a['actor_type'],
+        a['actor_id'],
+        a['actor_email'],
+        a['actor_username'],
+        a['target_type'],
+        a['target_id'],
+        a['metadata'],
+        a['ip_address'],
+      ]);
+    }
   }
 }
 

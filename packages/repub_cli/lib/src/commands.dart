@@ -3,6 +3,7 @@ import 'package:repub_server/repub_server.dart';
 import 'package:repub_storage/repub_storage.dart';
 
 import 'admin_commands.dart';
+import 'backup_commands.dart';
 
 /// Print usage information.
 void printUsage() {
@@ -16,6 +17,7 @@ Commands:
   serve           Start the HTTP server
   migrate         Run database migrations
   admin <cmd>     Admin user management (create, list, reset-password, etc.)
+  backup <cmd>    Database backup and restore (export, import)
   help            Show this help message
 
 Note:
@@ -75,4 +77,9 @@ Future<void> runAdminCommand(List<String> args) async {
 
   // Run admin commands
   await adminCommands(args, config);
+}
+
+/// Handle backup commands.
+Future<void> runBackupCommand(List<String> args) async {
+  await backupCommands(args);
 }
