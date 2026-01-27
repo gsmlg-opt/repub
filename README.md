@@ -55,7 +55,7 @@ The Docker image uses SQLite + local file storage by default, requiring no exter
 ```bash
 # Run with persistent volume
 docker run -d \
-  -p 8080:8080 \
+  -p 4920:4920 \
   -v repub_data:/data \
   ghcr.io/gsmlg-dev/repub:latest
 
@@ -63,7 +63,7 @@ docker run -d \
 docker exec <container_id> /app/bin/repub_cli admin create admin password123 "Admin User"
 
 # Note: User tokens are managed via the web UI
-# 1. Register/login at http://localhost:8080/login
+# 1. Register/login at http://localhost:4920/login
 # 2. Navigate to /account/tokens to create publish tokens
 ```
 
@@ -102,15 +102,15 @@ docker compose up -d
 This starts:
 - PostgreSQL (port 5432)
 - MinIO (ports 9000, 9001 for console)
-- Repub server (port 8080)
+- Repub server (port 4920)
 
 ### 4. Create a user account and token
 
 Register a user account to create publish tokens:
 
 ```bash
-# Visit http://localhost:8080/register to create an account
-# Then login at http://localhost:8080/login
+# Visit http://localhost:4920/register to create an account
+# Then login at http://localhost:4920/login
 # Navigate to /account/tokens to create publish tokens
 ```
 
@@ -123,7 +123,7 @@ docker compose exec repub /app/bin/repub_cli admin create admin password123 "Adm
 ### 5. Add the token to dart pub
 
 ```bash
-dart pub token add http://localhost:8080
+dart pub token add http://localhost:4920
 ```
 
 Paste the token when prompted.
@@ -135,7 +135,7 @@ In your package directory, add `publish_to` to pubspec.yaml:
 ```yaml
 name: my_package
 version: 1.0.0
-publish_to: http://localhost:8080
+publish_to: http://localhost:4920
 ```
 
 Then publish:
@@ -152,7 +152,7 @@ In a consuming project:
 dependencies:
   my_package:
     hosted:
-      url: http://localhost:8080
+      url: http://localhost:4920
     version: ^1.0.0
 ```
 
@@ -168,12 +168,12 @@ dart pub get
 # Bootstrap all packages
 melos bootstrap
 
-# Development - unified server on port 8080 (API + web UI + admin UI with hot reload)
+# Development - unified server on port 4920 (API + web UI + admin UI with hot reload)
 melos run dev
 
 # Run individual dev servers
-melos run dev:web          # Jaspr web UI on port 8081
-melos run dev:admin        # Flutter admin UI on port 8082
+melos run dev:web          # Jaspr web UI on port 4921
+melos run dev:admin        # Flutter admin UI on port 4922
 melos run server           # API server only
 
 # Build
@@ -199,8 +199,8 @@ All configuration is via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REPUB_LISTEN_ADDR` | `0.0.0.0:8080` | Listen address |
-| `REPUB_BASE_URL` | `http://localhost:8080` | Public URL of the registry |
+| `REPUB_LISTEN_ADDR` | `0.0.0.0:4920` | Listen address |
+| `REPUB_BASE_URL` | `http://localhost:4920` | Public URL of the registry |
 | `REPUB_REQUIRE_DOWNLOAD_AUTH` | `false` | Require auth for downloads |
 
 ### Database Options
@@ -441,7 +441,7 @@ dart pub global activate melos
 # Bootstrap workspace
 melos bootstrap
 
-# Start unified dev server on port 8080 (API + Web UI with hot reload)
+# Start unified dev server on port 4920 (API + Web UI with hot reload)
 # This is the recommended way for development
 melos run dev
 
@@ -466,22 +466,22 @@ dart run -C packages/repub_server repub_server
 
 ### Development Server
 
-The `melos run dev` command starts a unified development server on **port 8080** that includes:
+The `melos run dev` command starts a unified development server on **port 4920** that includes:
 - **API server** - All API endpoints at `/api/*`, `/admin/api/*`, `/packages/*`, `/health`
 - **Public Web UI** - Package browsing, search, and documentation (Jaspr with hot reload)
 - **Admin UI** - Admin dashboard and package management at `/admin` (Flutter with hot reload)
-- **Single URL** - Access everything at `http://localhost:8080`
+- **Single URL** - Access everything at `http://localhost:4920`
 
 The dev server internally proxies:
-- Web UI requests to Jaspr webdev (running on 8081)
-- Admin UI requests to Flutter dev server (running on 8082)
+- Web UI requests to Jaspr webdev (running on 4921)
+- Admin UI requests to Flutter dev server (running on 4922)
 
 This provides instant hot reload when you modify any frontend code.
 
 **Accessing the UIs in development:**
-- Public UI: `http://localhost:8080`
-- Admin UI: `http://localhost:8080/admin` (requires admin user - see Admin UI section)
-- API: `http://localhost:8080/api/*`
+- Public UI: `http://localhost:4920`
+- Admin UI: `http://localhost:4920/admin` (requires admin user - see Admin UI section)
+- API: `http://localhost:4920/api/*`
 
 You'll need to create an admin user first to access the admin UI:
 ```bash

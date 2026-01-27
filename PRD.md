@@ -394,7 +394,7 @@ repub_auth ← repub_storage
 All configuration via environment variables:
 
 ### Core Settings
-- `REPUB_LISTEN_ADDR`: Listen address (default: `0.0.0.0:8080`)
+- `REPUB_LISTEN_ADDR`: Listen address (default: `0.0.0.0:4920`)
 - `REPUB_BASE_URL`: Public URL of the registry
 - `REPUB_REQUIRE_DOWNLOAD_AUTH`: Require auth for downloads (default: `false`)
 

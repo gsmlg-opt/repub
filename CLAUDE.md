@@ -16,8 +16,8 @@ CRITICAL CONSTRAINTS (read these before every task):
 # Bootstrap workspace (run first)
 melos bootstrap
 
-# Development - unified server on port 8080 with hot reload
-# Access everything at http://localhost:8080 (API + web UI + admin UI)
+# Development - unified server on port 4920 with hot reload
+# Access everything at http://localhost:4920 (API + web UI + admin UI)
 melos run dev
 
 # Run API server only (SQLite + local storage, no external deps)
@@ -31,8 +31,8 @@ melos run build:web        # Build Jaspr web UI
 melos run build:admin      # Build Flutter admin UI
 
 # Run dev servers individually
-melos run dev:web          # Jaspr web UI on port 8081
-melos run dev:admin        # Flutter admin UI on port 8082
+melos run dev:web          # Jaspr web UI on port 4921
+melos run dev:admin        # Flutter admin UI on port 4922
 
 # Quality checks
 melos run analyze          # Static analysis with fatal-infos
@@ -92,11 +92,11 @@ repub_auth ← repub_storage
 
 ### Development Server
 
-The dev server (`repub_dev_server.dart`) provides a unified development experience on port 8080:
+The dev server (`repub_dev_server.dart`) provides a unified development experience on port 4920:
 - **API routes** (`/api/*`, `/admin/api/*`, `/packages/*`, `/health`) - Handled directly by the server
-- **Admin UI** (`/admin/*`) - Proxied to Flutter dev server on port 8082 for hot reload
-- **Web UI** (all other routes) - Proxied to Jaspr webdev on port 8081 for hot reload
-- Users only access `http://localhost:8080` for everything
+- **Admin UI** (`/admin/*`) - Proxied to Flutter dev server on port 4922 for hot reload
+- **Web UI** (all other routes) - Proxied to Jaspr webdev on port 4921 for hot reload
+- Users only access `http://localhost:4920` for everything
 - All UI changes reload instantly via their respective hot reload mechanisms
 
 ### Token Scopes
@@ -120,7 +120,7 @@ Storage: Either `REPUB_STORAGE_PATH` (local) or S3 vars (`REPUB_S3_ENDPOINT`, `R
 
 ```bash
 # Standalone (SQLite + local storage)
-docker run -p 8080:8080 -v repub_data:/data ghcr.io/gsmlg-dev/repub:latest
+docker run -p 4920:4920 -v repub_data:/data ghcr.io/gsmlg-dev/repub:latest
 
 # With PostgreSQL + MinIO
 docker compose up -d

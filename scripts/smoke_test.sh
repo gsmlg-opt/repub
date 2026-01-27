@@ -13,7 +13,7 @@
 
 set -e
 
-REPUB_URL="${REPUB_URL:-http://localhost:8080}"
+REPUB_URL="${REPUB_URL:-http://localhost:4920}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 TEST_DIR=$(mktemp -d)
