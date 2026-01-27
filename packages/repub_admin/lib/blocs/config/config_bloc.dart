@@ -32,9 +32,8 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
         configMap[cfg.name] = cfg.value;
       }
 
-      // Build SiteConfig from individual values
-      // For now, we'll use placeholder values since the backend uses key-value pairs
-      // TODO: Update backend to return structured config
+      // Build SiteConfig from individual key-value pairs
+      // The backend stores config as key-value pairs for flexibility
       final config = SiteConfig(
         baseUrl: configMap['base_url'] ?? 'http://localhost:4920',
         listenAddr: configMap['listen_addr'] ?? '0.0.0.0:4920',

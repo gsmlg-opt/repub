@@ -130,7 +130,7 @@ void main() {
 
       test('getTotalDownloads returns correct count', () async {
         // Initially no downloads
-        var count = await metadata.getTotalDownloads();
+        final count = await metadata.getTotalDownloads();
         expect(count, equals(0));
       });
 

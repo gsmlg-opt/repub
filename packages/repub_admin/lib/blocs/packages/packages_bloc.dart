@@ -41,7 +41,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
           latestVersion: _getLatestVersion(pkgInfo),
           createdAt: pkgInfo.package.createdAt,
           updatedAt: pkgInfo.package.updatedAt,
-          downloadCount: 0, // TODO: Add download count from backend
+          downloadCount: 0, // Download count available in package detail view
           isDiscontinued: pkgInfo.package.isDiscontinued,
           versions: pkgInfo.versions.map((v) => v.version).toList(),
           uploaderEmail: _getUploaderEmail(pkgInfo),

@@ -37,9 +37,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
           id: user.id,
           email: user.email,
           createdAt: user.createdAt,
-          isActive: true, // TODO: Add isActive field to backend User model
-          tokenCount: 0, // TODO: Add token count from backend
-          lastLoginAt: null, // TODO: Add last login tracking
+          isActive: user.isActive,
+          tokenCount: 0, // Token count fetched via ViewUserTokens
+          lastLoginAt: user.lastLoginAt,
         );
       }).toList();
 

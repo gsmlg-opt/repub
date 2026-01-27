@@ -32,8 +32,8 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
           id: user.id,
           username: user.username,
           createdAt: user.createdAt,
-          lastLoginAt: null, // TODO: Add from backend
-          loginCount: 0, // TODO: Add from backend
+          lastLoginAt: user.lastLoginAt,
+          loginCount: 0, // Login count is fetched in detail view
         );
       }).toList();
 
@@ -56,7 +56,7 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
         id: detail.adminUser.id,
         username: detail.adminUser.username,
         createdAt: detail.adminUser.createdAt,
-        lastLoginAt: null,
+        lastLoginAt: detail.adminUser.lastLoginAt,
         loginCount: detail.recentLogins.length,
       );
 
