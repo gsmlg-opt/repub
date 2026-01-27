@@ -76,7 +76,7 @@ Future<void> startServer({Config? config}) async {
   // Add middleware pipeline
   var pipeline = const Pipeline()
       .addMiddleware(logRequests())
-      .addMiddleware(_corsMiddleware())
+      .addMiddleware(_corsMiddleware(cfg.baseUrl))
       .addMiddleware(_versionMiddleware());
 
   // Add IP whitelist middleware if configured
@@ -121,16 +121,53 @@ Future<void> startServer({Config? config}) async {
   });
 }
 
-/// CORS middleware for development.
-Middleware _corsMiddleware() {
+/// CORS middleware with configurable allowed origins.
+/// Defaults to allowing only the baseUrl origin for security.
+/// Set REPUB_CORS_ALLOWED_ORIGINS='*' to allow all origins (not recommended for production).
+Middleware _corsMiddleware(String baseUrl) {
+  // Parse allowed origins from environment variable
+  final allowedOriginsEnv = Platform.environment['REPUB_CORS_ALLOWED_ORIGINS'];
+  final List<String> allowedOrigins;
+
+  if (allowedOriginsEnv == '*') {
+    // Wildcard mode (insecure, for development only)
+    allowedOrigins = ['*'];
+  } else if (allowedOriginsEnv != null && allowedOriginsEnv.isNotEmpty) {
+    // Custom origins from environment
+    allowedOrigins = allowedOriginsEnv.split(',').map((s) => s.trim()).toList();
+  } else {
+    // Default: only allow baseUrl origin
+    allowedOrigins = [baseUrl];
+  }
+
   return (Handler innerHandler) {
     return (Request request) async {
+      final requestOrigin = request.headers['origin'];
+
+      // Determine which origin to allow
+      String allowOrigin;
+      if (allowedOrigins.contains('*')) {
+        allowOrigin = '*';
+      } else if (requestOrigin != null && allowedOrigins.contains(requestOrigin)) {
+        allowOrigin = requestOrigin;
+      } else {
+        // Default to first allowed origin
+        allowOrigin = allowedOrigins.first;
+      }
+
+      final corsHeaders = {
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+        if (allowOrigin != '*') 'Access-Control-Allow-Credentials': 'true',
+      };
+
       if (request.method == 'OPTIONS') {
-        return Response.ok('', headers: _corsHeaders);
+        return Response.ok('', headers: corsHeaders);
       }
 
       final response = await innerHandler(request);
-      return response.change(headers: _corsHeaders);
+      return response.change(headers: corsHeaders);
     };
   };
 }
@@ -150,9 +187,3 @@ Middleware _versionMiddleware() {
     };
   };
 }
-
-const _corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
-};

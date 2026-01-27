@@ -380,6 +380,88 @@ class ApiHandlers {
     return await metadata.getAdminUser(session.userId);
   }
 
+  /// Validate webhook URL for SSRF protection.
+  /// Returns null if valid, or error Response if invalid.
+  Response? _validateWebhookUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      if (!uri.hasScheme || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+        return Response(
+          400,
+          headers: {'content-type': 'application/json'},
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_url',
+              'message': 'URL must use HTTP or HTTPS protocol',
+            },
+          }),
+        );
+      }
+
+      // SSRF Protection: Block private/internal IP addresses
+      final host = uri.host.toLowerCase();
+      final blockedPatterns = [
+        'localhost',
+        '127.', // Loopback
+        '0.0.0.0',
+        '10.', // Private class A
+        '192.168.', // Private class C
+        '169.254.', // Link-local
+        '[::1]',
+        '::1', // IPv6 localhost
+        'fd00:',
+        'fe80:', // IPv6 private/link-local
+      ];
+
+      // Check for blocked patterns
+      if (blockedPatterns.any((pattern) => host.startsWith(pattern))) {
+        return Response(
+          400,
+          headers: {'content-type': 'application/json'},
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_url',
+              'message': 'Cannot use internal or private IP addresses in webhook URLs',
+            },
+          }),
+        );
+      }
+
+      // Check for private class B (172.16.0.0 - 172.31.255.255)
+      if (host.startsWith('172.')) {
+        final parts = host.split('.');
+        if (parts.length >= 2) {
+          final second = int.tryParse(parts[1]);
+          if (second != null && second >= 16 && second <= 31) {
+            return Response(
+              400,
+              headers: {'content-type': 'application/json'},
+              body: jsonEncode({
+                'error': {
+                  'code': 'invalid_url',
+                  'message': 'Cannot use internal or private IP addresses in webhook URLs',
+                },
+              }),
+            );
+          }
+        }
+      }
+
+      return null; // Valid URL
+    } catch (_) {
+      return Response(
+        400,
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({
+          'error': {
+            'code': 'invalid_url',
+            'message': 'URL must be a valid HTTP/HTTPS URL',
+          },
+        }),
+      );
+    }
+  }
+
   /// Get the upstream client (lazy initialization).
   UpstreamClient? get upstream {
     if (!config.enableUpstreamProxy) return null;
@@ -2275,6 +2357,21 @@ class ApiHandlers {
         );
       }
 
+      // Validate email format
+      final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+      if (!emailRegex.hasMatch(email)) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_email',
+              'message': 'Invalid email format'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
       if (password == null || password.length < 8) {
         return Response(
           400,
@@ -2282,6 +2379,22 @@ class ApiHandlers {
             'error': {
               'code': 'weak_password',
               'message': 'Password must be at least 8 characters'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Validate password complexity
+      if (!password.contains(RegExp(r'[A-Z]')) ||
+          !password.contains(RegExp(r'[a-z]')) ||
+          !password.contains(RegExp(r'[0-9]'))) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'weak_password',
+              'message': 'Password must contain uppercase, lowercase, and numbers'
             },
           }),
           headers: {'content-type': 'application/json'},
@@ -3397,20 +3510,10 @@ class ApiHandlers {
         );
       }
 
-      // Validate URL
-      try {
-        final uri = Uri.parse(url);
-        if (!uri.hasScheme || (!uri.isScheme('http') && !uri.isScheme('https'))) {
-          throw FormatException('Invalid URL scheme');
-        }
-      } catch (_) {
-        return Response(
-          400,
-          headers: {'content-type': 'application/json'},
-          body: jsonEncode({
-            'error': {'code': 'invalid_url', 'message': 'URL must be a valid HTTP/HTTPS URL'},
-          }),
-        );
+      // Validate URL and check for SSRF
+      final urlValidation = _validateWebhookUrl(url);
+      if (urlValidation != null) {
+        return urlValidation;
       }
 
       // Validate events
@@ -3496,6 +3599,15 @@ class ApiHandlers {
 
     try {
       final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+
+      // Validate URL if provided
+      final newUrl = body['url'] as String?;
+      if (newUrl != null && newUrl != webhook.url) {
+        final urlValidation = _validateWebhookUrl(newUrl);
+        if (urlValidation != null) {
+          return urlValidation;
+        }
+      }
 
       final updated = webhook.copyWith(
         url: body['url'] as String? ?? webhook.url,
