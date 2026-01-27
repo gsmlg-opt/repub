@@ -33,6 +33,31 @@ All admin screens have been implemented with full BLoC state management:
 7. **Site Configuration** ✅ (Complete - form with save/reset, grouped settings)
 8. **Login** ✅ (Complete)
 
+## Authentication Architecture
+
+Repub uses **two separate authentication systems** for different user types:
+
+### Regular Users (Token-based)
+- **Purpose**: API access for publishing/downloading packages
+- **Authentication**: Bearer tokens with scoped permissions
+- **Scopes**: `admin`, `publish:all`, `publish:pkg:<name>`, `read:all`
+- **Management**: Users create/manage tokens via web UI (`/account/tokens`)
+- **Lifecycle**: Tokens can be created, listed, and deleted by users
+- **Storage**: Hashed in database for security
+
+### Admin Users (Session-based)
+- **Purpose**: Access to admin panel for registry management
+- **Authentication**: Username/password with session cookies
+- **Management**: CLI-only (cannot be created/edited/deleted from UI)
+- **No Tokens**: Admin users do NOT have bearer tokens
+- **Admin UI**: Read-only view of sessions and login history for security auditing
+- **CLI Commands**:
+  - Create: `repub_cli admin create <username> <password> "<name>"`
+  - List: `repub_cli admin list`
+  - Delete: `repub_cli admin delete <username>`
+
+**Key Distinction**: Regular users use tokens for API operations, while admin users use sessions for admin panel access. These are completely separate authentication mechanisms.
+
 ## Architecture: BLoC State Management
 
 ### Why BLoC for Admin Panel?
@@ -581,7 +606,9 @@ class UserTokensViewRequested extends UsersEvent {
 
 ### 5. Admin Users Screen
 
-**Goal**: View all admin users and their login history
+**Goal**: View admin users, sessions, and login history (read-only)
+
+**Important**: Admin users are managed exclusively via CLI. The admin UI provides read-only visibility into admin sessions and login history for security auditing purposes. Admin users do not use tokens - they authenticate with session-based login.
 
 #### BLoC Implementation
 
@@ -641,16 +668,24 @@ class AdminUserDetailRequested extends AdminUsersEvent {
   - Actions (View Details)
 
 **Features**:
-- **Read-Only**: Cannot create/edit/delete from UI
-- **Current User**: Highlighted with badge
-- **View Details**: Navigate to detail page
-- **Security Info**: Show CLI commands for management
+- **Strictly Read-Only**: Cannot create/edit/delete admin users from UI
+- **No Token Management**: Admin users do not have tokens (session-based auth only)
+- **Current User**: Currently logged-in admin highlighted with badge
+- **View Sessions**: Navigate to detail page for session history
+- **Security Auditing**: View login attempts and session data
 
 **Info Banner**:
 ```
-ℹ️ Admin users can only be managed via CLI for security reasons.
-To create: repub_cli admin create <username> <password> "<name>"
-To list: repub_cli admin list
+ℹ️ Admin User Management (CLI Only)
+
+Admin users authenticate with sessions, not tokens. All admin user
+management operations must be performed via CLI:
+
+Create:  repub_cli admin create <username> <password> "<name>"
+List:    repub_cli admin list
+Delete:  repub_cli admin delete <username>
+
+This screen is for viewing sessions and login history only.
 ```
 
 #### API Endpoints
@@ -661,7 +696,9 @@ To list: repub_cli admin list
 
 ### 6. Admin User Detail Screen
 
-**Goal**: View individual admin user's detailed information and login history
+**Goal**: View individual admin user's sessions and login history (read-only security audit)
+
+**Important**: This screen is strictly for security auditing. Admin users cannot be modified from the UI. No token management is available since admin users use session-based authentication only.
 
 #### BLoC Implementation
 
@@ -737,11 +774,14 @@ class AdminUserDetailRefreshRequested extends AdminUserDetailEvent {}
    - Pagination (last 100 attempts)
 
 **Features**:
-- **Real-time Data**: Refresh button
-- **Export**: Export login history to CSV
-- **Filter**: Show all/success/failed attempts
-- **Search**: Filter by IP address
-- **Security Alert**: Highlight suspicious patterns
+- **Read-Only View**: No edit or delete capabilities (CLI-managed)
+- **No Token Management**: Admin users do not have tokens
+- **Session Monitoring**: View all active and past sessions
+- **Real-time Data**: Refresh button to update statistics
+- **Export**: Export login history to CSV for external analysis
+- **Filter**: Show all/success/failed login attempts
+- **Search**: Filter by IP address or user agent
+- **Security Alerts**: Highlight suspicious login patterns
 
 **Security Alerts**:
 - Multiple failed attempts from same IP (>5 in 1 hour)
