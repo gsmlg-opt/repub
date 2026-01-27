@@ -11,6 +11,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
+import 'logger.dart';
 import 'publish.dart';
 import 'upstream.dart';
 
@@ -236,12 +237,12 @@ String? _findWebDir() {
     if (path == null) continue;
     final dir = Directory(path);
     if (dir.existsSync() && File(p.join(path, 'index.html')).existsSync()) {
-      print('Serving web UI from: ${dir.absolute.path}');
+      Logger.debug('Serving web UI', component: 'static', metadata: {'path': dir.absolute.path});
       return path;
     }
   }
 
-  print('Web UI not found - run "melos run build:web" to build it');
+  Logger.warn('Web UI not found - run "melos run build:web" to build it', component: 'static');
   return null;
 }
 
@@ -263,12 +264,12 @@ String? _findAdminDir() {
     if (path == null) continue;
     final dir = Directory(path);
     if (dir.existsSync() && File(p.join(path, 'index.html')).existsSync()) {
-      print('Serving admin UI from: ${dir.absolute.path}');
+      Logger.debug('Serving admin UI', component: 'static', metadata: {'path': dir.absolute.path});
       return path;
     }
   }
 
-  print('Admin UI not found - run "melos run build:admin" to build it');
+  Logger.warn('Admin UI not found - run "melos run build:admin" to build it', component: 'static');
   return null;
 }
 
@@ -986,7 +987,10 @@ class ApiHandlers {
         );
       } catch (e) {
         // If storage fails, try upstream
-        print('Storage error for $name@$version: $e');
+        Logger.warn('Storage error fetching archive', component: 'storage', error: e, metadata: {
+          'package': name,
+          'version': version,
+        });
       }
     }
 
@@ -994,8 +998,11 @@ class ApiHandlers {
     if (upstream != null) {
       final upstreamVersion = await upstream!.getVersion(name, version);
       if (upstreamVersion != null && upstreamVersion.archiveUrl.isNotEmpty) {
-        print(
-            'Fetching $name@$version from upstream: ${upstreamVersion.archiveUrl}');
+        Logger.debug('Fetching from upstream', component: 'upstream', metadata: {
+          'package': name,
+          'version': version,
+          'url': upstreamVersion.archiveUrl,
+        });
         final archiveBytes =
             await upstream!.downloadArchive(upstreamVersion.archiveUrl);
 
@@ -1018,7 +1025,10 @@ class ApiHandlers {
               isUpstreamCache: true,
             );
 
-            print('Cached $name@$version from upstream');
+            Logger.info('Cached package from upstream', component: 'cache', metadata: {
+              'package': name,
+              'version': version,
+            });
 
             // Log download for analytics
             await metadata.logDownload(
@@ -1036,7 +1046,10 @@ class ApiHandlers {
               },
             );
           } catch (e) {
-            print('Failed to cache $name@$version: $e');
+            Logger.warn('Failed to cache package from upstream', component: 'cache', error: e, metadata: {
+              'package': name,
+              'version': version,
+            });
 
             // Log download for analytics (even if caching failed)
             await metadata.logDownload(
@@ -1339,7 +1352,7 @@ class ApiHandlers {
       try {
         await store.delete(key);
       } catch (e) {
-        print('Warning: Failed to delete blob $key: $e');
+        Logger.warn('Failed to delete blob', component: 'storage', error: e, metadata: {'key': key});
       }
     }
 
@@ -1405,7 +1418,7 @@ class ApiHandlers {
       try {
         await store.delete(archiveKey);
       } catch (e) {
-        print('Warning: Failed to delete blob $archiveKey: $e');
+        Logger.warn('Failed to delete blob', component: 'storage', error: e, metadata: {'key': archiveKey});
       }
     }
 
@@ -1487,7 +1500,7 @@ class ApiHandlers {
         await cacheBlobs.delete(key);
         blobsDeleted++;
       } catch (e) {
-        print('Warning: Failed to delete cached blob $key: $e');
+        Logger.warn('Failed to delete cached blob', component: 'cache', error: e, metadata: {'key': key});
       }
     }
 
@@ -2349,8 +2362,7 @@ class ApiHandlers {
         },
       );
     } catch (e, stackTrace) {
-      print('Admin login error: $e');
-      print('Stack trace: $stackTrace');
+      Logger.error('Admin login error', component: 'auth', error: e, stackTrace: stackTrace);
       return Response(
         400,
         body: jsonEncode({

@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'logger.dart';
+
 /// Client for fetching packages from upstream pub server (e.g., pub.dev).
 class UpstreamClient {
   final String baseUrl;
@@ -25,14 +27,19 @@ class UpstreamClient {
       }
 
       if (response.statusCode != 200) {
-        print('Upstream error fetching $name: ${response.statusCode}');
+        Logger.warn('Upstream error fetching package', component: 'upstream', metadata: {
+          'package': name,
+          'statusCode': response.statusCode,
+        });
         return null;
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return UpstreamPackageInfo.fromJson(json);
     } catch (e) {
-      print('Upstream error fetching $name: $e');
+      Logger.error('Upstream error fetching package', component: 'upstream', error: e, metadata: {
+        'package': name,
+      });
       return null;
     }
   }
@@ -67,14 +74,21 @@ class UpstreamClient {
       }
 
       if (response.statusCode != 200) {
-        print('Upstream error fetching $name@$version: ${response.statusCode}');
+        Logger.warn('Upstream error fetching version', component: 'upstream', metadata: {
+          'package': name,
+          'version': version,
+          'statusCode': response.statusCode,
+        });
         return null;
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return UpstreamVersionInfo.fromJson(name, json);
     } catch (e) {
-      print('Upstream error fetching $name@$version: $e');
+      Logger.error('Upstream error fetching version', component: 'upstream', error: e, metadata: {
+        'package': name,
+        'version': version,
+      });
       return null;
     }
   }
@@ -93,7 +107,10 @@ class UpstreamClient {
       }
 
       if (response.statusCode != 200) {
-        print('Upstream error searching "$query": ${response.statusCode}');
+        Logger.warn('Upstream error searching', component: 'upstream', metadata: {
+          'query': query,
+          'statusCode': response.statusCode,
+        });
         return [];
       }
 
@@ -105,7 +122,9 @@ class UpstreamClient {
 
       return packages;
     } catch (e) {
-      print('Upstream error searching "$query": $e');
+      Logger.error('Upstream error searching', component: 'upstream', error: e, metadata: {
+        'query': query,
+      });
       return [];
     }
   }
@@ -120,13 +139,18 @@ class UpstreamClient {
           );
 
       if (response.statusCode != 200) {
-        print('Upstream error downloading archive: ${response.statusCode}');
+        Logger.warn('Upstream error downloading archive', component: 'upstream', metadata: {
+          'url': archiveUrl,
+          'statusCode': response.statusCode,
+        });
         return null;
       }
 
       return response.bodyBytes;
     } catch (e) {
-      print('Upstream error downloading archive: $e');
+      Logger.error('Upstream error downloading archive', component: 'upstream', error: e, metadata: {
+        'url': archiveUrl,
+      });
       return null;
     }
   }

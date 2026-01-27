@@ -7,37 +7,43 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'handlers.dart';
+import 'logger.dart';
 import 'rate_limit.dart';
 
 /// Start the repub server.
 Future<void> startServer({Config? config}) async {
+  // Initialize logger from environment
+  Logger.init();
+
   final cfg = config ?? Config.fromEnv();
 
-  print('Starting Repub server...');
-  print('Base URL: ${cfg.baseUrl}');
-  print('Database: ${cfg.databaseType.name}');
-  if (cfg.enableUpstreamProxy) {
-    print('Upstream proxy: ${cfg.upstreamUrl}');
-  } else {
-    print('Upstream proxy: disabled');
-  }
+  Logger.info('Starting Repub server...', component: 'startup');
+  Logger.info('Configuration loaded', component: 'startup', metadata: {
+    'baseUrl': cfg.baseUrl,
+    'database': cfg.databaseType.name,
+    'upstreamProxy': cfg.enableUpstreamProxy,
+    'upstreamUrl': cfg.enableUpstreamProxy ? cfg.upstreamUrl : null,
+    'rateLimit': '${cfg.rateLimitRequests}/${cfg.rateLimitWindowSeconds}s',
+  });
 
   // Create metadata store (handles connection and migrations)
-  print('Connecting to database...');
+  Logger.info('Connecting to database...', component: 'database');
   final metadata = await MetadataStore.create(cfg);
 
   // Run migrations
-  print('Running migrations...');
+  Logger.info('Running migrations...', component: 'database');
   final migrated = await metadata.runMigrations();
   if (migrated > 0) {
-    print('Applied $migrated migration(s)');
+    Logger.info('Applied migrations', component: 'database', metadata: {'count': migrated});
   }
 
   // Ensure default admin user exists
   final createdAdmin = await metadata.ensureDefaultAdminUser(hashPassword);
   if (createdAdmin) {
-    print('Created default admin user (username: admin, password: admin)');
-    print('  ⚠️  Please change the password on first login!');
+    Logger.warn('Created default admin user', component: 'security', metadata: {
+      'username': 'admin',
+      'action': 'Please change the password on first login!',
+    });
   }
 
   // Create blob storage for local packages
@@ -47,7 +53,7 @@ Future<void> startServer({Config? config}) async {
   final cacheBlobs = BlobStore.cacheFromConfig(cfg);
 
   // Ensure storage is ready
-  print('Checking storage...');
+  Logger.info('Checking storage...', component: 'storage');
   await blobs.ensureReady();
   await cacheBlobs.ensureReady();
 
@@ -81,15 +87,17 @@ Future<void> startServer({Config? config}) async {
     cfg.listenPort,
   );
 
-  print(
-      'Repub server listening on http://${server.address.host}:${server.port}');
-  print('Press Ctrl+C to stop');
+  Logger.info('Server started', component: 'startup', metadata: {
+    'address': 'http://${server.address.host}:${server.port}',
+  });
+  Logger.info('Press Ctrl+C to stop', component: 'startup');
 
   // Handle shutdown
   ProcessSignal.sigint.watch().listen((_) async {
-    print('\nShutting down...');
+    Logger.info('Shutting down...', component: 'shutdown');
     await server.close();
     await metadata.close();
+    Logger.info('Server stopped', component: 'shutdown');
     exit(0);
   });
 }
