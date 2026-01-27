@@ -16,10 +16,14 @@ import 'services/auth_service.dart';
 
 /// Creates the GoRouter configuration for the admin app.
 GoRouter createRouter(BuildContext context) {
+  // Capture AuthBloc reference - the redirect callback receives GoRouter's context
+  // which doesn't have access to our BLoC providers
+  final authBloc = context.read<AuthBloc>();
+
   return GoRouter(
-    initialLocation: '/',
-    redirect: (context, state) {
-      final authState = context.read<AuthBloc>().state;
+    // Don't set initialLocation - let GoRouter use the browser URL
+    redirect: (_, state) {
+      final authState = authBloc.state;
       final isAuthenticated = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == '/login';
 
@@ -40,7 +44,7 @@ GoRouter createRouter(BuildContext context) {
 
       return null;
     },
-    refreshListenable: GoRouterRefreshNotifier(context.read<AuthBloc>()),
+    refreshListenable: GoRouterRefreshNotifier(authBloc),
     routes: [
       GoRoute(
         path: '/login',

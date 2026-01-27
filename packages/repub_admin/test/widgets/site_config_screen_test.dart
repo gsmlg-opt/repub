@@ -7,7 +7,6 @@ import 'package:repub_model/repub_model.dart' show AdminUser;
 import 'package:repub_admin/blocs/config/config_bloc.dart';
 import 'package:repub_admin/blocs/config/config_event.dart';
 import 'package:repub_admin/blocs/config/config_state.dart';
-import 'package:repub_admin/models/site_config.dart';
 import 'package:repub_admin/screens/site_config_screen.dart';
 import 'package:repub_admin/services/auth_service.dart';
 

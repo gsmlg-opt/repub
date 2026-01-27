@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:repub_model/repub_model.dart';
 
 import 'package:repub_admin/screens/login_screen.dart';
 import 'package:repub_admin/services/auth_service.dart';
