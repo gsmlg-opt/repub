@@ -50,7 +50,7 @@ jobs:
         run: |
           TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}"
           if [ "${{ inputs.tag }}" != "latest" ]; then
-            TAGS="${TAGS},${ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
