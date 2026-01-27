@@ -4,3 +4,4 @@ library;
 export 'src/backup.dart';
 export 'src/blobs.dart';
 export 'src/metadata.dart';
+export 'src/migration.dart';

@@ -20,6 +20,8 @@ void main(List<String> args) async {
       await runAdminCommand(subArgs);
     case 'backup':
       await runBackupCommand(subArgs);
+    case 'storage':
+      await runStorageCommand(subArgs);
     case 'help':
     case '--help':
     case '-h':

@@ -4,6 +4,7 @@ import 'package:repub_storage/repub_storage.dart';
 
 import 'admin_commands.dart';
 import 'backup_commands.dart';
+import 'storage_commands.dart';
 
 /// Print usage information.
 void printUsage() {
@@ -18,6 +19,7 @@ Commands:
   migrate         Run database migrations
   admin <cmd>     Admin user management (create, list, reset-password, etc.)
   backup <cmd>    Database backup and restore (export, import)
+  storage <cmd>   Storage migration (local <-> S3)
   help            Show this help message
 
 Note:
@@ -82,4 +84,9 @@ Future<void> runAdminCommand(List<String> args) async {
 /// Handle backup commands.
 Future<void> runBackupCommand(List<String> args) async {
   await backupCommands(args);
+}
+
+/// Handle storage commands.
+Future<void> runStorageCommand(List<String> args) async {
+  await storageCommands(args);
 }
