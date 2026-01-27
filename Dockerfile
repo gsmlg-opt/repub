@@ -38,8 +38,8 @@ COPY packages/ packages/
 # Build web UI
 RUN cd packages/repub_web && dart run build_runner build --release --output build
 
-# Build Flutter admin UI
-RUN cd packages/repub_admin && flutter build web --release
+# Build Flutter admin UI with base href for /admin/ subdirectory
+RUN cd packages/repub_admin && flutter build web --release --base-href /admin/
 
 # Create output directory and compile executables
 RUN mkdir -p bin
