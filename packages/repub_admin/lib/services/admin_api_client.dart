@@ -11,12 +11,18 @@ class AdminStats {
   final int localPackages;
   final int cachedPackages;
   final int totalVersions;
+  final int totalUsers;
+  final int activeTokens;
+  final int totalDownloads;
 
   const AdminStats({
     required this.totalPackages,
     required this.localPackages,
     required this.cachedPackages,
     required this.totalVersions,
+    this.totalUsers = 0,
+    this.activeTokens = 0,
+    this.totalDownloads = 0,
   });
 
   factory AdminStats.fromJson(Map<String, dynamic> json) => AdminStats(
@@ -24,6 +30,9 @@ class AdminStats {
         localPackages: json['localPackages'] as int,
         cachedPackages: json['cachedPackages'] as int,
         totalVersions: json['totalVersions'] as int,
+        totalUsers: json['totalUsers'] as int? ?? 0,
+        activeTokens: json['activeTokens'] as int? ?? 0,
+        totalDownloads: json['totalDownloads'] as int? ?? 0,
       );
 }
 
@@ -155,9 +164,9 @@ class AdminApiClient {
       'local_packages': stats.localPackages,
       'cached_packages': stats.cachedPackages,
       'total_versions': stats.totalVersions,
-      'total_users': 0, // TODO: Add users count to stats endpoint
-      'total_downloads': 0, // TODO: Add downloads count to stats endpoint
-      'active_tokens': 0, // TODO: Add tokens count to stats endpoint
+      'total_users': stats.totalUsers,
+      'total_downloads': stats.totalDownloads,
+      'active_tokens': stats.activeTokens,
       'recent_activity': recentActivity,
       'top_packages': <Map<String, dynamic>>[],
     };
