@@ -109,7 +109,8 @@ Future<void> _importBackup(List<String> args) async {
 
   if (fileArgs.isEmpty) {
     print('Error: Missing input file path');
-    print('Usage: dart run repub_cli backup import [--dry-run] [--force] <file>');
+    print(
+        'Usage: dart run repub_cli backup import [--dry-run] [--force] <file>');
     exit(1);
   }
 

@@ -207,7 +207,8 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             InkWell(
-                              onTap: () => context.go('/packages/${pkg.name}/stats'),
+                              onTap: () =>
+                                  context.go('/packages/${pkg.name}/stats'),
                               child: Text(
                                 pkg.name,
                                 style: TextStyle(

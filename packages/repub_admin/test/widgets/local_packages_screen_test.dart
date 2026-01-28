@@ -192,8 +192,7 @@ void main() {
       expect(find.text('8.0.0'), findsOneWidget);
     });
 
-    testWidgets('shows error icon when state is PackagesError',
-        (tester) async {
+    testWidgets('shows error icon when state is PackagesError', (tester) async {
       when(() => mockPackagesBloc.state).thenReturn(
         const PackagesError('Failed to load packages'),
       );
@@ -350,4 +349,3 @@ void main() {
     // with mocktail's simple stream.thenAnswer approach.
   });
 }
-

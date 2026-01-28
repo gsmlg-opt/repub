@@ -48,7 +48,8 @@ void main() {
         await Future.delayed(Duration(milliseconds: 100));
 
         expect(capturedRequests, hasLength(1));
-        expect(capturedRequests.first.url.toString(), equals('https://example.com/webhook'));
+        expect(capturedRequests.first.url.toString(),
+            equals('https://example.com/webhook'));
       });
 
       test('does not trigger webhooks for non-matching events', () async {
@@ -145,7 +146,8 @@ void main() {
         final hmac = Hmac(sha256, key);
         final expectedSignature = 'sha256=${hmac.convert(bytes)}';
 
-        expect(request.headers['x-webhook-signature'], equals(expectedSignature));
+        expect(
+            request.headers['x-webhook-signature'], equals(expectedSignature));
       });
 
       test('sends correct payload format', () async {
@@ -184,7 +186,8 @@ void main() {
         await Future.delayed(Duration(milliseconds: 100));
 
         final webhooks = await metadata.listWebhooks();
-        final deliveries = await metadata.getWebhookDeliveries(webhooks.first.id);
+        final deliveries =
+            await metadata.getWebhookDeliveries(webhooks.first.id);
 
         expect(deliveries, hasLength(1));
         expect(deliveries.first.success, isTrue);
@@ -299,7 +302,8 @@ void main() {
 
         await Future.delayed(Duration(milliseconds: 100));
 
-        final payload = jsonDecode(capturedRequests.first.body) as Map<String, dynamic>;
+        final payload =
+            jsonDecode(capturedRequests.first.body) as Map<String, dynamic>;
         expect(payload['event'], equals('package.published'));
         expect(payload['data']['package'], equals('my_pkg'));
         expect(payload['data']['version'], equals('2.0.0'));
@@ -316,7 +320,8 @@ void main() {
 
         await Future.delayed(Duration(milliseconds: 100));
 
-        final payload = jsonDecode(capturedRequests.first.body) as Map<String, dynamic>;
+        final payload =
+            jsonDecode(capturedRequests.first.body) as Map<String, dynamic>;
         expect(payload['event'], equals('package.deleted'));
         expect(payload['data']['package'], equals('deleted_pkg'));
         expect(payload['data']['deleted_by'], equals('admin'));
@@ -329,7 +334,8 @@ void main() {
 
         await Future.delayed(Duration(milliseconds: 100));
 
-        final payload = jsonDecode(capturedRequests.first.body) as Map<String, dynamic>;
+        final payload =
+            jsonDecode(capturedRequests.first.body) as Map<String, dynamic>;
         expect(payload['event'], equals('user.registered'));
         expect(payload['data']['email'], equals('new@example.com'));
       });

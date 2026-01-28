@@ -3,8 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
 
 import '../models/webhook_info.dart';
-import 'url_detector_stub.dart'
-    if (dart.library.html) 'url_detector_web.dart';
+import 'url_detector_stub.dart' if (dart.library.html) 'url_detector_web.dart';
 
 class AdminStats {
   final int totalPackages;
@@ -302,7 +301,8 @@ class AdminApiClient {
     int depth = 2,
   }) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/admin/api/packages/$packageName/dependencies?depth=$depth'),
+      Uri.parse(
+          '$baseUrl/admin/api/packages/$packageName/dependencies?depth=$depth'),
       headers: _headers,
     );
 
@@ -899,7 +899,8 @@ class AdminApiClient {
     int limit = 50,
   }) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/admin/api/webhooks/$webhookId/deliveries?limit=$limit'),
+      Uri.parse(
+          '$baseUrl/admin/api/webhooks/$webhookId/deliveries?limit=$limit'),
       headers: _headers,
     );
 
@@ -912,7 +913,8 @@ class AdminApiClient {
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final deliveries = (json['deliveries'] as List<dynamic>?)
-            ?.map((d) => WebhookDeliveryInfo.fromJson(d as Map<String, dynamic>))
+            ?.map(
+                (d) => WebhookDeliveryInfo.fromJson(d as Map<String, dynamic>))
             .toList() ??
         [];
 
@@ -928,7 +930,8 @@ class AdminApiClient {
     String? message,
   }) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
+      Uri.parse(
+          '$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
       headers: _headers,
       body: message != null && message.isNotEmpty
           ? jsonEncode({'message': message})
@@ -951,9 +954,11 @@ class AdminApiClient {
   }
 
   /// Un-retract a package version.
-  Future<void> unretractPackageVersion(String packageName, String version) async {
+  Future<void> unretractPackageVersion(
+      String packageName, String version) async {
     final response = await _client.delete(
-      Uri.parse('$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
+      Uri.parse(
+          '$baseUrl/admin/api/packages/$packageName/versions/$version/retract'),
       headers: _headers,
     );
 
@@ -1102,18 +1107,16 @@ class PackageDependencies {
     return PackageDependencies(
       package: json['package'] as String,
       version: json['version'] as String?,
-      dependencies:
-          (json['dependencies'] as Map<String, dynamic>?) ?? {},
+      dependencies: (json['dependencies'] as Map<String, dynamic>?) ?? {},
       devDependencies:
           (json['dev_dependencies'] as Map<String, dynamic>?) ?? {},
       reverseDependencies: (json['reverse_dependencies'] as List<dynamic>?)
-              ?.map((e) => ReverseDependency.fromJson(e as Map<String, dynamic>))
+              ?.map(
+                  (e) => ReverseDependency.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      dependencyTree:
-          (json['dependency_tree'] as Map<String, dynamic>?) ?? {},
-      environment:
-          (json['environment'] as Map<String, dynamic>?) ?? {},
+      dependencyTree: (json['dependency_tree'] as Map<String, dynamic>?) ?? {},
+      environment: (json['environment'] as Map<String, dynamic>?) ?? {},
     );
   }
 

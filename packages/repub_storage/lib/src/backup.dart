@@ -50,8 +50,8 @@ class BackupData {
       formatVersion: json['formatVersion'] as int,
       createdAt: DateTime.parse(json['createdAt'] as String),
       databaseType: json['databaseType'] as String,
-      packages: (data['packages'] as List<dynamic>)
-          .cast<Map<String, dynamic>>(),
+      packages:
+          (data['packages'] as List<dynamic>).cast<Map<String, dynamic>>(),
       packageVersions: (data['packageVersions'] as List<dynamic>)
           .cast<Map<String, dynamic>>(),
       users: (data['users'] as List<dynamic>).cast<Map<String, dynamic>>(),
@@ -87,9 +87,8 @@ class BackupManager {
   /// Blob storage should be backed up separately using appropriate tools
   /// (e.g., filesystem copy for local storage, S3 bucket replication for S3).
   Future<BackupData> createBackup() async {
-    final databaseType = metadata is SqliteMetadataStore
-        ? 'sqlite'
-        : 'postgresql';
+    final databaseType =
+        metadata is SqliteMetadataStore ? 'sqlite' : 'postgresql';
 
     return BackupData(
       formatVersion: backupFormatVersion,
@@ -116,7 +115,8 @@ class BackupManager {
   ///
   /// WARNING: This will clear existing data before importing!
   /// Returns a summary of imported records.
-  Future<Map<String, int>> importFromFile(String filePath, {bool dryRun = false}) async {
+  Future<Map<String, int>> importFromFile(String filePath,
+      {bool dryRun = false}) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw BackupException('Backup file not found: $filePath');
@@ -231,7 +231,8 @@ class BackupManager {
     }
   }
 
-  Future<void> _importPackageVersions(List<Map<String, dynamic>> versions) async {
+  Future<void> _importPackageVersions(
+      List<Map<String, dynamic>> versions) async {
     if (metadata is SqliteMetadataStore) {
       await (metadata as SqliteMetadataStore).importPackageVersions(versions);
     } else {

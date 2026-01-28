@@ -219,7 +219,8 @@ void main() {
       );
     });
 
-    test('email not sent when package publish notifications disabled', () async {
+    test('email not sent when package publish notifications disabled',
+        () async {
       await metadata.setConfig('smtp_host', 'smtp.test.com');
       await metadata.setConfig('smtp_from_address', 'test@test.com');
       await metadata.setConfig('email_notifications_enabled', 'true');

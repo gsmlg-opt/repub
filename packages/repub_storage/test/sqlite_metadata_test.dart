@@ -314,8 +314,8 @@ void main() {
 
       final tokens = await store.listTokens(userId: testUserId);
       expect(tokens, hasLength(2));
-      expect(
-          tokens.map((t) => t.label).toList(), containsAll(['token_1', 'token_2']));
+      expect(tokens.map((t) => t.label).toList(),
+          containsAll(['token_1', 'token_2']));
     });
 
     test('deleteToken removes token by label', () async {
@@ -326,8 +326,7 @@ void main() {
       );
 
       var tokens = await store.listTokens(userId: testUserId);
-      expect(
-          tokens.where((t) => t.label == 'delete_this_token'), hasLength(1));
+      expect(tokens.where((t) => t.label == 'delete_this_token'), hasLength(1));
 
       final deleted = await store.deleteToken('delete_this_token');
       expect(deleted, isTrue);
@@ -412,7 +411,8 @@ void main() {
       // Completed sessions are typically deleted, so getUploadSession returns null
       final retrievedSession = await store.getUploadSession(session.id);
       // Session may be deleted or still exist after completion depending on implementation
-      expect(retrievedSession == null || retrievedSession.id == session.id, isTrue);
+      expect(retrievedSession == null || retrievedSession.id == session.id,
+          isTrue);
     });
 
     test('cleanupExpiredSessions removes old sessions', () async {
@@ -520,11 +520,13 @@ void main() {
 
       final names = configs.map((c) => c.name).toList();
       // Check for some default configs from migration
-      expect(names, containsAll([
-        'allow_registration',
-        'require_email_verification',
-        'allow_anonymous_publish',
-      ]));
+      expect(
+          names,
+          containsAll([
+            'allow_registration',
+            'require_email_verification',
+            'allow_anonymous_publish',
+          ]));
     });
   });
 

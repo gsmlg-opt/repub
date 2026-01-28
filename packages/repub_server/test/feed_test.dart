@@ -64,7 +64,8 @@ void main() {
 
         expect(rss, contains('<title>Test Feed</title>'));
         expect(rss, contains('<link>https://example.com</link>'));
-        expect(rss, contains('<description>Test feed description</description>'));
+        expect(
+            rss, contains('<description>Test feed description</description>'));
         expect(rss, contains('<lastBuildDate>'));
         expect(rss, contains('atom:link href="https://example.com/feed.rss"'));
       });
@@ -98,7 +99,8 @@ void main() {
         expect(rss, contains('<item>'));
         expect(rss, contains('<title>pkg_a 1.0.0</title>'));
         expect(rss, contains('<title>pkg_a 2.0.0</title>'));
-        expect(rss, contains('<link>https://example.com/packages/pkg_a</link>'));
+        expect(
+            rss, contains('<link>https://example.com/packages/pkg_a</link>'));
         expect(rss, contains('<guid isPermaLink="false">pkg_a-1.0.0</guid>'));
         expect(rss, contains('<guid isPermaLink="false">pkg_a-2.0.0</guid>'));
       });
@@ -231,8 +233,12 @@ void main() {
 
         expect(atom, contains('<title>Test Feed</title>'));
         expect(atom, contains('<subtitle>Test feed description</subtitle>'));
-        expect(atom, contains('<link href="https://example.com" rel="alternate"/>'));
-        expect(atom, contains('<link href="https://example.com/feed.atom" rel="self"/>'));
+        expect(atom,
+            contains('<link href="https://example.com" rel="alternate"/>'));
+        expect(
+            atom,
+            contains(
+                '<link href="https://example.com/feed.atom" rel="self"/>'));
         expect(atom, contains('<id>https://example.com/</id>'));
         expect(atom, contains('<updated>'));
       });
@@ -243,8 +249,12 @@ void main() {
 
         expect(atom, contains('<entry>'));
         expect(atom, contains('<title>test_pkg 1.0.0</title>'));
-        expect(atom, contains('<link href="https://example.com/packages/test_pkg"/>'));
-        expect(atom, contains('<id>https://example.com/packages/test_pkg/versions/1.0.0</id>'));
+        expect(atom,
+            contains('<link href="https://example.com/packages/test_pkg"/>'));
+        expect(
+            atom,
+            contains(
+                '<id>https://example.com/packages/test_pkg/versions/1.0.0</id>'));
         expect(atom, contains('<published>'));
         expect(atom, contains('<summary type="text">'));
         expect(atom, contains('<content type="html">'));
@@ -264,8 +274,12 @@ void main() {
         final rss = feed.generatePackageRss(pkg);
 
         expect(rss, contains('<title>my_package - Package Updates</title>'));
-        expect(rss, contains('<link>https://example.com/packages/my_package</link>'));
-        expect(rss, contains('atom:link href="https://example.com/packages/my_package/feed.rss"'));
+        expect(rss,
+            contains('<link>https://example.com/packages/my_package</link>'));
+        expect(
+            rss,
+            contains(
+                'atom:link href="https://example.com/packages/my_package/feed.rss"'));
       });
 
       test('includes all package versions', () {
@@ -329,9 +343,16 @@ void main() {
         final atom = feed.generatePackageAtom(pkg);
 
         expect(atom, contains('<title>my_package - Package Updates</title>'));
-        expect(atom, contains('<link href="https://example.com/packages/my_package" rel="alternate"/>'));
-        expect(atom, contains('<link href="https://example.com/packages/my_package/feed.atom" rel="self"/>'));
-        expect(atom, contains('<id>https://example.com/packages/my_package</id>'));
+        expect(
+            atom,
+            contains(
+                '<link href="https://example.com/packages/my_package" rel="alternate"/>'));
+        expect(
+            atom,
+            contains(
+                '<link href="https://example.com/packages/my_package/feed.atom" rel="self"/>'));
+        expect(
+            atom, contains('<id>https://example.com/packages/my_package</id>'));
       });
     });
 

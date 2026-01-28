@@ -21,20 +21,26 @@ class FeedGenerator {
 
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
-    buffer.writeln('<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">');
+    buffer.writeln(
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">');
     buffer.writeln('  <channel>');
     buffer.writeln('    <title>${_escapeXml(title)}</title>');
     buffer.writeln('    <link>$baseUrl</link>');
     buffer.writeln('    <description>${_escapeXml(description)}</description>');
     buffer.writeln('    <lastBuildDate>$lastBuildDate</lastBuildDate>');
-    buffer.writeln('    <atom:link href="$baseUrl/feed.rss" rel="self" type="application/rss+xml"/>');
+    buffer.writeln(
+        '    <atom:link href="$baseUrl/feed.rss" rel="self" type="application/rss+xml"/>');
 
     for (final item in items) {
       buffer.writeln('    <item>');
-      buffer.writeln('      <title>${_escapeXml(item.packageName)} ${item.version}</title>');
-      buffer.writeln('      <link>$baseUrl/packages/${item.packageName}</link>');
-      buffer.writeln('      <guid isPermaLink="false">${item.packageName}-${item.version}</guid>');
-      buffer.writeln('      <pubDate>${_formatRssDate(item.publishedAt)}</pubDate>');
+      buffer.writeln(
+          '      <title>${_escapeXml(item.packageName)} ${item.version}</title>');
+      buffer
+          .writeln('      <link>$baseUrl/packages/${item.packageName}</link>');
+      buffer.writeln(
+          '      <guid isPermaLink="false">${item.packageName}-${item.version}</guid>');
+      buffer.writeln(
+          '      <pubDate>${_formatRssDate(item.publishedAt)}</pubDate>');
 
       final desc = _getVersionDescription(item);
       buffer.writeln('      <description>${_escapeXml(desc)}</description>');
@@ -65,19 +71,25 @@ class FeedGenerator {
     buffer.writeln('  <updated>$updated</updated>');
 
     for (final item in items) {
-      final itemId = '$baseUrl/packages/${item.packageName}/versions/${item.version}';
+      final itemId =
+          '$baseUrl/packages/${item.packageName}/versions/${item.version}';
       buffer.writeln('  <entry>');
-      buffer.writeln('    <title>${_escapeXml(item.packageName)} ${item.version}</title>');
-      buffer.writeln('    <link href="$baseUrl/packages/${item.packageName}"/>');
+      buffer.writeln(
+          '    <title>${_escapeXml(item.packageName)} ${item.version}</title>');
+      buffer
+          .writeln('    <link href="$baseUrl/packages/${item.packageName}"/>');
       buffer.writeln('    <id>$itemId</id>');
-      buffer.writeln('    <updated>${_formatAtomDate(item.publishedAt)}</updated>');
-      buffer.writeln('    <published>${_formatAtomDate(item.publishedAt)}</published>');
+      buffer.writeln(
+          '    <updated>${_formatAtomDate(item.publishedAt)}</updated>');
+      buffer.writeln(
+          '    <published>${_formatAtomDate(item.publishedAt)}</published>');
 
       final desc = _getVersionDescription(item);
       buffer.writeln('    <summary type="text">${_escapeXml(desc)}</summary>');
 
       final content = _getVersionContent(item);
-      buffer.writeln('    <content type="html">${_escapeXml(content)}</content>');
+      buffer
+          .writeln('    <content type="html">${_escapeXml(content)}</content>');
       buffer.writeln('  </entry>');
     }
 
@@ -94,15 +106,19 @@ class FeedGenerator {
         : _formatRssDate(DateTime.now());
 
     buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
-    buffer.writeln('<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">');
+    buffer.writeln(
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">');
     buffer.writeln('  <channel>');
-    buffer.writeln('    <title>${_escapeXml(package.package.name)} - Package Updates</title>');
-    buffer.writeln('    <link>$baseUrl/packages/${package.package.name}</link>');
+    buffer.writeln(
+        '    <title>${_escapeXml(package.package.name)} - Package Updates</title>');
+    buffer
+        .writeln('    <link>$baseUrl/packages/${package.package.name}</link>');
 
     final desc = _getPackageDescription(package);
     buffer.writeln('    <description>${_escapeXml(desc)}</description>');
     buffer.writeln('    <lastBuildDate>$lastBuildDate</lastBuildDate>');
-    buffer.writeln('    <atom:link href="$baseUrl/packages/${package.package.name}/feed.rss" rel="self" type="application/rss+xml"/>');
+    buffer.writeln(
+        '    <atom:link href="$baseUrl/packages/${package.package.name}/feed.rss" rel="self" type="application/rss+xml"/>');
 
     // Sort versions by published date descending
     final sortedVersions = List<PackageVersion>.from(package.versions)
@@ -110,13 +126,18 @@ class FeedGenerator {
 
     for (final version in sortedVersions.take(20)) {
       buffer.writeln('    <item>');
-      buffer.writeln('      <title>${_escapeXml(package.package.name)} ${version.version}</title>');
-      buffer.writeln('      <link>$baseUrl/packages/${package.package.name}</link>');
-      buffer.writeln('      <guid isPermaLink="false">${package.package.name}-${version.version}</guid>');
-      buffer.writeln('      <pubDate>${_formatRssDate(version.publishedAt)}</pubDate>');
+      buffer.writeln(
+          '      <title>${_escapeXml(package.package.name)} ${version.version}</title>');
+      buffer.writeln(
+          '      <link>$baseUrl/packages/${package.package.name}</link>');
+      buffer.writeln(
+          '      <guid isPermaLink="false">${package.package.name}-${version.version}</guid>');
+      buffer.writeln(
+          '      <pubDate>${_formatRssDate(version.publishedAt)}</pubDate>');
 
       final versionDesc = _getVersionDescription(version);
-      buffer.writeln('      <description>${_escapeXml(versionDesc)}</description>');
+      buffer.writeln(
+          '      <description>${_escapeXml(versionDesc)}</description>');
       buffer.writeln('    </item>');
     }
 
@@ -135,12 +156,15 @@ class FeedGenerator {
 
     buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
     buffer.writeln('<feed xmlns="http://www.w3.org/2005/Atom">');
-    buffer.writeln('  <title>${_escapeXml(package.package.name)} - Package Updates</title>');
+    buffer.writeln(
+        '  <title>${_escapeXml(package.package.name)} - Package Updates</title>');
 
     final desc = _getPackageDescription(package);
     buffer.writeln('  <subtitle>${_escapeXml(desc)}</subtitle>');
-    buffer.writeln('  <link href="$baseUrl/packages/${package.package.name}" rel="alternate"/>');
-    buffer.writeln('  <link href="$baseUrl/packages/${package.package.name}/feed.atom" rel="self"/>');
+    buffer.writeln(
+        '  <link href="$baseUrl/packages/${package.package.name}" rel="alternate"/>');
+    buffer.writeln(
+        '  <link href="$baseUrl/packages/${package.package.name}/feed.atom" rel="self"/>');
     buffer.writeln('  <id>$baseUrl/packages/${package.package.name}</id>');
     buffer.writeln('  <updated>$updated</updated>');
 
@@ -149,19 +173,26 @@ class FeedGenerator {
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
     for (final version in sortedVersions.take(20)) {
-      final itemId = '$baseUrl/packages/${package.package.name}/versions/${version.version}';
+      final itemId =
+          '$baseUrl/packages/${package.package.name}/versions/${version.version}';
       buffer.writeln('  <entry>');
-      buffer.writeln('    <title>${_escapeXml(package.package.name)} ${version.version}</title>');
-      buffer.writeln('    <link href="$baseUrl/packages/${package.package.name}"/>');
+      buffer.writeln(
+          '    <title>${_escapeXml(package.package.name)} ${version.version}</title>');
+      buffer.writeln(
+          '    <link href="$baseUrl/packages/${package.package.name}"/>');
       buffer.writeln('    <id>$itemId</id>');
-      buffer.writeln('    <updated>${_formatAtomDate(version.publishedAt)}</updated>');
-      buffer.writeln('    <published>${_formatAtomDate(version.publishedAt)}</published>');
+      buffer.writeln(
+          '    <updated>${_formatAtomDate(version.publishedAt)}</updated>');
+      buffer.writeln(
+          '    <published>${_formatAtomDate(version.publishedAt)}</published>');
 
       final versionDesc = _getVersionDescription(version);
-      buffer.writeln('    <summary type="text">${_escapeXml(versionDesc)}</summary>');
+      buffer.writeln(
+          '    <summary type="text">${_escapeXml(versionDesc)}</summary>');
 
       final content = _getVersionContent(version);
-      buffer.writeln('    <content type="html">${_escapeXml(content)}</content>');
+      buffer
+          .writeln('    <content type="html">${_escapeXml(content)}</content>');
       buffer.writeln('  </entry>');
     }
 
@@ -171,7 +202,8 @@ class FeedGenerator {
   }
 
   /// Get recent versions sorted by publish date.
-  List<PackageVersion> _getRecentVersions(List<PackageInfo> packages, int limit) {
+  List<PackageVersion> _getRecentVersions(
+      List<PackageInfo> packages, int limit) {
     final allVersions = <PackageVersion>[];
 
     for (final pkg in packages) {
@@ -189,8 +221,18 @@ class FeedGenerator {
     final utc = date.toUtc();
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
 
     final day = days[utc.weekday - 1];
@@ -221,7 +263,8 @@ class FeedGenerator {
   String _getVersionDescription(PackageVersion version) {
     final pubspec = version.pubspec;
     final description = pubspec['description'] as String? ?? '';
-    return 'Version ${version.version} of ${version.packageName}. $description'.trim();
+    return 'Version ${version.version} of ${version.packageName}. $description'
+        .trim();
   }
 
   /// Get HTML content for version.
@@ -236,7 +279,8 @@ class FeedGenerator {
 <p><strong>Dart SDK:</strong> $sdk</p>
 <p><strong>Published:</strong> ${version.publishedAt.toIso8601String()}</p>
 <p><a href="$baseUrl/packages/${version.packageName}">View package</a></p>
-'''.trim();
+'''
+        .trim();
   }
 
   /// Get description for a package.

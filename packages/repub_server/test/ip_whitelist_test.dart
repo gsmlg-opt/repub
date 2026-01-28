@@ -20,7 +20,8 @@ void main() {
       if (forwardedFor != null) {
         headers['x-forwarded-for'] = forwardedFor;
       }
-      return Request('GET', Uri.parse('http://localhost$path'), headers: headers);
+      return Request('GET', Uri.parse('http://localhost$path'),
+          headers: headers);
     }
 
     group('Empty whitelist', () {
@@ -31,7 +32,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
         expect(response.statusCode, equals(200));
       });
     });
@@ -44,7 +46,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
         expect(response.statusCode, equals(200));
       });
     });
@@ -57,7 +60,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.100'));
+        final response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.100'));
         expect(response.statusCode, equals(200));
       });
 
@@ -68,7 +72,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.101'));
+        final response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.101'));
         expect(response.statusCode, equals(403));
       });
 
@@ -79,7 +84,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '127.0.0.1'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '127.0.0.1'));
         expect(response.statusCode, equals(200));
       });
     });
@@ -93,13 +99,16 @@ void main() {
         final handler = middleware(testHandler);
 
         // All 192.168.1.x addresses should be allowed
-        var response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.0'));
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '192.168.1.0'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.1'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '192.168.1.1'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.255'));
+        response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.255'));
         expect(response.statusCode, equals(200));
       });
 
@@ -110,7 +119,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '192.168.2.1'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '192.168.2.1'));
         expect(response.statusCode, equals(403));
       });
 
@@ -121,13 +131,16 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        var response = await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '10.0.255.255'));
+        response = await handler(
+            createRequest('/admin/api/stats', ip: '10.0.255.255'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '10.1.0.1'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '10.1.0.1'));
         expect(response.statusCode, equals(403));
       });
 
@@ -138,10 +151,12 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        var response = await handler(createRequest('/admin/api/stats', ip: '10.255.255.255'));
+        var response = await handler(
+            createRequest('/admin/api/stats', ip: '10.255.255.255'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '11.0.0.1'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '11.0.0.1'));
         expect(response.statusCode, equals(403));
       });
     });
@@ -154,13 +169,16 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        var response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.50'));
+        var response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.50'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '10.10.10.10'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '10.10.10.10'));
         expect(response.statusCode, equals(200));
 
-        response = await handler(createRequest('/admin/api/stats', ip: '172.16.0.5'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '172.16.0.5'));
         expect(response.statusCode, equals(200));
       });
 
@@ -171,7 +189,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '172.16.0.1'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '172.16.0.1'));
         expect(response.statusCode, equals(403));
       });
     });
@@ -185,7 +204,8 @@ void main() {
         final handler = middleware(testHandler);
 
         // Admin path should be blocked for non-whitelisted IP
-        var response = await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
         expect(response.statusCode, equals(403));
 
         // Non-admin path should be allowed
@@ -255,11 +275,13 @@ void main() {
         final handler = middleware(testHandler);
 
         // Valid entry should still work
-        var response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.100'));
+        var response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.100'));
         expect(response.statusCode, equals(200));
 
         // Invalid entries are ignored
-        response = await handler(createRequest('/admin/api/stats', ip: 'not-an-ip'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: 'not-an-ip'));
         expect(response.statusCode, equals(403));
       });
 
@@ -271,11 +293,13 @@ void main() {
         final handler = middleware(testHandler);
 
         // Valid CIDR should work
-        var response = await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
         expect(response.statusCode, equals(200));
 
         // Invalid CIDR is ignored
-        response = await handler(createRequest('/admin/api/stats', ip: '192.168.1.1'));
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '192.168.1.1'));
         expect(response.statusCode, equals(403));
       });
     });
@@ -288,7 +312,8 @@ void main() {
         );
         final handler = middleware(testHandler);
 
-        final response = await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '1.2.3.4'));
         expect(response.statusCode, equals(403));
         expect(response.headers['content-type'], equals('application/json'));
 

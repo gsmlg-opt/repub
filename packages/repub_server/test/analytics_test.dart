@@ -24,7 +24,8 @@ void main() {
       await metadata.runMigrations();
 
       blobs = FileBlobStore(
-          basePath: '${tempDir.path}/storage', baseUrl: 'http://localhost:4920');
+          basePath: '${tempDir.path}/storage',
+          baseUrl: 'http://localhost:4920');
       cacheBlobs = FileBlobStore(
           basePath: '${tempDir.path}/cache',
           baseUrl: 'http://localhost:4920',

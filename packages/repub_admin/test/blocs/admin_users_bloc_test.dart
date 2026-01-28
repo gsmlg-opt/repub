@@ -43,8 +43,8 @@ void main() {
           const AdminUsersLoading(),
           isA<AdminUsersLoaded>()
               .having((s) => s.adminUsers.length, 'admin users count', 2)
-              .having(
-                  (s) => s.adminUsers.first.username, 'first username', 'admin'),
+              .having((s) => s.adminUsers.first.username, 'first username',
+                  'admin'),
         ],
       );
 
@@ -107,8 +107,8 @@ void main() {
       blocTest<AdminUsersBloc, AdminUsersState>(
         'emits [AdminUserDetailLoading, AdminUsersError] when LoadAdminUserDetail fails',
         build: () {
-          when(() => mockApiClient.getAdminUser('admin-1'))
-              .thenThrow(AdminApiException(
+          when(() => mockApiClient.getAdminUser('admin-1')).thenThrow(
+              AdminApiException(
                   statusCode: 404, message: 'Admin user not found'));
           return AdminUsersBloc(apiClient: mockApiClient);
         },
@@ -116,8 +116,7 @@ void main() {
         expect: () => [
           const AdminUserDetailLoading('admin-1'),
           isA<AdminUsersError>()
-              .having(
-                  (s) => s.message, 'message', contains('Failed to load')),
+              .having((s) => s.message, 'message', contains('Failed to load')),
         ],
       );
 
@@ -175,8 +174,7 @@ void main() {
         expect: () => [
           const LoginHistoryLoading('admin-1'),
           isA<AdminUsersError>()
-              .having(
-                  (s) => s.message, 'message', contains('Failed to load')),
+              .having((s) => s.message, 'message', contains('Failed to load')),
         ],
       );
 

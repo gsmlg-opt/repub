@@ -202,8 +202,10 @@ void main() {
         final key = 'packages/my_package/1.0.0/hash.tar.gz';
         final url = await blobStore.getDownloadUrl(key);
 
-        expect(url,
-            equals('http://localhost:4920/api/packages/my_package/versions/1.0.0/archive.tar.gz'));
+        expect(
+            url,
+            equals(
+                'http://localhost:4920/api/packages/my_package/versions/1.0.0/archive.tar.gz'));
       });
 
       test('handles base URL with trailing slash', () async {
@@ -216,15 +218,18 @@ void main() {
         final url = await store.getDownloadUrl(key);
 
         // Should not have double slashes
-        expect(url,
-            equals('http://localhost:4920/api/packages/my_package/versions/2.0.0/archive.tar.gz'));
+        expect(
+            url,
+            equals(
+                'http://localhost:4920/api/packages/my_package/versions/2.0.0/archive.tar.gz'));
       });
 
       test('returns fallback for non-package keys', () async {
         final key = 'other/path/file.txt';
         final url = await blobStore.getDownloadUrl(key);
 
-        expect(url, equals('http://localhost:4920/storage/other/path/file.txt'));
+        expect(
+            url, equals('http://localhost:4920/storage/other/path/file.txt'));
       });
     });
   });

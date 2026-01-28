@@ -168,7 +168,8 @@ void main() {
         expect(
           createIndexCount,
           equals(0),
-          reason: 'Migration ${entry.key} should use CREATE INDEX IF NOT EXISTS',
+          reason:
+              'Migration ${entry.key} should use CREATE INDEX IF NOT EXISTS',
         );
       }
     });

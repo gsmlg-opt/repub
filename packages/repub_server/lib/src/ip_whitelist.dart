@@ -151,7 +151,8 @@ _CidrRule? _parseCidr(String cidr) {
   if (networkAddr == null) return null;
 
   // Create subnet mask (e.g., /24 = 0xFFFFFF00)
-  final mask = prefixLength == 0 ? 0 : (0xFFFFFFFF << (32 - prefixLength)) & 0xFFFFFFFF;
+  final mask =
+      prefixLength == 0 ? 0 : (0xFFFFFFFF << (32 - prefixLength)) & 0xFFFFFFFF;
 
   return _CidrRule(networkAddr, mask);
 }

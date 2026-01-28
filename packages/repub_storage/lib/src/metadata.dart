@@ -460,14 +460,13 @@ class PostgresMetadataStore extends MetadataStore {
       final startTime = DateTime.now();
       final result = await _conn.execute('SELECT COUNT(*) FROM packages');
       final endTime = DateTime.now();
-      final latencyMs =
-          endTime.difference(startTime).inMicroseconds / 1000.0;
+      final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
 
       final packageCount = result.first[0] as int;
 
       // Get database size
-      final sizeResult = await _conn.execute(
-          'SELECT pg_database_size(current_database())');
+      final sizeResult =
+          await _conn.execute('SELECT pg_database_size(current_database())');
       final dbSizeBytes = sizeResult.first[0] as int;
 
       return {
@@ -1107,7 +1106,8 @@ class PostgresMetadataStore extends MetadataStore {
 
   @override
   Future<int> getTotalDownloads() async {
-    final result = await _conn.execute('SELECT COUNT(*) FROM package_downloads');
+    final result =
+        await _conn.execute('SELECT COUNT(*) FROM package_downloads');
     return result.first[0] as int;
   }
 
@@ -1212,7 +1212,8 @@ class PostgresMetadataStore extends MetadataStore {
       parameters: {'name': packageName, 'days': historyDays.toString()},
     );
     final dailyDownloads = <String, int>{
-      for (final row in dailyResult) row[0].toString().split(' ')[0]: row[1] as int,
+      for (final row in dailyResult)
+        row[0].toString().split(' ')[0]: row[1] as int,
     };
 
     return PackageDownloadStats(
@@ -1897,8 +1898,9 @@ class PostgresMetadataStore extends MetadataStore {
       parameters['actorType'] = actorType;
     }
 
-    final whereClause =
-        whereConditions.isNotEmpty ? 'WHERE ${whereConditions.join(' AND ')}' : '';
+    final whereClause = whereConditions.isNotEmpty
+        ? 'WHERE ${whereConditions.join(' AND ')}'
+        : '';
 
     final result = await _conn.execute(
       Sql.named('''
@@ -2166,7 +2168,8 @@ class PostgresMetadataStore extends MetadataStore {
   }
 
   /// Import package versions from backup.
-  Future<void> importPackageVersions(List<Map<String, dynamic>> versions) async {
+  Future<void> importPackageVersions(
+      List<Map<String, dynamic>> versions) async {
     for (final v in versions) {
       await _conn.execute(
         Sql.named('''
@@ -2387,8 +2390,7 @@ class SqliteMetadataStore extends MetadataStore {
       final startTime = DateTime.now();
       final result = _db.select('SELECT COUNT(*) as count FROM packages');
       final endTime = DateTime.now();
-      final latencyMs =
-          endTime.difference(startTime).inMicroseconds / 1000.0;
+      final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
 
       final packageCount = result.first['count'] as int;
 
@@ -2953,7 +2955,8 @@ class SqliteMetadataStore extends MetadataStore {
       totalVersions: versionsResult.first.values.first as int,
       totalUsers: usersResult.first.values.first as int,
       activeTokens: tokensResult.first.values.first as int,
-      totalDownloads: (downloadsResult.first.values.first as num?)?.toInt() ?? 0,
+      totalDownloads:
+          (downloadsResult.first.values.first as num?)?.toInt() ?? 0,
     );
   }
 
@@ -2975,7 +2978,8 @@ class SqliteMetadataStore extends MetadataStore {
 
   @override
   Future<int> getTotalDownloads() async {
-    final result = _db.select('SELECT COUNT(*) as count FROM package_downloads');
+    final result =
+        _db.select('SELECT COUNT(*) as count FROM package_downloads');
     return result.first['count'] as int;
   }
 
@@ -3065,8 +3069,7 @@ class SqliteMetadataStore extends MetadataStore {
       ORDER BY day DESC
     ''', [packageName, cutoffDate]);
     final dailyDownloads = <String, int>{
-      for (final row in dailyResult)
-        row['day'] as String: row['count'] as int,
+      for (final row in dailyResult) row['day'] as String: row['count'] as int,
     };
 
     return PackageDownloadStats(
@@ -3662,8 +3665,9 @@ class SqliteMetadataStore extends MetadataStore {
       parameters.add(actorType);
     }
 
-    final whereClause =
-        whereConditions.isNotEmpty ? 'WHERE ${whereConditions.join(' AND ')}' : '';
+    final whereClause = whereConditions.isNotEmpty
+        ? 'WHERE ${whereConditions.join(' AND ')}'
+        : '';
 
     parameters.add(limit);
 
@@ -3895,7 +3899,8 @@ class SqliteMetadataStore extends MetadataStore {
   }
 
   /// Import package versions from backup.
-  Future<void> importPackageVersions(List<Map<String, dynamic>> versions) async {
+  Future<void> importPackageVersions(
+      List<Map<String, dynamic>> versions) async {
     for (final v in versions) {
       _db.execute('''
         INSERT OR REPLACE INTO package_versions (

@@ -41,8 +41,8 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
     });
 
     try {
-      final response =
-          await _apiClient.getPackageStats(widget.packageName, days: _historyDays);
+      final response = await _apiClient.getPackageStats(widget.packageName,
+          days: _historyDays);
       setState(() {
         _stats = PackageStats.fromJson(response);
         _packageInfo = response['package'] as Map<String, dynamic>?;
@@ -109,7 +109,8 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
       if (confirm != true) return;
 
       try {
-        await _apiClient.unretractPackageVersion(widget.packageName, version.version);
+        await _apiClient.unretractPackageVersion(
+            widget.packageName, version.version);
         _loadVersions();
         _loadStats();
         if (mounted) {
@@ -193,7 +194,8 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
             children: [
               Text(
                 widget.packageName,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               Text(
                 _stats != null
@@ -472,22 +474,36 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
   Widget _buildStatsCards() {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('Total Downloads',
-            _formatNumber(_stats!.totalDownloads), Icons.download, Colors.blue)),
+        Expanded(
+            child: _buildStatCard(
+                'Total Downloads',
+                _formatNumber(_stats!.totalDownloads),
+                Icons.download,
+                Colors.blue)),
         const SizedBox(width: 16),
-        Expanded(child: _buildStatCard('Versions',
-            _stats!.versionCount.toString(), Icons.tag, Colors.green)),
+        Expanded(
+            child: _buildStatCard('Versions', _stats!.versionCount.toString(),
+                Icons.tag, Colors.green)),
         const SizedBox(width: 16),
-        Expanded(child: _buildStatCard('Latest Version',
-            _stats!.latestVersion ?? 'N/A', Icons.new_releases, Colors.orange)),
+        Expanded(
+            child: _buildStatCard(
+                'Latest Version',
+                _stats!.latestVersion ?? 'N/A',
+                Icons.new_releases,
+                Colors.orange)),
         const SizedBox(width: 16),
-        Expanded(child: _buildStatCard('Avg/Day',
-            _formatNumber(_calculateAvgDownloads()), Icons.trending_up, Colors.purple)),
+        Expanded(
+            child: _buildStatCard(
+                'Avg/Day',
+                _formatNumber(_calculateAvgDownloads()),
+                Icons.trending_up,
+                Colors.purple)),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -588,9 +604,11 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                             : 0.0;
                         return Expanded(
                           child: Tooltip(
-                            message: '${_formatDateShort(date)}: $count downloads',
+                            message:
+                                '${_formatDateShort(date)}: $count downloads',
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 1),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 1),
                               child: Container(
                                 height: height,
                                 decoration: BoxDecoration(
@@ -706,7 +724,7 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.green.shade100,
                               borderRadius: BorderRadius.circular(4),
@@ -728,10 +746,11 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                   DataCell(
                     version.isRetracted
                         ? Tooltip(
-                            message: _buildRetractionTooltip(version, dateFormat),
+                            message:
+                                _buildRetractionTooltip(version, dateFormat),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.orange.shade100,
                                 borderRadius: BorderRadius.circular(4),
@@ -751,10 +770,12 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                                     ),
                                   ),
                                   if (version.retractionMessage != null &&
-                                      version.retractionMessage!.isNotEmpty) ...[
+                                      version
+                                          .retractionMessage!.isNotEmpty) ...[
                                     const SizedBox(width: 4),
                                     Icon(Icons.info_outline,
-                                        size: 12, color: Colors.orange.shade700),
+                                        size: 12,
+                                        color: Colors.orange.shade700),
                                   ],
                                 ],
                               ),
@@ -762,7 +783,7 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                           )
                         : Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.green.shade100,
                               borderRadius: BorderRadius.circular(4),
@@ -791,7 +812,8 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
                         version.isRetracted ? Icons.undo : Icons.block,
                         size: 16,
                       ),
-                      label: Text(version.isRetracted ? 'Un-retract' : 'Retract'),
+                      label:
+                          Text(version.isRetracted ? 'Un-retract' : 'Retract'),
                       style: TextButton.styleFrom(
                         foregroundColor:
                             version.isRetracted ? Colors.green : Colors.orange,
@@ -893,8 +915,10 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
             _buildInfoRow('Created',
                 dateFormat.format(DateTime.parse(pkg['created_at'] as String))),
             if (pkg['updated_at'] != null)
-              _buildInfoRow('Last Updated',
-                  dateFormat.format(DateTime.parse(pkg['updated_at'] as String))),
+              _buildInfoRow(
+                  'Last Updated',
+                  dateFormat
+                      .format(DateTime.parse(pkg['updated_at'] as String))),
             if (pkg['is_discontinued'] == true)
               _buildInfoRow('Status', 'Discontinued',
                   valueColor: Colors.orange),
@@ -929,7 +953,8 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> {
 
   int _calculateAvgDownloads() {
     if (_stats!.dailyDownloads.isEmpty) return 0;
-    final total = _stats!.dailyDownloads.values.fold(0, (sum, val) => sum + val);
+    final total =
+        _stats!.dailyDownloads.values.fold(0, (sum, val) => sum + val);
     return (total / _stats!.dailyDownloads.length).round();
   }
 

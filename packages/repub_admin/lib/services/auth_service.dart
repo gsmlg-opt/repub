@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
 
-import 'url_detector_stub.dart'
-    if (dart.library.html) 'url_detector_web.dart';
+import 'url_detector_stub.dart' if (dart.library.html) 'url_detector_web.dart';
 
 // Events
 abstract class AuthEvent {}

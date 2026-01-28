@@ -93,7 +93,8 @@ Future<void> _runMigrate(List<String> args) async {
 
   if (directionArgs.isEmpty) {
     print('Error: Missing migration direction');
-    print('Usage: dart run repub_cli storage migrate <local-to-s3|s3-to-local>');
+    print(
+        'Usage: dart run repub_cli storage migrate <local-to-s3|s3-to-local>');
     exit(1);
   }
 
@@ -252,7 +253,8 @@ Future<void> _runVerify(List<String> args) async {
 
       case 's3-to-local':
         if (targetPath == null) {
-          print('Error: --target <path> is required for s3-to-local verification');
+          print(
+              'Error: --target <path> is required for s3-to-local verification');
           exit(1);
         }
         print('Verifying: S3 -> Local ($targetPath)');

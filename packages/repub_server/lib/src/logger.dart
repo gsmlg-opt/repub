@@ -130,7 +130,8 @@ class Logger {
     var output = '$timestamp $levelStr $componentStr$message';
 
     if (metadata != null && metadata.isNotEmpty) {
-      final metaStr = metadata.entries.map((e) => '${e.key}=${e.value}').join(' ');
+      final metaStr =
+          metadata.entries.map((e) => '${e.key}=${e.value}').join(' ');
       output += ' ($metaStr)';
     }
 

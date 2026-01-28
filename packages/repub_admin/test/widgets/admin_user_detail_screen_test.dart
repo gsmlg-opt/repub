@@ -56,7 +56,8 @@ void main() {
           BlocProvider<AdminUsersBloc>.value(value: mockAdminUsersBloc),
           BlocProvider<AuthBloc>.value(value: mockAuthBloc),
         ],
-        child: const Scaffold(body: AdminUserDetailScreen(adminUserId: testAdminId)),
+        child: const Scaffold(
+            body: AdminUserDetailScreen(adminUserId: testAdminId)),
       ),
     );
   }
@@ -110,7 +111,8 @@ void main() {
         success: false,
         ipAddress: '203.0.113.50',
         userAgent: 'Bot/1.0',
-        failureReason: 'brute_force attempt detected', // isSuspicious detected from failureReason
+        failureReason:
+            'brute_force attempt detected', // isSuspicious detected from failureReason
       ),
     ];
   }
@@ -118,7 +120,8 @@ void main() {
   group('AdminUserDetailScreen', () {
     testWidgets('triggers LoadAdminUserDetail on init', (tester) async {
       await setLargeScreenSize(tester);
-      when(() => mockAdminUsersBloc.state).thenReturn(const AdminUsersInitial());
+      when(() => mockAdminUsersBloc.state)
+          .thenReturn(const AdminUsersInitial());
       when(() => mockAdminUsersBloc.stream).thenAnswer(
         (_) => Stream.value(const AdminUsersInitial()),
       );
@@ -126,7 +129,9 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
 
-      verify(() => mockAdminUsersBloc.add(const LoadAdminUserDetail(testAdminId))).called(1);
+      verify(() =>
+              mockAdminUsersBloc.add(const LoadAdminUserDetail(testAdminId)))
+          .called(1);
     });
 
     testWidgets('shows loading indicator when state is AdminUserDetailLoading',
@@ -229,7 +234,8 @@ void main() {
       when(() => mockAdminUsersBloc.state).thenReturn(
         AdminUserDetailLoaded(
           adminUser: createTestAdminUser(),
-          loginHistory: createTestLoginHistory(), // 2 success, 1 failed, 1 suspicious
+          loginHistory:
+              createTestLoginHistory(), // 2 success, 1 failed, 1 suspicious
         ),
       );
       when(() => mockAdminUsersBloc.stream).thenAnswer(

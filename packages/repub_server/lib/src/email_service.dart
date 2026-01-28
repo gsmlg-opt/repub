@@ -31,8 +31,7 @@ class SmtpConfig {
   });
 
   /// Check if SMTP is properly configured.
-  bool get isConfigured =>
-      host.isNotEmpty && fromAddress.isNotEmpty && enabled;
+  bool get isConfigured => host.isNotEmpty && fromAddress.isNotEmpty && enabled;
 
   /// Create from site config map.
   factory SmtpConfig.fromConfigMap(Map<String, String> config) {
@@ -318,8 +317,7 @@ This is an automated message from Repub Package Registry.
       return;
     }
 
-    final usersUrl =
-        baseUrl != null ? '$baseUrl/admin/users' : '/admin/users';
+    final usersUrl = baseUrl != null ? '$baseUrl/admin/users' : '/admin/users';
 
     final message = Message()
       ..from = await _getFromAddress()

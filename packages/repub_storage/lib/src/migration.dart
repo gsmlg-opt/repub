@@ -253,7 +253,8 @@ class StorageMigration {
         }
       } else {
         mismatched++;
-        mismatches.add('$key (size mismatch: ${sourceData.length} vs ${targetData.length})');
+        mismatches.add(
+            '$key (size mismatch: ${sourceData.length} vs ${targetData.length})');
       }
     }
 

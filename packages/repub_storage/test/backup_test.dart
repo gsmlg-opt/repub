@@ -265,7 +265,8 @@ void main() {
       final filePath = '${tempDir.path}/import_dry.json';
       await File(filePath).writeAsString(jsonEncode(backupJson));
 
-      final summary = await backupManager.importFromFile(filePath, dryRun: true);
+      final summary =
+          await backupManager.importFromFile(filePath, dryRun: true);
 
       expect(summary['packages'], 1);
 

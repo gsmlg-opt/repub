@@ -156,16 +156,15 @@ void main() {
       blocTest<PackagesBloc, PackagesState>(
         'emits [PackageOperationInProgress, PackageOperationError] when delete fails',
         build: () {
-          when(() => mockApiClient.deletePackage('my_package'))
-              .thenThrow(AdminApiException(
-                  statusCode: 404, message: 'Package not found'));
+          when(() => mockApiClient.deletePackage('my_package')).thenThrow(
+              AdminApiException(statusCode: 404, message: 'Package not found'));
           return PackagesBloc(apiClient: mockApiClient);
         },
         act: (bloc) => bloc.add(const DeletePackage('my_package')),
         expect: () => [
           const PackageOperationInProgress('deleting', 'my_package'),
-          isA<PackageOperationError>()
-              .having((s) => s.message, 'message', contains('Failed to delete')),
+          isA<PackageOperationError>().having(
+              (s) => s.message, 'message', contains('Failed to delete')),
         ],
       );
     });
@@ -221,9 +220,8 @@ void main() {
       blocTest<PackagesBloc, PackagesState>(
         'emits error when clear cache fails',
         build: () {
-          when(() => mockApiClient.clearCachedPackage('cached_pkg'))
-              .thenThrow(AdminApiException(
-                  statusCode: 404, message: 'Not found'));
+          when(() => mockApiClient.clearCachedPackage('cached_pkg')).thenThrow(
+              AdminApiException(statusCode: 404, message: 'Not found'));
           return PackagesBloc(apiClient: mockApiClient);
         },
         act: (bloc) => bloc.add(const ClearPackageCache('cached_pkg')),

@@ -91,7 +91,8 @@ void main() {
 
     test('getPackageStats returns package statistics', () async {
       apiClient = createClient((request) {
-        expect(request.url.path, equals('/admin/api/packages/my_package/stats'));
+        expect(
+            request.url.path, equals('/admin/api/packages/my_package/stats'));
         expect(request.url.queryParameters['days'], equals('30'));
 
         return http.Response(

@@ -19,8 +19,12 @@ void main() {
       await metadata.runMigrations();
 
       // Create minimal blob stores (using file-based storage)
-      blobs = FileBlobStore(basePath: '/tmp/repub_test_blobs', baseUrl: 'http://localhost:4920');
-      cacheBlobs = FileBlobStore(basePath: '/tmp/repub_test_cache', baseUrl: 'http://localhost:4920', isCache: true);
+      blobs = FileBlobStore(
+          basePath: '/tmp/repub_test_blobs', baseUrl: 'http://localhost:4920');
+      cacheBlobs = FileBlobStore(
+          basePath: '/tmp/repub_test_cache',
+          baseUrl: 'http://localhost:4920',
+          isCache: true);
 
       config = Config(
         listenAddr: '0.0.0.0',

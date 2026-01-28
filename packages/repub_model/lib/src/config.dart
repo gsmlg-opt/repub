@@ -133,7 +133,8 @@ class Config {
       enableUpstreamProxy: _envBool('REPUB_ENABLE_UPSTREAM_PROXY', true),
       rateLimitRequests: _envInt('REPUB_RATE_LIMIT_REQUESTS', 100),
       rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
-      adminIpWhitelist: _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
+      adminIpWhitelist:
+          _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
     );
   }
 

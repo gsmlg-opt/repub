@@ -15,7 +15,8 @@ void main() {
       final windowDuration = Duration(seconds: 60);
 
       for (var i = 0; i < maxRequests; i++) {
-        final count = store.checkAndRecord('test-key', maxRequests, windowDuration);
+        final count =
+            store.checkAndRecord('test-key', maxRequests, windowDuration);
         expect(count, isNotNull);
         expect(count, equals(i + 1));
       }
@@ -31,7 +32,8 @@ void main() {
       }
 
       // Next request should be blocked
-      final count = store.checkAndRecord('test-key', maxRequests, windowDuration);
+      final count =
+          store.checkAndRecord('test-key', maxRequests, windowDuration);
       expect(count, isNull);
     });
 
@@ -47,20 +49,24 @@ void main() {
       expect(store.checkAndRecord('key1', maxRequests, windowDuration), isNull);
 
       // key2 should still work
-      expect(store.checkAndRecord('key2', maxRequests, windowDuration), equals(1));
+      expect(
+          store.checkAndRecord('key2', maxRequests, windowDuration), equals(1));
     });
 
     test('getRemaining returns correct count', () {
       const maxRequests = 5;
       final windowDuration = Duration(seconds: 60);
 
-      expect(store.getRemaining('test-key', maxRequests, windowDuration), equals(5));
+      expect(store.getRemaining('test-key', maxRequests, windowDuration),
+          equals(5));
 
       store.checkAndRecord('test-key', maxRequests, windowDuration);
-      expect(store.getRemaining('test-key', maxRequests, windowDuration), equals(4));
+      expect(store.getRemaining('test-key', maxRequests, windowDuration),
+          equals(4));
 
       store.checkAndRecord('test-key', maxRequests, windowDuration);
-      expect(store.getRemaining('test-key', maxRequests, windowDuration), equals(3));
+      expect(store.getRemaining('test-key', maxRequests, windowDuration),
+          equals(3));
     });
 
     test('cleanup removes old entries', () {
@@ -68,13 +74,15 @@ void main() {
       final windowDuration = Duration(milliseconds: 10);
 
       store.checkAndRecord('test-key', maxRequests, windowDuration);
-      expect(store.getRemaining('test-key', maxRequests, windowDuration), equals(4));
+      expect(store.getRemaining('test-key', maxRequests, windowDuration),
+          equals(4));
 
       // Wait for window to expire
       Future.delayed(Duration(milliseconds: 20), () {
         store.cleanup(windowDuration);
         // After cleanup, the key should have full capacity again
-        expect(store.getRemaining('test-key', maxRequests, windowDuration), equals(5));
+        expect(store.getRemaining('test-key', maxRequests, windowDuration),
+            equals(5));
       });
     });
   });
@@ -115,7 +123,8 @@ void main() {
       expect(extractClientIp(request), equals('192.168.1.100'));
     });
 
-    test('extracts IP from X-Real-IP header when X-Forwarded-For is missing', () {
+    test('extracts IP from X-Real-IP header when X-Forwarded-For is missing',
+        () {
       final request = Request(
         'GET',
         Uri.parse('http://localhost/test'),
@@ -206,7 +215,8 @@ void main() {
         final response = await handler(request);
         expect(response.statusCode, equals(200));
         expect(response.headers['X-RateLimit-Limit'], equals('5'));
-        expect(response.headers['X-RateLimit-Remaining'], equals((4 - i).toString()));
+        expect(response.headers['X-RateLimit-Remaining'],
+            equals((4 - i).toString()));
       }
     });
 

@@ -101,7 +101,8 @@ class PackageVersion {
         'published': publishedAt.toUtc().toIso8601String(),
         if (isRetracted) ...{
           'retracted': true,
-          if (retractionMessage != null) 'retraction_message': retractionMessage,
+          if (retractionMessage != null)
+            'retraction_message': retractionMessage,
         },
       };
 }

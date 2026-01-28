@@ -125,9 +125,7 @@ Middleware rateLimitMiddleware({
       );
 
       // Get rate limit headers
-      final remaining = count != null
-          ? config.maxRequests - count
-          : 0;
+      final remaining = count != null ? config.maxRequests - count : 0;
       final resetSeconds = limitStore.getResetSeconds(key, windowDuration);
 
       final rateLimitHeaders = {

@@ -61,7 +61,8 @@ void main() {
       expect(find.byIcon(Icons.lock), findsOneWidget);
     });
 
-    testWidgets('shows validation error when username is empty', (tester) async {
+    testWidgets('shows validation error when username is empty',
+        (tester) async {
       await tester.pumpWidget(createTestWidget());
 
       // Tap login without entering anything
@@ -72,7 +73,8 @@ void main() {
       expect(find.text('Please enter your username'), findsOneWidget);
     });
 
-    testWidgets('shows validation error when password is empty', (tester) async {
+    testWidgets('shows validation error when password is empty',
+        (tester) async {
       await tester.pumpWidget(createTestWidget());
 
       // Enter username only
@@ -87,7 +89,8 @@ void main() {
       expect(find.text('Please enter your password'), findsOneWidget);
     });
 
-    testWidgets('dispatches login event with valid credentials', (tester) async {
+    testWidgets('dispatches login event with valid credentials',
+        (tester) async {
       await tester.pumpWidget(createTestWidget());
 
       // Enter credentials

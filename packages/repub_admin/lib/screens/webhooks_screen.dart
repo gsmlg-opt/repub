@@ -493,7 +493,8 @@ class _WebhookFormDialogState extends State<_WebhookFormDialog> {
                 const SizedBox(height: 8),
                 CheckboxListTile(
                   title: const Text('Subscribe to all events'),
-                  subtitle: const Text('Receive notifications for all event types'),
+                  subtitle:
+                      const Text('Receive notifications for all event types'),
                   value: _subscribeAll,
                   onChanged: (value) {
                     setState(() {
@@ -512,7 +513,8 @@ class _WebhookFormDialogState extends State<_WebhookFormDialog> {
                   ...WebhookEventTypes.all.map((event) {
                     return CheckboxListTile(
                       title: Text(WebhookEventTypes.displayName(event)),
-                      subtitle: Text(event, style: const TextStyle(fontSize: 12)),
+                      subtitle:
+                          Text(event, style: const TextStyle(fontSize: 12)),
                       value: _selectedEvents.contains(event),
                       onChanged: (value) {
                         setState(() {
@@ -565,7 +567,8 @@ class _WebhookFormDialogState extends State<_WebhookFormDialog> {
       widget.bloc.add(CreateWebhook(
         url: _urlController.text,
         events: events,
-        secret: _secretController.text.isNotEmpty ? _secretController.text : null,
+        secret:
+            _secretController.text.isNotEmpty ? _secretController.text : null,
       ));
     }
 
@@ -642,8 +645,9 @@ class _DeliveriesDialog extends StatelessWidget {
 
           return ListTile(
             leading: CircleAvatar(
-              backgroundColor:
-                  delivery.success ? Colors.green.shade100 : Colors.red.shade100,
+              backgroundColor: delivery.success
+                  ? Colors.green.shade100
+                  : Colors.red.shade100,
               child: Icon(
                 delivery.success ? Icons.check : Icons.close,
                 color: delivery.success ? Colors.green : Colors.red,

@@ -46,7 +46,8 @@ void main() {
       expect(pubspec['name'], equals('my_package'));
       expect(pubspec['dependencies'], isA<Map>());
       expect((pubspec['dependencies'] as Map)['http'], equals('^1.0.0'));
-      expect((pubspec['dependencies'] as Map)['json_annotation'], equals('^4.8.0'));
+      expect((pubspec['dependencies'] as Map)['json_annotation'],
+          equals('^4.8.0'));
       expect(pubspec['dev_dependencies'], isA<Map>());
       expect((pubspec['dev_dependencies'] as Map)['test'], equals('^1.24.0'));
       expect(pubspec['environment'], isA<Map>());

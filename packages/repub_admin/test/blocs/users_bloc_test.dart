@@ -170,8 +170,8 @@ void main() {
       blocTest<UsersBloc, UsersState>(
         'emits error when delete fails',
         build: () {
-          when(() => mockApiClient.deleteUser('user-3'))
-              .thenThrow(AdminApiException(
+          when(() => mockApiClient.deleteUser('user-3')).thenThrow(
+              AdminApiException(
                   statusCode: 403, message: 'Cannot delete admin'));
           return UsersBloc(apiClient: mockApiClient);
         },
@@ -203,16 +203,16 @@ void main() {
           isA<UserTokensLoaded>()
               .having((s) => s.userId, 'userId', 'user-1')
               .having((s) => s.tokens.length, 'tokens count', 1)
-              .having((s) => s.tokens.first.label, 'first token label', 'Token 1'),
+              .having(
+                  (s) => s.tokens.first.label, 'first token label', 'Token 1'),
         ],
       );
 
       blocTest<UsersBloc, UsersState>(
         'emits error when view tokens fails',
         build: () {
-          when(() => mockApiClient.getUserTokens('user-1'))
-              .thenThrow(AdminApiException(
-                  statusCode: 404, message: 'User not found'));
+          when(() => mockApiClient.getUserTokens('user-1')).thenThrow(
+              AdminApiException(statusCode: 404, message: 'User not found'));
           return UsersBloc(apiClient: mockApiClient);
         },
         act: (bloc) => bloc.add(const ViewUserTokens('user-1')),

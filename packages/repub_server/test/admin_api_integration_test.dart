@@ -343,7 +343,8 @@ void main() {
       test('can retract a package version', () async {
         await publishVersion('retract_pkg', '1.0.0');
 
-        final result = await metadata.retractPackageVersion('retract_pkg', '1.0.0');
+        final result =
+            await metadata.retractPackageVersion('retract_pkg', '1.0.0');
         expect(result, isTrue);
 
         final pkgInfo = await metadata.getPackageInfo('retract_pkg');
@@ -377,7 +378,8 @@ void main() {
         expect(pkgInfo!.versions.first.isRetracted, isTrue);
 
         // Un-retract
-        final result = await metadata.unretractPackageVersion('unretract_pkg', '1.0.0');
+        final result =
+            await metadata.unretractPackageVersion('unretract_pkg', '1.0.0');
         expect(result, isTrue);
 
         pkgInfo = await metadata.getPackageInfo('unretract_pkg');
@@ -388,12 +390,14 @@ void main() {
       test('retract returns false for non-existent version', () async {
         await publishVersion('exists_pkg', '1.0.0');
 
-        final result = await metadata.retractPackageVersion('exists_pkg', '9.9.9');
+        final result =
+            await metadata.retractPackageVersion('exists_pkg', '9.9.9');
         expect(result, isFalse);
       });
 
       test('retract returns false for non-existent package', () async {
-        final result = await metadata.retractPackageVersion('no_such_pkg', '1.0.0');
+        final result =
+            await metadata.retractPackageVersion('no_such_pkg', '1.0.0');
         expect(result, isFalse);
       });
 
@@ -423,7 +427,8 @@ void main() {
         expect(json['retracted'], isTrue);
       });
 
-      test('version toJson excludes retracted flag when not retracted', () async {
+      test('version toJson excludes retracted flag when not retracted',
+          () async {
         await publishVersion('nojson_pkg', '1.0.0');
 
         final pkgInfo = await metadata.getPackageInfo('nojson_pkg');

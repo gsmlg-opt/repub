@@ -88,7 +88,8 @@ version: 1.0.0
         final result = await validateTarball(tarball);
 
         expect(result, isA<PublishError>());
-        expect((result as PublishError).message, contains('Invalid package name'));
+        expect(
+            (result as PublishError).message, contains('Invalid package name'));
       });
 
       test('rejects names with uppercase', () async {
@@ -99,7 +100,8 @@ version: 1.0.0
         final result = await validateTarball(tarball);
 
         expect(result, isA<PublishError>());
-        expect((result as PublishError).message, contains('Invalid package name'));
+        expect(
+            (result as PublishError).message, contains('Invalid package name'));
       });
 
       test('rejects names with hyphens', () async {
@@ -110,7 +112,8 @@ version: 1.0.0
         final result = await validateTarball(tarball);
 
         expect(result, isA<PublishError>());
-        expect((result as PublishError).message, contains('Invalid package name'));
+        expect(
+            (result as PublishError).message, contains('Invalid package name'));
       });
 
       test('rejects names starting with underscore', () async {
@@ -121,7 +124,8 @@ version: 1.0.0
         final result = await validateTarball(tarball);
 
         expect(result, isA<PublishError>());
-        expect((result as PublishError).message, contains('Invalid package name'));
+        expect(
+            (result as PublishError).message, contains('Invalid package name'));
       });
     });
 

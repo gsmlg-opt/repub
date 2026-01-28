@@ -113,7 +113,8 @@ Router createRouter({
   router.get('/admin/api/hosted-packages', handlers.adminListHostedPackages);
   router.get('/admin/api/cached-packages', handlers.adminListCachedPackages);
   router.get('/admin/api/packages/<name>/stats', handlers.adminGetPackageStats);
-  router.get('/admin/api/packages/<name>/versions', handlers.adminGetPackageVersions);
+  router.get(
+      '/admin/api/packages/<name>/versions', handlers.adminGetPackageVersions);
   router.delete('/admin/api/packages/<name>', handlers.adminDeletePackage);
   router.delete('/admin/api/packages/<name>/versions/<version>',
       handlers.adminDeletePackageVersion);
@@ -145,7 +146,8 @@ Router createRouter({
   router.get('/admin/api/webhooks/<id>', handlers.adminGetWebhook);
   router.put('/admin/api/webhooks/<id>', handlers.adminUpdateWebhook);
   router.delete('/admin/api/webhooks/<id>', handlers.adminDeleteWebhook);
-  router.get('/admin/api/webhooks/<id>/deliveries', handlers.adminGetWebhookDeliveries);
+  router.get('/admin/api/webhooks/<id>/deliveries',
+      handlers.adminGetWebhookDeliveries);
   router.post('/admin/api/webhooks/<id>/test', handlers.adminTestWebhook);
 
   // Auth endpoints (user authentication)
@@ -267,12 +269,14 @@ String? _findWebDir() {
     if (path == null) continue;
     final dir = Directory(path);
     if (dir.existsSync() && File(p.join(path, 'index.html')).existsSync()) {
-      Logger.debug('Serving web UI', component: 'static', metadata: {'path': dir.absolute.path});
+      Logger.debug('Serving web UI',
+          component: 'static', metadata: {'path': dir.absolute.path});
       return path;
     }
   }
 
-  Logger.warn('Web UI not found - run "melos run build:web" to build it', component: 'static');
+  Logger.warn('Web UI not found - run "melos run build:web" to build it',
+      component: 'static');
   return null;
 }
 
@@ -294,12 +298,14 @@ String? _findAdminDir() {
     if (path == null) continue;
     final dir = Directory(path);
     if (dir.existsSync() && File(p.join(path, 'index.html')).existsSync()) {
-      Logger.debug('Serving admin UI', component: 'static', metadata: {'path': dir.absolute.path});
+      Logger.debug('Serving admin UI',
+          component: 'static', metadata: {'path': dir.absolute.path});
       return path;
     }
   }
 
-  Logger.warn('Admin UI not found - run "melos run build:admin" to build it', component: 'static');
+  Logger.warn('Admin UI not found - run "melos run build:admin" to build it',
+      component: 'static');
   return null;
 }
 
@@ -330,7 +336,8 @@ class ApiHandlers {
   });
 
   /// Get the webhook service (lazy initialization).
-  WebhookService get webhooks => _webhookService ??= WebhookService(metadata: metadata);
+  WebhookService get webhooks =>
+      _webhookService ??= WebhookService(metadata: metadata);
 
   /// Get the email service (lazy initialization).
   EmailService get emails => _emailService ??= EmailService(metadata: metadata);
@@ -421,7 +428,8 @@ class ApiHandlers {
           body: jsonEncode({
             'error': {
               'code': 'invalid_url',
-              'message': 'Cannot use internal or private IP addresses in webhook URLs',
+              'message':
+                  'Cannot use internal or private IP addresses in webhook URLs',
             },
           }),
         );
@@ -439,7 +447,8 @@ class ApiHandlers {
               body: jsonEncode({
                 'error': {
                   'code': 'invalid_url',
-                  'message': 'Cannot use internal or private IP addresses in webhook URLs',
+                  'message':
+                      'Cannot use internal or private IP addresses in webhook URLs',
                 },
               }),
             );
@@ -1128,10 +1137,13 @@ class ApiHandlers {
         );
       } catch (e) {
         // If storage fails, try upstream
-        Logger.warn('Storage error fetching archive', component: 'storage', error: e, metadata: {
-          'package': name,
-          'version': version,
-        });
+        Logger.warn('Storage error fetching archive',
+            component: 'storage',
+            error: e,
+            metadata: {
+              'package': name,
+              'version': version,
+            });
       }
     }
 
@@ -1139,11 +1151,13 @@ class ApiHandlers {
     if (upstream != null) {
       final upstreamVersion = await upstream!.getVersion(name, version);
       if (upstreamVersion != null && upstreamVersion.archiveUrl.isNotEmpty) {
-        Logger.debug('Fetching from upstream', component: 'upstream', metadata: {
-          'package': name,
-          'version': version,
-          'url': upstreamVersion.archiveUrl,
-        });
+        Logger.debug('Fetching from upstream',
+            component: 'upstream',
+            metadata: {
+              'package': name,
+              'version': version,
+              'url': upstreamVersion.archiveUrl,
+            });
         final archiveBytes =
             await upstream!.downloadArchive(upstreamVersion.archiveUrl);
 
@@ -1166,10 +1180,12 @@ class ApiHandlers {
               isUpstreamCache: true,
             );
 
-            Logger.info('Cached package from upstream', component: 'cache', metadata: {
-              'package': name,
-              'version': version,
-            });
+            Logger.info('Cached package from upstream',
+                component: 'cache',
+                metadata: {
+                  'package': name,
+                  'version': version,
+                });
 
             // Log download for analytics
             await metadata.logDownload(
@@ -1187,10 +1203,13 @@ class ApiHandlers {
               },
             );
           } catch (e) {
-            Logger.warn('Failed to cache package from upstream', component: 'cache', error: e, metadata: {
-              'package': name,
-              'version': version,
-            });
+            Logger.warn('Failed to cache package from upstream',
+                component: 'cache',
+                error: e,
+                metadata: {
+                  'package': name,
+                  'version': version,
+                });
 
             // Log download for analytics (even if caching failed)
             await metadata.logDownload(
@@ -1480,8 +1499,10 @@ class ApiHandlers {
     }
 
     // Get download statistics
-    final days = int.tryParse(request.url.queryParameters['days'] ?? '30') ?? 30;
-    final stats = await metadata.getPackageDownloadStats(name, historyDays: days);
+    final days =
+        int.tryParse(request.url.queryParameters['days'] ?? '30') ?? 30;
+    final stats =
+        await metadata.getPackageDownloadStats(name, historyDays: days);
 
     return Response.ok(
       jsonEncode({
@@ -1509,16 +1530,18 @@ class ApiHandlers {
       );
     }
 
-    final versions = pkgInfo.versions.map((v) => {
-      'version': v.version,
-      'published_at': v.publishedAt.toIso8601String(),
-      'is_retracted': v.isRetracted,
-      'retracted_at': v.retractedAt?.toIso8601String(),
-    }).toList();
+    final versions = pkgInfo.versions
+        .map((v) => {
+              'version': v.version,
+              'published_at': v.publishedAt.toIso8601String(),
+              'is_retracted': v.isRetracted,
+              'retracted_at': v.retractedAt?.toIso8601String(),
+            })
+        .toList();
 
     // Sort by version descending (latest first)
-    versions.sort((a, b) =>
-      (b['version'] as String).compareTo(a['version'] as String));
+    versions.sort(
+        (a, b) => (b['version'] as String).compareTo(a['version'] as String));
 
     return Response.ok(
       jsonEncode({
@@ -1559,7 +1582,8 @@ class ApiHandlers {
       try {
         await store.delete(key);
       } catch (e) {
-        Logger.warn('Failed to delete blob', component: 'storage', error: e, metadata: {'key': key});
+        Logger.warn('Failed to delete blob',
+            component: 'storage', error: e, metadata: {'key': key});
       }
     }
 
@@ -1625,7 +1649,8 @@ class ApiHandlers {
       try {
         await store.delete(archiveKey);
       } catch (e) {
-        Logger.warn('Failed to delete blob', component: 'storage', error: e, metadata: {'key': archiveKey});
+        Logger.warn('Failed to delete blob',
+            component: 'storage', error: e, metadata: {'key': archiveKey});
       }
     }
 
@@ -1691,8 +1716,8 @@ class ApiHandlers {
         'version': version,
         if (retractionMessage != null) 'message': retractionMessage,
       },
-      ipAddress: request.headers['x-forwarded-for'] ??
-          request.headers['x-real-ip'],
+      ipAddress:
+          request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
     );
 
     return Response.ok(
@@ -1737,8 +1762,8 @@ class ApiHandlers {
       targetType: 'package_version',
       targetId: '$name@$version',
       metadata: {'package': name, 'version': version},
-      ipAddress: request.headers['x-forwarded-for'] ??
-          request.headers['x-real-ip'],
+      ipAddress:
+          request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
     );
 
     return Response.ok(
@@ -1789,9 +1814,8 @@ class ApiHandlers {
     }
 
     // Get depth parameter (default 2, max 5)
-    final depth = int.tryParse(
-            request.requestedUri.queryParameters['depth'] ?? '2') ??
-        2;
+    final depth =
+        int.tryParse(request.requestedUri.queryParameters['depth'] ?? '2') ?? 2;
     final maxDepth = depth.clamp(1, 5);
 
     // Extract direct dependencies from pubspec
@@ -1971,8 +1995,7 @@ class ApiHandlers {
     final oldOwnerId = existingPackage.ownerId;
 
     // Perform transfer
-    final success =
-        await metadata.transferPackageOwnership(name, newOwnerId);
+    final success = await metadata.transferPackageOwnership(name, newOwnerId);
 
     if (!success) {
       return Response(
@@ -1980,7 +2003,8 @@ class ApiHandlers {
         body: jsonEncode({
           'error': {
             'code': 'transfer_failed',
-            'message': 'Failed to transfer ownership. Check that the new owner exists.',
+            'message':
+                'Failed to transfer ownership. Check that the new owner exists.',
           },
         }),
         headers: {'content-type': 'application/json'},
@@ -2000,8 +2024,8 @@ class ApiHandlers {
         'oldOwnerId': oldOwnerId,
         'newOwnerId': newOwnerId,
       },
-      ipAddress: request.headers['x-forwarded-for'] ??
-          request.headers['x-real-ip'],
+      ipAddress:
+          request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
     );
 
     return Response.ok(
@@ -2085,7 +2109,8 @@ class ApiHandlers {
         await cacheBlobs.delete(key);
         blobsDeleted++;
       } catch (e) {
-        Logger.warn('Failed to delete cached blob', component: 'cache', error: e, metadata: {'key': key});
+        Logger.warn('Failed to delete cached blob',
+            component: 'cache', error: e, metadata: {'key': key});
       }
     }
 
@@ -2358,7 +2383,8 @@ class ApiHandlers {
       }
 
       // Validate email format
-      final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+      final emailRegex =
+          RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
       if (!emailRegex.hasMatch(email)) {
         return Response(
           400,
@@ -2394,7 +2420,8 @@ class ApiHandlers {
           body: jsonEncode({
             'error': {
               'code': 'weak_password',
-              'message': 'Password must contain uppercase, lowercase, and numbers'
+              'message':
+                  'Password must contain uppercase, lowercase, and numbers'
             },
           }),
           headers: {'content-type': 'application/json'},
@@ -2432,8 +2459,9 @@ class ApiHandlers {
         actorEmail: email,
         targetType: 'user',
         targetId: userId,
-        ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
-            request.headers['x-real-ip'],
+        ipAddress:
+            request.headers['x-forwarded-for']?.split(',').first.trim() ??
+                request.headers['x-real-ip'],
       );
 
       // Trigger webhook
@@ -3006,7 +3034,8 @@ class ApiHandlers {
         },
       );
     } catch (e, stackTrace) {
-      Logger.error('Admin login error', component: 'auth', error: e, stackTrace: stackTrace);
+      Logger.error('Admin login error',
+          component: 'auth', error: e, stackTrace: stackTrace);
       return Response(
         400,
         body: jsonEncode({
@@ -3329,19 +3358,18 @@ class ApiHandlers {
     // Help and type comments
     buffer.writeln('# HELP repub_up Server availability (1 = up, 0 = down)');
     buffer.writeln('# TYPE repub_up gauge');
-    buffer.writeln(
-        'repub_up ${dbHealth['status'] == 'healthy' ? 1 : 0}');
+    buffer.writeln('repub_up ${dbHealth['status'] == 'healthy' ? 1 : 0}');
 
     buffer.writeln();
     buffer.writeln('# HELP repub_packages_total Total number of packages');
     buffer.writeln('# TYPE repub_packages_total gauge');
-    buffer.writeln(
-        'repub_packages_total{type="local"} ${stats.localPackages}');
-    buffer.writeln(
-        'repub_packages_total{type="cached"} ${stats.cachedPackages}');
+    buffer.writeln('repub_packages_total{type="local"} ${stats.localPackages}');
+    buffer
+        .writeln('repub_packages_total{type="cached"} ${stats.cachedPackages}');
 
     buffer.writeln();
-    buffer.writeln('# HELP repub_versions_total Total number of package versions');
+    buffer.writeln(
+        '# HELP repub_versions_total Total number of package versions');
     buffer.writeln('# TYPE repub_versions_total gauge');
     buffer.writeln('repub_versions_total ${stats.totalVersions}');
 
@@ -3431,7 +3459,9 @@ class ApiHandlers {
     final pkg = await metadata.getPackageInfo(name);
     if (pkg == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Package not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }
@@ -3453,7 +3483,9 @@ class ApiHandlers {
     final pkg = await metadata.getPackageInfo(name);
     if (pkg == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Package not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Package not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }
@@ -3495,7 +3527,8 @@ class ApiHandlers {
     if (authError != null) return authError;
 
     try {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
       final url = body['url'] as String?;
       final secret = body['secret'] as String?;
       final events = (body['events'] as List?)?.cast<String>() ?? ['*'];
@@ -3525,7 +3558,8 @@ class ApiHandlers {
             body: jsonEncode({
               'error': {
                 'code': 'invalid_event',
-                'message': 'Invalid event type: $event. Valid types are: ${WebhookEventType.all.join(', ')} or *',
+                'message':
+                    'Invalid event type: $event. Valid types are: ${WebhookEventType.all.join(', ')} or *',
               },
             }),
           );
@@ -3547,7 +3581,8 @@ class ApiHandlers {
         actorUsername: admin?.username,
         targetType: 'webhook',
         targetId: webhook.id,
-        ipAddress: request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
+        ipAddress:
+            request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
       );
 
       return Response.ok(
@@ -3559,7 +3594,10 @@ class ApiHandlers {
         400,
         headers: {'content-type': 'application/json'},
         body: jsonEncode({
-          'error': {'code': 'invalid_request', 'message': 'Invalid request body'},
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
         }),
       );
     }
@@ -3573,7 +3611,9 @@ class ApiHandlers {
     final webhook = await metadata.getWebhook(id);
     if (webhook == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Webhook not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }
@@ -3592,13 +3632,16 @@ class ApiHandlers {
     final webhook = await metadata.getWebhook(id);
     if (webhook == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Webhook not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }
 
     try {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
 
       // Validate URL if provided
       final newUrl = body['url'] as String?;
@@ -3627,7 +3670,10 @@ class ApiHandlers {
         400,
         headers: {'content-type': 'application/json'},
         body: jsonEncode({
-          'error': {'code': 'invalid_request', 'message': 'Invalid request body'},
+          'error': {
+            'code': 'invalid_request',
+            'message': 'Invalid request body'
+          },
         }),
       );
     }
@@ -3641,7 +3687,9 @@ class ApiHandlers {
     final webhook = await metadata.getWebhook(id);
     if (webhook == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Webhook not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }
@@ -3657,7 +3705,8 @@ class ApiHandlers {
       actorUsername: admin?.username,
       targetType: 'webhook',
       targetId: id,
-      ipAddress: request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
+      ipAddress:
+          request.headers['x-forwarded-for'] ?? request.headers['x-real-ip'],
     );
 
     return Response.ok(
@@ -3674,12 +3723,15 @@ class ApiHandlers {
     final webhook = await metadata.getWebhook(id);
     if (webhook == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Webhook not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }
 
-    final limit = int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
     final deliveries = await metadata.getWebhookDeliveries(id, limit: limit);
 
     return Response.ok(
@@ -3699,7 +3751,9 @@ class ApiHandlers {
     final webhook = await metadata.getWebhook(id);
     if (webhook == null) {
       return Response.notFound(
-        jsonEncode({'error': {'code': 'not_found', 'message': 'Webhook not found'}}),
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'Webhook not found'}
+        }),
         headers: {'content-type': 'application/json'},
       );
     }

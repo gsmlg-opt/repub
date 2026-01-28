@@ -27,19 +27,24 @@ class UpstreamClient {
       }
 
       if (response.statusCode != 200) {
-        Logger.warn('Upstream error fetching package', component: 'upstream', metadata: {
-          'package': name,
-          'statusCode': response.statusCode,
-        });
+        Logger.warn('Upstream error fetching package',
+            component: 'upstream',
+            metadata: {
+              'package': name,
+              'statusCode': response.statusCode,
+            });
         return null;
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return UpstreamPackageInfo.fromJson(json);
     } catch (e) {
-      Logger.error('Upstream error fetching package', component: 'upstream', error: e, metadata: {
-        'package': name,
-      });
+      Logger.error('Upstream error fetching package',
+          component: 'upstream',
+          error: e,
+          metadata: {
+            'package': name,
+          });
       return null;
     }
   }
@@ -74,21 +79,26 @@ class UpstreamClient {
       }
 
       if (response.statusCode != 200) {
-        Logger.warn('Upstream error fetching version', component: 'upstream', metadata: {
-          'package': name,
-          'version': version,
-          'statusCode': response.statusCode,
-        });
+        Logger.warn('Upstream error fetching version',
+            component: 'upstream',
+            metadata: {
+              'package': name,
+              'version': version,
+              'statusCode': response.statusCode,
+            });
         return null;
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return UpstreamVersionInfo.fromJson(name, json);
     } catch (e) {
-      Logger.error('Upstream error fetching version', component: 'upstream', error: e, metadata: {
-        'package': name,
-        'version': version,
-      });
+      Logger.error('Upstream error fetching version',
+          component: 'upstream',
+          error: e,
+          metadata: {
+            'package': name,
+            'version': version,
+          });
       return null;
     }
   }
@@ -107,10 +117,12 @@ class UpstreamClient {
       }
 
       if (response.statusCode != 200) {
-        Logger.warn('Upstream error searching', component: 'upstream', metadata: {
-          'query': query,
-          'statusCode': response.statusCode,
-        });
+        Logger.warn('Upstream error searching',
+            component: 'upstream',
+            metadata: {
+              'query': query,
+              'statusCode': response.statusCode,
+            });
         return [];
       }
 
@@ -122,9 +134,12 @@ class UpstreamClient {
 
       return packages;
     } catch (e) {
-      Logger.error('Upstream error searching', component: 'upstream', error: e, metadata: {
-        'query': query,
-      });
+      Logger.error('Upstream error searching',
+          component: 'upstream',
+          error: e,
+          metadata: {
+            'query': query,
+          });
       return [];
     }
   }
@@ -139,18 +154,23 @@ class UpstreamClient {
           );
 
       if (response.statusCode != 200) {
-        Logger.warn('Upstream error downloading archive', component: 'upstream', metadata: {
-          'url': archiveUrl,
-          'statusCode': response.statusCode,
-        });
+        Logger.warn('Upstream error downloading archive',
+            component: 'upstream',
+            metadata: {
+              'url': archiveUrl,
+              'statusCode': response.statusCode,
+            });
         return null;
       }
 
       return response.bodyBytes;
     } catch (e) {
-      Logger.error('Upstream error downloading archive', component: 'upstream', error: e, metadata: {
-        'url': archiveUrl,
-      });
+      Logger.error('Upstream error downloading archive',
+          component: 'upstream',
+          error: e,
+          metadata: {
+            'url': archiveUrl,
+          });
       return null;
     }
   }

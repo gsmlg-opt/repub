@@ -136,8 +136,8 @@ void main() {
       expect(find.text('Recent Activity'), findsOneWidget);
 
       // Check for activity entries
-      expect(
-          find.text('user@example.com published my_package 1.0.0'), findsOneWidget);
+      expect(find.text('user@example.com published my_package 1.0.0'),
+          findsOneWidget);
       expect(find.text('newuser@example.com registered'), findsOneWidget);
     });
 

@@ -35,7 +35,8 @@ Future<void> startServer({Config? config}) async {
   Logger.info('Running migrations...', component: 'database');
   final migrated = await metadata.runMigrations();
   if (migrated > 0) {
-    Logger.info('Applied migrations', component: 'database', metadata: {'count': migrated});
+    Logger.info('Applied migrations',
+        component: 'database', metadata: {'count': migrated});
   }
 
   // Ensure default admin user exists
@@ -148,7 +149,8 @@ Middleware _corsMiddleware(String baseUrl) {
       String allowOrigin;
       if (allowedOrigins.contains('*')) {
         allowOrigin = '*';
-      } else if (requestOrigin != null && allowedOrigins.contains(requestOrigin)) {
+      } else if (requestOrigin != null &&
+          allowedOrigins.contains(requestOrigin)) {
         allowOrigin = requestOrigin;
       } else {
         // Default to first allowed origin
