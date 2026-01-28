@@ -185,6 +185,21 @@ class SiteConfigDefaults {
     description: 'Send email when a new user registers',
   );
 
+  static const emailOnWebhookDisabled = SiteConfig(
+    name: 'email_on_webhook_disabled',
+    valueType: ConfigValueType.boolean,
+    value: 'true',
+    description: 'Send email to admins when a webhook is auto-disabled',
+  );
+
+  static const adminNotificationEmail = SiteConfig(
+    name: 'admin_notification_email',
+    valueType: ConfigValueType.string,
+    value: '',
+    description:
+        'Email address for administrative notifications (webhook failures, etc.)',
+  );
+
   /// All default configurations.
   static const all = [
     allowRegistration,
@@ -206,5 +221,7 @@ class SiteConfigDefaults {
     emailNotificationsEnabled,
     emailOnPackagePublished,
     emailOnUserRegistered,
+    emailOnWebhookDisabled,
+    adminNotificationEmail,
   ];
 }

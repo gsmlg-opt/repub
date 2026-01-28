@@ -171,6 +171,22 @@ void main() {
       expect(config.value, 'true');
       expect(config.valueType, ConfigValueType.boolean);
     });
+
+    test('email_on_webhook_disabled defaults to true', () {
+      final config = SiteConfigDefaults.all.firstWhere(
+        (c) => c.name == 'email_on_webhook_disabled',
+      );
+      expect(config.value, 'true');
+      expect(config.valueType, ConfigValueType.boolean);
+    });
+
+    test('admin_notification_email defaults to empty string', () {
+      final config = SiteConfigDefaults.all.firstWhere(
+        (c) => c.name == 'admin_notification_email',
+      );
+      expect(config.value, '');
+      expect(config.valueType, ConfigValueType.string);
+    });
   });
 
   group('EmailService', () {
@@ -233,6 +249,52 @@ void main() {
         version: '1.0.0',
         publisherEmail: 'publisher@example.com',
       );
+    });
+
+    test('webhook disabled notification skipped when SMTP not configured',
+        () async {
+      // With default config (not enabled), emails should not be sent
+      await emailService.onWebhookDisabled(
+        webhookId: 'test-webhook-id',
+        webhookUrl: 'https://example.com/webhook',
+        reason: 'Test reason',
+      );
+      // Should complete without error
+    });
+
+    test('webhook disabled notification skipped when admin email not set',
+        () async {
+      await metadata.setConfig('smtp_host', 'smtp.test.com');
+      await metadata.setConfig('smtp_from_address', 'test@test.com');
+      await metadata.setConfig('email_notifications_enabled', 'true');
+      await metadata.setConfig('email_on_webhook_disabled', 'true');
+      // admin_notification_email not set
+
+      emailService.clearConfigCache();
+
+      await emailService.onWebhookDisabled(
+        webhookId: 'test-webhook-id',
+        webhookUrl: 'https://example.com/webhook',
+        reason: 'Test reason',
+      );
+      // Should complete without error
+    });
+
+    test('webhook disabled notification skipped when disabled', () async {
+      await metadata.setConfig('smtp_host', 'smtp.test.com');
+      await metadata.setConfig('smtp_from_address', 'test@test.com');
+      await metadata.setConfig('email_notifications_enabled', 'true');
+      await metadata.setConfig('email_on_webhook_disabled', 'false');
+      await metadata.setConfig('admin_notification_email', 'admin@test.com');
+
+      emailService.clearConfigCache();
+
+      await emailService.onWebhookDisabled(
+        webhookId: 'test-webhook-id',
+        webhookUrl: 'https://example.com/webhook',
+        reason: 'Test reason',
+      );
+      // Should complete without error
     });
   });
 }

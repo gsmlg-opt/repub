@@ -17,6 +17,8 @@ class SmtpConfig {
   final bool enabled;
   final bool onPackagePublished;
   final bool onUserRegistered;
+  final bool onWebhookDisabled;
+  final String adminNotificationEmail;
 
   SmtpConfig({
     required this.host,
@@ -29,6 +31,8 @@ class SmtpConfig {
     required this.enabled,
     required this.onPackagePublished,
     required this.onUserRegistered,
+    required this.onWebhookDisabled,
+    required this.adminNotificationEmail,
   });
 
   /// Check if SMTP is properly configured.
@@ -49,6 +53,9 @@ class SmtpConfig {
           config['email_on_package_published']?.toLowerCase() != 'false',
       onUserRegistered:
           config['email_on_user_registered']?.toLowerCase() != 'false',
+      onWebhookDisabled:
+          config['email_on_webhook_disabled']?.toLowerCase() != 'false',
+      adminNotificationEmail: config['admin_notification_email'] ?? '',
     );
   }
 }
@@ -351,6 +358,55 @@ Email: $userEmail
 Registered: ${DateTime.now().toUtc().toIso8601String()}
 
 Manage users: $usersUrl
+
+---
+This is an automated message from Repub Package Registry.
+''';
+
+    await _send(message);
+  }
+
+  /// Send notification when a webhook is auto-disabled.
+  ///
+  /// Uses the admin_notification_email config setting.
+  Future<void> onWebhookDisabled({
+    required String webhookId,
+    required String webhookUrl,
+    required String reason,
+    String? baseUrl,
+  }) async {
+    final config = await _getConfig();
+    if (!config.isConfigured || !config.onWebhookDisabled) {
+      return;
+    }
+
+    if (config.adminNotificationEmail.isEmpty) {
+      Logger.debug(
+        'Webhook disabled notification skipped: no admin_notification_email configured',
+        component: 'email',
+      );
+      return;
+    }
+
+    final webhooksUrl =
+        baseUrl != null ? '$baseUrl/admin/webhooks' : '/admin/webhooks';
+
+    final message = Message()
+      ..from = await _getFromAddress()
+      ..recipients.add(config.adminNotificationEmail)
+      ..subject = 'Webhook Disabled - Repub Package Registry'
+      ..text = '''
+A webhook has been automatically disabled on the Repub Package Registry.
+
+Webhook URL: $webhookUrl
+Webhook ID: $webhookId
+Disabled: ${DateTime.now().toUtc().toIso8601String()}
+
+Reason: $reason
+
+To re-enable this webhook, visit the admin panel and manually activate it after resolving the underlying issue.
+
+Manage webhooks: $webhooksUrl
 
 ---
 This is an automated message from Repub Package Registry.

@@ -6,12 +6,16 @@ import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:uuid/uuid.dart';
 
+/// Callback invoked when a webhook is auto-disabled due to failures.
+typedef WebhookDisabledCallback = void Function(Webhook webhook, String reason);
+
 /// Service for triggering webhooks on events.
 class WebhookService {
   static const _uuid = Uuid();
 
   final MetadataStore metadata;
   final http.Client _httpClient;
+  final WebhookDisabledCallback? _onWebhookDisabled;
 
   /// Maximum number of delivery attempts before disabling a webhook.
   static const maxFailures = 5;
@@ -41,7 +45,9 @@ class WebhookService {
   WebhookService({
     required this.metadata,
     http.Client? httpClient,
-  }) : _httpClient = httpClient ?? http.Client();
+    WebhookDisabledCallback? onWebhookDisabled,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _onWebhookDisabled = onWebhookDisabled;
 
   /// Check if a URL is safe to call (SSRF protection).
   /// Returns true if safe, false if blocked.
@@ -141,11 +147,16 @@ class WebhookService {
       );
 
       // Disable the webhook to prevent repeated attempts
-      await metadata.updateWebhook(
-        webhook.copyWith(
-          isActive: false,
-          lastTriggeredAt: DateTime.now(),
-        ),
+      final disabledWebhook = webhook.copyWith(
+        isActive: false,
+        lastTriggeredAt: DateTime.now(),
+      );
+      await metadata.updateWebhook(disabledWebhook);
+
+      // Invoke callback for external notification
+      _onWebhookDisabled?.call(
+        disabledWebhook,
+        'Disabled: URL targets internal or private network (SSRF protection)',
       );
 
       // Log the blocked delivery
@@ -247,20 +258,25 @@ class WebhookService {
     final newFailureCount = webhook.failureCount + 1;
     final shouldDisable = newFailureCount >= maxFailures;
 
-    await metadata.updateWebhook(
-      webhook.copyWith(
-        lastTriggeredAt: DateTime.now(),
-        failureCount: newFailureCount,
-        isActive: shouldDisable ? false : webhook.isActive,
-      ),
+    final updatedWebhook = webhook.copyWith(
+      lastTriggeredAt: DateTime.now(),
+      failureCount: newFailureCount,
+      isActive: shouldDisable ? false : webhook.isActive,
     );
 
+    await metadata.updateWebhook(updatedWebhook);
+
     if (shouldDisable) {
+      final reason =
+          'Disabled after $maxFailures consecutive failures. Last error: $error';
       Logger.warn(
         'Webhook disabled after $maxFailures consecutive failures',
         component: 'webhook',
         metadata: {'webhookId': webhook.id, 'url': webhook.url},
       );
+
+      // Invoke callback for external notification (e.g., email to admins)
+      _onWebhookDisabled?.call(updatedWebhook, reason);
     }
   }
 

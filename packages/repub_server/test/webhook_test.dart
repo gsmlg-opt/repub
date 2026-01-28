@@ -250,7 +250,81 @@ void main() {
         expect(updated.failureCount, equals(5));
       });
 
-      test('triggers multiple webhooks concurrently', () async {
+      test('invokes onWebhookDisabled callback when disabled', () async {
+        final failingClient = MockClient((request) async {
+          return http.Response('Error', 500);
+        });
+
+        Webhook? disabledWebhook;
+        String? disabledReason;
+
+        final failingService = WebhookService(
+          metadata: metadata,
+          httpClient: failingClient,
+          onWebhookDisabled: (webhook, reason) {
+            disabledWebhook = webhook;
+            disabledReason = reason;
+          },
+        );
+
+        final webhook = await metadata.createWebhook(
+          url: 'https://example.com/webhook',
+          events: ['package.published'],
+        );
+
+        // Simulate 5 failures (maxFailures) to trigger disable
+        for (var i = 0; i < 5; i++) {
+          await failingService.triggerEvent(
+            eventType: 'package.published',
+            data: {'package': 'test_pkg'},
+          );
+          await Future.delayed(Duration(milliseconds: 50));
+        }
+
+        // Callback should have been invoked
+        expect(disabledWebhook, isNotNull);
+        expect(disabledWebhook!.id, equals(webhook.id));
+        expect(disabledWebhook!.isActive, isFalse);
+        expect(disabledReason, contains('5 consecutive failures'));
+      });
+
+      test('invokes onWebhookDisabled callback for SSRF-blocked webhook',
+          () async {
+        Webhook? disabledWebhook;
+        String? disabledReason;
+
+        final service = WebhookService(
+          metadata: metadata,
+          httpClient: mockClient,
+          onWebhookDisabled: (webhook, reason) {
+            disabledWebhook = webhook;
+            disabledReason = reason;
+          },
+        );
+
+        // Create webhook with internal URL (bypassing creation validation)
+        // In real code this would be blocked at creation, but we simulate
+        // a legacy webhook that existed before SSRF protection
+        final internalWebhook = await metadata.createWebhook(
+          url: 'https://169.254.169.254/metadata', // AWS metadata service
+          events: ['package.published'],
+        );
+
+        await service.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        // Callback should have been invoked with SSRF reason
+        expect(disabledWebhook, isNotNull);
+        expect(disabledWebhook!.id, equals(internalWebhook.id));
+        expect(disabledWebhook!.isActive, isFalse);
+        expect(disabledReason, contains('SSRF protection'));
+      });
+
+      test('triggers multiple webhooks concurrently', () async{
         await metadata.createWebhook(
           url: 'https://example1.com/webhook',
           events: ['package.published'],

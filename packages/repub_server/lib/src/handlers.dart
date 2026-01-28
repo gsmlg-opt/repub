@@ -394,11 +394,41 @@ class ApiHandlers {
   }
 
   /// Get the webhook service (lazy initialization).
-  WebhookService get webhooks =>
-      _webhookService ??= WebhookService(metadata: metadata);
+  WebhookService get webhooks => _webhookService ??= WebhookService(
+        metadata: metadata,
+        onWebhookDisabled: _handleWebhookDisabled,
+      );
 
   /// Get the email service (lazy initialization).
   EmailService get emails => _emailService ??= EmailService(metadata: metadata);
+
+  /// Handle webhook disabled callback - notifies admins via email.
+  void _handleWebhookDisabled(Webhook webhook, String reason) {
+    // Fire-and-forget notification to avoid blocking webhook processing
+    _notifyOfDisabledWebhookAsync(webhook, reason);
+  }
+
+  /// Async helper for notifying of disabled webhook.
+  Future<void> _notifyOfDisabledWebhookAsync(
+    Webhook webhook,
+    String reason,
+  ) async {
+    try {
+      await emails.onWebhookDisabled(
+        webhookId: webhook.id,
+        webhookUrl: webhook.url,
+        reason: reason,
+        baseUrl: config.baseUrl,
+      );
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to send webhook disabled notification',
+        component: 'webhook',
+        error: e,
+        stackTrace: stack,
+      );
+    }
+  }
 
   /// Create a JSON error response with consistent format.
   ///
