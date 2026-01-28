@@ -361,4 +361,143 @@ void main() {
       expect(int.tryParse(response.headers['Retry-After']!), greaterThan(0));
     });
   });
+
+  group('RateLimitStore edge cases', () {
+    late RateLimitStore store;
+
+    setUp(() {
+      store = RateLimitStore();
+    });
+
+    test('getRemaining returns full capacity for unknown key', () {
+      const maxRequests = 100;
+      final windowDuration = Duration(seconds: 60);
+
+      // Key that has never been seen should have full capacity
+      expect(store.getRemaining('never-seen', maxRequests, windowDuration),
+          equals(maxRequests));
+    });
+
+    test('getResetSeconds returns 0 for unknown key', () {
+      final windowDuration = Duration(seconds: 60);
+
+      // Key that has never been seen should have 0 reset time
+      expect(store.getResetSeconds('never-seen', windowDuration), equals(0));
+    });
+
+    test('handles very short window duration', () {
+      const maxRequests = 5;
+      final windowDuration = Duration(milliseconds: 1);
+
+      // Record a request
+      final count =
+          store.checkAndRecord('short-window', maxRequests, windowDuration);
+      expect(count, equals(1));
+
+      // After 1ms, the request should expire - but in practice it might not
+      // due to timing, so we just verify no crash
+    });
+
+    test('handles large request counts without overflow', () {
+      const maxRequests = 1000000; // 1 million
+      final windowDuration = Duration(seconds: 60);
+
+      // Should be able to track up to the limit
+      for (var i = 0; i < 10; i++) {
+        final count = store.checkAndRecord('large-limit', maxRequests, windowDuration);
+        expect(count, equals(i + 1));
+      }
+
+      // Verify remaining calculation is correct
+      expect(store.getRemaining('large-limit', maxRequests, windowDuration),
+          equals(maxRequests - 10));
+    });
+
+    test('empty string key works correctly', () {
+      const maxRequests = 5;
+      final windowDuration = Duration(seconds: 60);
+
+      final count = store.checkAndRecord('', maxRequests, windowDuration);
+      expect(count, equals(1));
+
+      expect(store.getRemaining('', maxRequests, windowDuration), equals(4));
+    });
+  });
+
+  group('extractCompositeKey edge cases', () {
+    test('handles empty Bearer token', () {
+      final request = Request(
+        'GET',
+        Uri.parse('http://localhost/test'),
+        headers: {
+          'x-forwarded-for': '192.168.1.100',
+          'authorization': 'Bearer ',
+        },
+      );
+
+      expect(extractCompositeKey(request), equals('192.168.1.100:'));
+    });
+
+    test('handles non-Bearer authorization', () {
+      final request = Request(
+        'GET',
+        Uri.parse('http://localhost/test'),
+        headers: {
+          'x-forwarded-for': '192.168.1.100',
+          'authorization': 'Basic dXNlcjpwYXNz',
+        },
+      );
+
+      // Should return just IP since it's not a Bearer token
+      expect(extractCompositeKey(request), equals('192.168.1.100'));
+    });
+
+    test('handles malformed authorization header', () {
+      final request = Request(
+        'GET',
+        Uri.parse('http://localhost/test'),
+        headers: {
+          'x-forwarded-for': '192.168.1.100',
+          'authorization': 'Bearer',  // Missing space and token
+        },
+      );
+
+      // Should return just IP since there's no token after Bearer
+      expect(extractCompositeKey(request), equals('192.168.1.100'));
+    });
+  });
+
+  group('extractClientIp edge cases', () {
+    test('handles empty X-Forwarded-For header', () {
+      final request = Request(
+        'GET',
+        Uri.parse('http://localhost/test'),
+        headers: {'x-forwarded-for': ''},
+      );
+
+      // Empty X-Forwarded-For falls back to 'unknown'
+      expect(extractClientIp(request), equals('unknown'));
+    });
+
+    test('handles whitespace in X-Forwarded-For', () {
+      final request = Request(
+        'GET',
+        Uri.parse('http://localhost/test'),
+        headers: {'x-forwarded-for': '  192.168.1.100  , 10.0.0.1'},
+      );
+
+      // Should trim whitespace from the first IP
+      expect(extractClientIp(request), equals('192.168.1.100'));
+    });
+
+    test('handles single IP in X-Forwarded-For without comma', () {
+      final request = Request(
+        'GET',
+        Uri.parse('http://localhost/test'),
+        headers: {'x-forwarded-for': '192.168.1.100'},
+      );
+
+      expect(extractClientIp(request), equals('192.168.1.100'));
+    });
+  });
 }

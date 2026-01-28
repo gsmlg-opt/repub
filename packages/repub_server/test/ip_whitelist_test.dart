@@ -366,6 +366,129 @@ void main() {
       });
     });
 
+    group('CIDR edge cases', () {
+      test('supports /32 single host CIDR', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['192.168.1.50/32'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        // Exact IP should match
+        var response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.50'));
+        expect(response.statusCode, equals(200));
+
+        // Adjacent IP should not match
+        response = await handler(
+            createRequest('/admin/api/stats', ip: '192.168.1.51'));
+        expect(response.statusCode, equals(403));
+      });
+
+      test('ignores CIDR with negative prefix length', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['192.168.1.0/-1', '10.0.0.1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        // Invalid CIDR is ignored, valid IP works
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
+        expect(response.statusCode, equals(200));
+
+        // IP in invalid CIDR range doesn't match
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '192.168.1.1'));
+        expect(response.statusCode, equals(403));
+      });
+
+      test('ignores CIDR with non-numeric prefix', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['192.168.1.0/abc', '10.0.0.1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
+        expect(response.statusCode, equals(200));
+
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '192.168.1.1'));
+        expect(response.statusCode, equals(403));
+      });
+
+      test('handles empty CIDR prefix', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['192.168.1.0/', '10.0.0.1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        // Valid IP should work
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
+        expect(response.statusCode, equals(200));
+      });
+
+      test('172.16.0.0/12 boundary - 172.15.255.255 outside range', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['172.16.0.0/12'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        // First IP in range should match
+        var response =
+            await handler(createRequest('/admin/api/stats', ip: '172.16.0.0'));
+        expect(response.statusCode, equals(200));
+
+        // Last IP in range (172.31.255.255) should match
+        response = await handler(
+            createRequest('/admin/api/stats', ip: '172.31.255.255'));
+        expect(response.statusCode, equals(200));
+
+        // IP just before range should not match
+        response = await handler(
+            createRequest('/admin/api/stats', ip: '172.15.255.255'));
+        expect(response.statusCode, equals(403));
+
+        // IP just after range should not match
+        response =
+            await handler(createRequest('/admin/api/stats', ip: '172.32.0.0'));
+        expect(response.statusCode, equals(403));
+      });
+    });
+
+    group('IPv6 edge cases', () {
+      test('handles IPv4-mapped IPv6 addresses', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['::ffff:192.168.1.100'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        // Exact match should work
+        var response = await handler(
+            createRequest('/admin/api/stats', ip: '::ffff:192.168.1.100'));
+        expect(response.statusCode, equals(200));
+      });
+
+      test('handles mixed case IPv6', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['2001:DB8::1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        // Lowercase should match uppercase whitelist entry
+        var response = await handler(
+            createRequest('/admin/api/stats', ip: '2001:db8::1'));
+        expect(response.statusCode, equals(200));
+      });
+    });
+
     group('Response format', () {
       test('returns JSON error for blocked requests', () async {
         final middleware = ipWhitelistMiddleware(
