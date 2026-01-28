@@ -118,7 +118,9 @@ class Config {
     final listenAddrFull = _env('REPUB_LISTEN_ADDR', '0.0.0.0:4920');
     final parts = listenAddrFull.split(':');
     final addr = parts.length > 1 ? parts[0] : '0.0.0.0';
-    final port = parts.length > 1 ? int.parse(parts[1]) : 4920;
+    final port = parts.length > 1
+        ? (int.tryParse(parts[1]) ?? 4920)
+        : 4920;
 
     return Config(
       listenAddr: addr,

@@ -23,6 +23,7 @@ Future<void> backupCommands(List<String> args) async {
     case '-h':
       _printBackupUsage();
     default:
+      Logger.error('Unknown backup command', component: 'cli', metadata: {'command': command});
       print('Unknown backup command: $command');
       _printBackupUsage();
       exit(1);
@@ -65,6 +66,7 @@ Note:
 
 Future<void> _exportBackup(List<String> args) async {
   if (args.isEmpty) {
+    Logger.error('Missing output file path for backup export', component: 'cli');
     print('Error: Missing output file path');
     print('Usage: dart run repub_cli backup export <file>');
     exit(1);
@@ -95,6 +97,7 @@ Future<void> _exportBackup(List<String> args) async {
       print('  $key: $value');
     });
   } catch (e) {
+    Logger.error('Failed to create backup', component: 'cli', metadata: {'error': e.toString()});
     print('Error creating backup: $e');
     exit(1);
   } finally {
@@ -108,6 +111,7 @@ Future<void> _importBackup(List<String> args) async {
   final fileArgs = args.where((a) => !a.startsWith('--')).toList();
 
   if (fileArgs.isEmpty) {
+    Logger.error('Missing input file path for backup import', component: 'cli');
     print('Error: Missing input file path');
     print(
         'Usage: dart run repub_cli backup import [--dry-run] [--force] <file>');
@@ -118,6 +122,7 @@ Future<void> _importBackup(List<String> args) async {
   final file = File(filePath);
 
   if (!file.existsSync()) {
+    Logger.error('Backup file not found', component: 'cli', metadata: {'file': filePath});
     print('Error: Backup file not found: $filePath');
     exit(1);
   }
@@ -155,7 +160,7 @@ Future<void> _importBackup(List<String> args) async {
       print('');
       print('WARNING: This will overwrite existing records with matching IDs.');
       stdout.write('Continue with import? [y/N]: ');
-      final input = stdin.readLineSync()?.toLowerCase();
+      final input = (stdin.readLineSync() ?? '').toLowerCase();
 
       if (input != 'y' && input != 'yes') {
         print('Import cancelled.');
@@ -171,10 +176,12 @@ Future<void> _importBackup(List<String> args) async {
     print('');
     print('Import completed successfully!');
   } on BackupException catch (e) {
+    Logger.error('Backup import failed', component: 'cli', metadata: {'error': e.message});
     print('');
     print('Error: ${e.message}');
     exit(1);
   } catch (e) {
+    Logger.error('Backup import failed with unexpected error', component: 'cli', metadata: {'error': e.toString()});
     print('');
     print('Error importing backup: $e');
     exit(1);
