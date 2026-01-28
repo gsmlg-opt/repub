@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:repub_model/repub_model.dart';
+import 'package:repub_server/src/handlers.dart';
 import 'package:repub_storage/repub_storage.dart';
+import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -480,6 +484,239 @@ void main() {
         final config = await metadata.getConfig('token_max_ttl_days');
         expect(config, isNotNull);
         expect(config!.intValue, equals(0));
+      });
+    });
+
+    group('Download Scope Enforcement', () {
+      late Config authConfig;
+      late BlobStore blobs;
+      late ApiHandlers handlers;
+      late String userId;
+      late String tokenWithReadScope;
+      late String tokenWithoutReadScope;
+
+      setUp(() async {
+        // Create config that requires download auth
+        authConfig = Config(
+          listenAddr: '0.0.0.0',
+          listenPort: 4920,
+          baseUrl: 'http://localhost:4920',
+          databaseUrl: config.databaseUrl,
+          storagePath: tempDir.path,
+          requirePublishAuth: true,
+          requireDownloadAuth: true, // Enable download auth
+          signedUrlTtlSeconds: 3600,
+          upstreamUrl: 'https://pub.dev',
+          enableUpstreamProxy: false,
+          rateLimitRequests: 100,
+          rateLimitWindowSeconds: 60,
+        );
+
+        // Create blob storage
+        blobs = BlobStore.fromConfig(authConfig);
+        await blobs.ensureReady();
+
+        // Create handlers
+        handlers = ApiHandlers(
+          config: authConfig,
+          metadata: metadata,
+          blobs: blobs,
+          cacheBlobs: blobs,
+        );
+
+        // Create user
+        userId = await metadata.createUser(
+          email: 'downloader@example.com',
+          passwordHash: 'hash',
+        );
+
+        // Create token WITH read:all scope
+        tokenWithReadScope = await metadata.createToken(
+          userId: userId,
+          label: 'Can Read',
+          scopes: ['read:all'],
+        );
+
+        // Create token WITHOUT read:all scope (only publish)
+        tokenWithoutReadScope = await metadata.createToken(
+          userId: userId,
+          label: 'Cannot Read',
+          scopes: ['publish:all'],
+        );
+
+        // Create test package
+        await metadata.upsertPackageVersion(
+          packageName: 'test_package',
+          version: '1.0.0',
+          pubspec: {'name': 'test_package', 'version': '1.0.0'},
+          archiveKey: 'test_package/1.0.0/abc123',
+          archiveSha256: 'abc123',
+        );
+      });
+
+      tearDown(() async {
+        // BlobStore doesn't need explicit cleanup
+      });
+
+      test('listPackages requires read:all scope when download auth enabled',
+          () async {
+        // Request without read scope should fail
+        final requestNoScope = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithoutReadScope',
+          },
+        );
+        final responseNoScope = await handlers.listPackages(requestNoScope);
+        expect(responseNoScope.statusCode, equals(403));
+
+        // Request with read scope should succeed
+        final requestWithScope = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithReadScope',
+          },
+        );
+        final responseWithScope =
+            await handlers.listPackages(requestWithScope);
+        expect(responseWithScope.statusCode, equals(200));
+      });
+
+      test('searchPackages requires read:all scope when download auth enabled',
+          () async {
+        final requestNoScope = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages/search?q=test'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithoutReadScope',
+          },
+        );
+        final responseNoScope = await handlers.searchPackages(requestNoScope);
+        expect(responseNoScope.statusCode, equals(403));
+
+        final requestWithScope = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages/search?q=test'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithReadScope',
+          },
+        );
+        final responseWithScope =
+            await handlers.searchPackages(requestWithScope);
+        expect(responseWithScope.statusCode, equals(200));
+      });
+
+      test('getPackage requires read:all scope when download auth enabled',
+          () async {
+        final requestNoScope = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages/test_package'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithoutReadScope',
+          },
+        );
+        final responseNoScope =
+            await handlers.getPackage(requestNoScope, 'test_package');
+        expect(responseNoScope.statusCode, equals(403));
+
+        final requestWithScope = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages/test_package'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithReadScope',
+          },
+        );
+        final responseWithScope =
+            await handlers.getPackage(requestWithScope, 'test_package');
+        expect(responseWithScope.statusCode, equals(200));
+      });
+
+      test('getVersion requires read:all scope when download auth enabled',
+          () async {
+        final requestNoScope = Request(
+          'GET',
+          Uri.parse(
+              'http://localhost:4920/api/packages/test_package/versions/1.0.0'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithoutReadScope',
+          },
+        );
+        final responseNoScope = await handlers.getVersion(
+            requestNoScope, 'test_package', '1.0.0');
+        expect(responseNoScope.statusCode, equals(403));
+
+        final requestWithScope = Request(
+          'GET',
+          Uri.parse(
+              'http://localhost:4920/api/packages/test_package/versions/1.0.0'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithReadScope',
+          },
+        );
+        final responseWithScope = await handlers.getVersion(
+            requestWithScope, 'test_package', '1.0.0');
+        expect(responseWithScope.statusCode, equals(200));
+      });
+
+      test('downloadPackage requires read:all scope when download auth enabled',
+          () async {
+        final requestNoScope = Request(
+          'GET',
+          Uri.parse(
+              'http://localhost:4920/packages/test_package/versions/1.0.0.tar.gz'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithoutReadScope',
+          },
+        );
+        final responseNoScope = await handlers.downloadPackage(
+            requestNoScope, 'test_package', '1.0.0');
+        expect(responseNoScope.statusCode, equals(403));
+
+        // Note: We can't fully test successful download without actual blob data,
+        // but we can verify the scope check passes (would fail later on missing blob)
+        final requestWithScope = Request(
+          'GET',
+          Uri.parse(
+              'http://localhost:4920/packages/test_package/versions/1.0.0.tar.gz'),
+          headers: {
+            'authorization':
+                'Bearer $tokenWithReadScope',
+          },
+        );
+        final responseWithScope = await handlers.downloadPackage(
+            requestWithScope, 'test_package', '1.0.0');
+        // Should pass scope check (403 = scope fail, 404/500 = scope passed but blob missing)
+        expect(responseWithScope.statusCode, isNot(equals(403)));
+      });
+
+      test('admin scope grants read access', () async {
+        // Create admin token
+        final adminToken = await metadata.createToken(
+          userId: userId,
+          label: 'Admin',
+          scopes: ['admin'],
+        );
+
+        final request = Request(
+          'GET',
+          Uri.parse('http://localhost:4920/api/packages'),
+          headers: {
+            'authorization': 'Bearer $adminToken',
+          },
+        );
+        final response = await handlers.listPackages(request);
+        expect(response.statusCode, equals(200));
       });
     });
   });

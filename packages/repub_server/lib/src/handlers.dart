@@ -575,6 +575,13 @@ class ApiHandlers {
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
       }
+
+      // Check read scope
+      final token = authResult.token;
+      final scopeForbidden = requireReadScope(token);
+      if (scopeForbidden != null) {
+        return scopeForbidden;
+      }
     }
 
     final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
@@ -602,6 +609,13 @@ class ApiHandlers {
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
+      }
+
+      // Check read scope
+      final token = authResult.token;
+      final scopeForbidden = requireReadScope(token);
+      if (scopeForbidden != null) {
+        return scopeForbidden;
       }
     }
 
@@ -801,6 +815,13 @@ class ApiHandlers {
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
       }
+
+      // Check read scope
+      final token = authResult.token;
+      final scopeForbidden = requireReadScope(token);
+      if (scopeForbidden != null) {
+        return scopeForbidden;
+      }
     }
 
     final info = await metadata.getPackageInfo(name);
@@ -863,6 +884,13 @@ class ApiHandlers {
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
+      }
+
+      // Check read scope
+      final token = authResult.token;
+      final scopeForbidden = requireReadScope(token);
+      if (scopeForbidden != null) {
+        return scopeForbidden;
       }
     }
 
@@ -1233,6 +1261,13 @@ class ApiHandlers {
       );
       if (authResult is! AuthSuccess) {
         return _authErrorResponse(authResult);
+      }
+
+      // Check read scope
+      final token = authResult.token;
+      final scopeForbidden = requireReadScope(token);
+      if (scopeForbidden != null) {
+        return scopeForbidden;
       }
     }
 
