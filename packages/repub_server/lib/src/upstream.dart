@@ -12,6 +12,9 @@ class UpstreamClient {
   /// Default timeout for HTTP requests.
   static const _timeout = Duration(seconds: 10);
 
+  /// Maximum number of packages to fetch in a batch to prevent DoS.
+  static const _maxBatchSize = 100;
+
   UpstreamClient({required this.baseUrl}) : _client = http.Client();
 
   /// Fetch package info from upstream.
@@ -49,15 +52,33 @@ class UpstreamClient {
   }
 
   /// Fetch multiple packages in parallel with concurrency limit.
+  ///
+  /// The list of names is capped at [_maxBatchSize] to prevent DoS attacks.
   Future<List<UpstreamPackageInfo>> getPackagesBatch(
     List<String> names, {
     int concurrency = 5,
   }) async {
+    // Cap batch size to prevent resource exhaustion
+    final cappedNames = names.length > _maxBatchSize
+        ? names.sublist(0, _maxBatchSize)
+        : names;
+
+    if (names.length > _maxBatchSize) {
+      Logger.warn(
+        'Batch size exceeded maximum, truncating',
+        component: 'upstream',
+        metadata: {
+          'requested': names.length,
+          'maxBatchSize': _maxBatchSize,
+        },
+      );
+    }
+
     final results = <UpstreamPackageInfo>[];
 
     // Process in batches to limit concurrency
-    for (var i = 0; i < names.length; i += concurrency) {
-      final batch = names.skip(i).take(concurrency);
+    for (var i = 0; i < cappedNames.length; i += concurrency) {
+      final batch = cappedNames.skip(i).take(concurrency);
       final futures = batch.map((name) => getPackage(name));
       final batchResults = await Future.wait(futures);
       results.addAll(batchResults.whereType<UpstreamPackageInfo>());

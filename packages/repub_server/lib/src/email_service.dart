@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 import 'package:repub_model/repub_model.dart' show Logger;
@@ -60,6 +62,9 @@ class EmailService {
   /// Cache duration for SMTP config.
   static const _configCacheDuration = Duration(minutes: 5);
 
+  /// Timeout for sending emails to prevent hanging connections.
+  static const _sendTimeout = Duration(seconds: 30);
+
   EmailService({required this.metadata});
 
   /// Get SMTP configuration from database, with caching.
@@ -118,7 +123,12 @@ class EmailService {
 
     try {
       final smtpServer = _getSmtpServer(config);
-      await send(message, smtpServer);
+      await send(message, smtpServer).timeout(
+        _sendTimeout,
+        onTimeout: () {
+          throw TimeoutException('Email send timed out after $_sendTimeout');
+        },
+      );
 
       Logger.info(
         'Email sent successfully',
@@ -130,6 +140,17 @@ class EmailService {
       );
 
       return true;
+    } on TimeoutException catch (e) {
+      Logger.error(
+        'Email send timed out',
+        component: 'email',
+        error: e,
+        metadata: {
+          'to': message.recipients.map((a) => a.toString()).join(', '),
+          'subject': message.subject,
+        },
+      );
+      return false;
     } catch (e, stack) {
       Logger.error(
         'Failed to send email',

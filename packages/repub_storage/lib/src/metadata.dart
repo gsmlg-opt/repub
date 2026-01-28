@@ -2335,6 +2335,13 @@ class SqliteMetadataStore extends MetadataStore {
     }
 
     final db = sqlite3.open(path);
+
+    // Enable WAL mode for better concurrent read/write performance
+    // WAL allows concurrent readers while a write is in progress
+    db.execute('PRAGMA journal_mode = WAL');
+    db.execute('PRAGMA synchronous = NORMAL');
+    db.execute('PRAGMA busy_timeout = 5000');
+
     return SqliteMetadataStore._(db);
   }
 

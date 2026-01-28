@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -322,6 +323,15 @@ class ApiHandlers {
   // In-memory storage for upload data (sessionId -> bytes)
   final Map<String, Uint8List> _uploadData = {};
 
+  // Track session creation times for TTL-based cleanup
+  final Map<String, DateTime> _uploadSessionCreatedAt = {};
+
+  // Upload session TTL (1 hour)
+  static const _uploadSessionTtl = Duration(hours: 1);
+
+  // Cleanup timer for orphaned upload sessions
+  Timer? _uploadSessionCleanupTimer;
+
   // Upstream client for caching proxy
   UpstreamClient? _upstream;
 
@@ -336,7 +346,44 @@ class ApiHandlers {
     required this.metadata,
     required this.blobs,
     required this.cacheBlobs,
-  });
+  }) {
+    // Start periodic cleanup for orphaned upload sessions (every 10 minutes)
+    _uploadSessionCleanupTimer =
+        Timer.periodic(const Duration(minutes: 10), (_) {
+      _cleanupOrphanedUploadSessions();
+    });
+  }
+
+  /// Cleanup upload sessions that have exceeded their TTL.
+  void _cleanupOrphanedUploadSessions() {
+    final now = DateTime.now();
+    final expiredSessions = <String>[];
+
+    for (final entry in _uploadSessionCreatedAt.entries) {
+      if (now.difference(entry.value) > _uploadSessionTtl) {
+        expiredSessions.add(entry.key);
+      }
+    }
+
+    if (expiredSessions.isNotEmpty) {
+      Logger.info(
+        'Cleaning up orphaned upload sessions',
+        component: 'upload',
+        metadata: {'count': expiredSessions.length},
+      );
+      for (final sessionId in expiredSessions) {
+        _uploadData.remove(sessionId);
+        _uploadSessionCreatedAt.remove(sessionId);
+        _uploadSessionCreatedAt.remove(sessionId);
+      }
+    }
+  }
+
+  /// Dispose resources (call when shutting down).
+  void dispose() {
+    _uploadSessionCleanupTimer?.cancel();
+    _uploadSessionCleanupTimer = null;
+  }
 
   /// Get the webhook service (lazy initialization).
   WebhookService get webhooks =>
@@ -494,9 +541,8 @@ class ApiHandlers {
       }
     }
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -537,9 +583,8 @@ class ApiHandlers {
       );
     }
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -583,9 +628,8 @@ class ApiHandlers {
       );
     }
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -923,8 +967,9 @@ class ApiHandlers {
       );
     }
 
-    // Store temporarily
+    // Store temporarily with creation time for TTL-based cleanup
     _uploadData[sessionId] = tarballBytes;
+    _uploadSessionCreatedAt[sessionId] = DateTime.now();
 
     // Respond with 204 and Location header for finalize
     final finalizeUrl =
@@ -970,6 +1015,7 @@ class ApiHandlers {
     final session = await metadata.getUploadSession(sessionId);
     if (session == null) {
       _uploadData.remove(sessionId);
+      _uploadSessionCreatedAt.remove(sessionId);
       return Response(
         400,
         body: jsonEncode({
@@ -987,6 +1033,7 @@ class ApiHandlers {
 
     if (result is PublishError) {
       _uploadData.remove(sessionId);
+      _uploadSessionCreatedAt.remove(sessionId);
       return Response(
         400,
         body: jsonEncode({
@@ -1004,6 +1051,7 @@ class ApiHandlers {
           requirePackagePublishScope(token, success.packageName);
       if (scopeForbidden != null) {
         _uploadData.remove(sessionId);
+        _uploadSessionCreatedAt.remove(sessionId);
         return scopeForbidden;
       }
     }
@@ -1015,6 +1063,7 @@ class ApiHandlers {
     final existingPackage = await metadata.getPackage(success.packageName);
     if (existingPackage != null && !existingPackage.canPublish(userId)) {
       _uploadData.remove(sessionId);
+      _uploadSessionCreatedAt.remove(sessionId);
       return forbidden(
           'Not authorized to publish package: ${success.packageName}');
     }
@@ -1022,6 +1071,7 @@ class ApiHandlers {
     // Check if version already exists
     if (await metadata.versionExists(success.packageName, success.version)) {
       _uploadData.remove(sessionId);
+      _uploadSessionCreatedAt.remove(sessionId);
       return Response(
         400,
         body: jsonEncode({
@@ -1089,6 +1139,7 @@ class ApiHandlers {
 
     // Clean up
     _uploadData.remove(sessionId);
+    _uploadSessionCreatedAt.remove(sessionId);
 
     return Response.ok(
       jsonEncode({
@@ -1489,7 +1540,8 @@ class ApiHandlers {
     }).toList();
 
     final csv = mapListToCsv(rows);
-    final filename = isUpstreamCache ? 'cached_packages.csv' : 'hosted_packages.csv';
+    final filename =
+        isUpstreamCache ? 'cached_packages.csv' : 'hosted_packages.csv';
 
     return Response.ok(
       csv,
@@ -1577,11 +1629,13 @@ class ApiHandlers {
     packageData.sort((a, b) => b.downloads.compareTo(a.downloads));
 
     // Convert to CSV rows
-    final rows = packageData.map((p) => {
-          'package_name': p.name,
-          'total_downloads': p.downloads.toString(),
-          'latest_version': p.version,
-        }).toList();
+    final rows = packageData
+        .map((p) => {
+              'package_name': p.name,
+              'total_downloads': p.downloads.toString(),
+              'latest_version': p.version,
+            })
+        .toList();
 
     final csv = mapListToCsv(rows.take(limit).toList());
 
@@ -1599,9 +1653,8 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -1623,9 +1676,8 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -2291,9 +2343,8 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -3401,9 +3452,8 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page =
-        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
-            .clamp(1, 10000);
+    final page = (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+        .clamp(1, 10000);
     final limit =
         (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
             .clamp(1, 100);
@@ -3499,8 +3549,7 @@ class ApiHandlers {
         'type': storageType,
       };
     } catch (e) {
-      Logger.warn('Storage health check failed',
-          component: 'health', error: e);
+      Logger.warn('Storage health check failed', component: 'health', error: e);
       storageHealth = {
         'status': 'unhealthy',
         'type': storageType,
