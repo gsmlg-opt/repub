@@ -91,6 +91,47 @@ void main() {
       expect(await store.versionExists('test_pkg', '2.0.0'), isFalse);
     });
 
+    test('concurrent version publishing is handled safely', () async {
+      // Test that concurrent attempts to publish the same version
+      // don't corrupt the database (upsert is idempotent)
+      final futures = List.generate(
+        5,
+        (i) => store.upsertPackageVersion(
+          packageName: 'concurrent_pkg',
+          version: '1.0.0',
+          pubspec: {'name': 'concurrent_pkg', 'version': '1.0.0'},
+          archiveKey: 'concurrent_pkg/1.0.0.tar.gz',
+          archiveSha256: 'hash_$i', // Different hash each attempt
+        ),
+      );
+
+      // All concurrent upserts should complete without error
+      await Future.wait(futures);
+
+      // Only one version should exist
+      final versions = await store.getPackageVersions('concurrent_pkg');
+      expect(versions, hasLength(1));
+      expect(versions.first.version, '1.0.0');
+    });
+
+    test('versionExists check prevents duplicate publishing', () async {
+      await store.upsertPackageVersion(
+        packageName: 'check_first_pkg',
+        version: '1.0.0',
+        pubspec: {'name': 'check_first_pkg', 'version': '1.0.0'},
+        archiveKey: 'check_first_pkg/1.0.0.tar.gz',
+        archiveSha256: 'original_hash',
+      );
+
+      // Simulate the check that handlers do before publishing
+      final exists = await store.versionExists('check_first_pkg', '1.0.0');
+      expect(exists, isTrue);
+
+      // This pattern (check then upsert) is what handlers use
+      // If exists is true, handlers reject with 400
+      // This test verifies the check works correctly
+    });
+
     test('getPackageVersion returns specific version', () async {
       await store.upsertPackageVersion(
         packageName: 'versioned_pkg',

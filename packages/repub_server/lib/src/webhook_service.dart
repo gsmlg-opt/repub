@@ -71,7 +71,13 @@ class WebhookService {
       }
 
       return true;
-    } catch (_) {
+    } catch (e) {
+      // Log URL parsing errors for debugging
+      Logger.debug(
+        'Failed to parse webhook URL for safety check',
+        component: 'webhook',
+        metadata: {'url': url, 'error': e.toString()},
+      );
       return false;
     }
   }
