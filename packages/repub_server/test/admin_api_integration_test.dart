@@ -438,5 +438,101 @@ void main() {
         expect(json.containsKey('retracted'), isFalse);
       });
     });
+
+    group('Package Deletion', () {
+      late String userId;
+
+      setUp(() async {
+        userId = await metadata.createUser(
+          email: 'delete_test@example.com',
+          passwordHash: 'hash',
+        );
+      });
+
+      Future<void> publishVersion(String pkgName, String version) async {
+        await metadata.upsertPackageVersion(
+          packageName: pkgName,
+          version: version,
+          pubspec: {'name': pkgName, 'version': version},
+          archiveKey: 'archives/$pkgName-$version.tar.gz',
+          archiveSha256: 'sha256_$version',
+          ownerId: userId,
+        );
+      }
+
+      test('deletePackage removes package and returns version count', () async {
+        await publishVersion('delete_pkg', '1.0.0');
+        await publishVersion('delete_pkg', '2.0.0');
+
+        final versionCount = await metadata.deletePackage('delete_pkg');
+        expect(versionCount, equals(2));
+
+        // Package should be gone
+        final pkg = await metadata.getPackage('delete_pkg');
+        expect(pkg, isNull);
+      });
+
+      test('deletePackage returns 0 for non-existent package', () async {
+        final versionCount = await metadata.deletePackage('no_such_pkg');
+        expect(versionCount, equals(0));
+      });
+
+      test('getPackageArchiveKeys returns all version keys', () async {
+        await publishVersion('keys_pkg', '1.0.0');
+        await publishVersion('keys_pkg', '2.0.0');
+        await publishVersion('keys_pkg', '3.0.0');
+
+        final keys = await metadata.getPackageArchiveKeys('keys_pkg');
+        expect(keys.length, equals(3));
+        expect(keys, contains('archives/keys_pkg-1.0.0.tar.gz'));
+        expect(keys, contains('archives/keys_pkg-2.0.0.tar.gz'));
+        expect(keys, contains('archives/keys_pkg-3.0.0.tar.gz'));
+      });
+
+      test('getPackageArchiveKeys returns empty for non-existent package',
+          () async {
+        final keys = await metadata.getPackageArchiveKeys('no_such_pkg');
+        expect(keys, isEmpty);
+      });
+
+      test('deletePackageVersion removes single version', () async {
+        await publishVersion('single_del', '1.0.0');
+        await publishVersion('single_del', '2.0.0');
+
+        final deleted =
+            await metadata.deletePackageVersion('single_del', '1.0.0');
+        expect(deleted, isTrue);
+
+        // Version should be gone
+        final version = await metadata.getPackageVersion('single_del', '1.0.0');
+        expect(version, isNull);
+
+        // Other version should remain
+        final v2 = await metadata.getPackageVersion('single_del', '2.0.0');
+        expect(v2, isNotNull);
+      });
+
+      test('deletePackageVersion returns false for non-existent version',
+          () async {
+        await publishVersion('exists_pkg2', '1.0.0');
+
+        final deleted =
+            await metadata.deletePackageVersion('exists_pkg2', '9.9.9');
+        expect(deleted, isFalse);
+      });
+
+      test('getVersionArchiveKey returns correct key', () async {
+        await publishVersion('key_pkg', '1.0.0');
+
+        final key = await metadata.getVersionArchiveKey('key_pkg', '1.0.0');
+        expect(key, equals('archives/key_pkg-1.0.0.tar.gz'));
+      });
+
+      test('getVersionArchiveKey returns null for non-existent version',
+          () async {
+        final key = await metadata.getVersionArchiveKey('no_pkg', '1.0.0');
+        expect(key, isNull);
+      });
+    });
   });
 }
