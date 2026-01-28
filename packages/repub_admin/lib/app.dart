@@ -4,7 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'router.dart';
 import 'services/auth_service.dart';
 import 'blocs/dashboard/dashboard_bloc.dart';
-import 'blocs/packages/packages_bloc.dart';
+import 'blocs/local_packages/local_packages_bloc.dart';
+import 'blocs/cached_packages/cached_packages_bloc.dart';
 import 'blocs/users/users_bloc.dart';
 import 'blocs/admin_users/admin_users_bloc.dart';
 import 'blocs/config/config_bloc.dart';
@@ -20,7 +21,8 @@ class RepubAdminApp extends StatelessWidget {
       providers: [
         BlocProvider(create: (context) => AuthBloc()),
         BlocProvider(create: (context) => DashboardBloc()),
-        BlocProvider(create: (context) => PackagesBloc()),
+        BlocProvider(create: (context) => LocalPackagesBloc()),
+        BlocProvider(create: (context) => CachedPackagesBloc()),
         BlocProvider(create: (context) => UsersBloc()),
         BlocProvider(create: (context) => AdminUsersBloc()),
         BlocProvider(create: (context) => ConfigBloc()),

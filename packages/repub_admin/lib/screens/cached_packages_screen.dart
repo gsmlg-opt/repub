@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../blocs/packages/packages_bloc.dart';
-import '../blocs/packages/packages_event.dart';
-import '../blocs/packages/packages_state.dart';
+import '../blocs/cached_packages/cached_packages_bloc.dart';
+import '../blocs/cached_packages/cached_packages_event.dart';
+import '../blocs/cached_packages/cached_packages_state.dart';
 import '../models/package_info.dart';
 import '../widgets/admin_layout.dart';
 
@@ -23,7 +23,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
   void initState() {
     super.initState();
     // Load cached packages when screen initializes
-    context.read<PackagesBloc>().add(const LoadCachedPackages());
+    context.read<CachedPackagesBloc>().add(const CachedPackagesLoadRequested());
   }
 
   @override
@@ -36,7 +36,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      context.read<PackagesBloc>().add(SearchPackages(query));
+      context.read<CachedPackagesBloc>().add(CachedPackagesSearchChanged(query));
     });
   }
 
@@ -44,16 +44,16 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
   Widget build(BuildContext context) {
     return AdminLayout(
       currentPath: '/packages/cached',
-      child: BlocConsumer<PackagesBloc, PackagesState>(
+      child: BlocConsumer<CachedPackagesBloc, CachedPackagesState>(
         listener: (context, state) {
-          if (state is PackageOperationSuccess) {
+          if (state is CachedPackageCleared) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Colors.green,
               ),
             );
-          } else if (state is PackageOperationError) {
+          } else if (state is CachedPackagesClearError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -75,7 +75,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, PackagesState state) {
+  Widget _buildHeader(BuildContext context, CachedPackagesState state) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -96,7 +96,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
               ),
               Row(
                 children: [
-                  if (state is PackagesLoaded)
+                  if (state is CachedPackagesLoaded)
                     Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Chip(
@@ -106,7 +106,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
                       ),
                     ),
                   FilledButton.icon(
-                    onPressed: () => _showClearAllCacheDialog(context),
+                    onPressed: () => _showCachedPackagesClearAllRequestedDialog(context),
                     icon: const Icon(Icons.delete_sweep),
                     label: const Text('Clear All Cache'),
                     style: FilledButton.styleFrom(
@@ -118,8 +118,8 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
                     icon: const Icon(Icons.refresh),
                     onPressed: () {
                       context
-                          .read<PackagesBloc>()
-                          .add(const LoadCachedPackages());
+                          .read<CachedPackagesBloc>()
+                          .add(const CachedPackagesLoadRequested());
                     },
                     tooltip: 'Refresh',
                   ),
@@ -162,34 +162,30 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     );
   }
 
-  Widget _buildContent(BuildContext context, PackagesState state) {
-    if (state is PackagesLoading) {
+  Widget _buildContent(BuildContext context, CachedPackagesState state) {
+    if (state is CachedPackagesLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (state is PackagesError) {
+    if (state is CachedPackagesError) {
       return _buildError(context, state.message);
     }
 
-    if (state is PackagesLoaded && state.viewType == PackageViewType.cached) {
+    if (state is CachedPackagesLoaded) {
       if (state.packages.isEmpty) {
         return _buildEmptyState(context, state.searchQuery);
       }
       return _buildPackagesTable(context, state);
     }
 
-    if (state is PackageOperationInProgress) {
+    if (state is CachedPackageClearing) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text(
-              state.operation == 'clearing_cache'
-                  ? 'Clearing cache for ${state.packageName}...'
-                  : '${state.operation} ${state.packageName}...',
-            ),
+            Text('Clearing cache for ${state.packageName}...'),
           ],
         ),
       );
@@ -199,7 +195,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     return const Center(child: CircularProgressIndicator());
   }
 
-  Widget _buildPackagesTable(BuildContext context, PackagesLoaded state) {
+  Widget _buildPackagesTable(BuildContext context, CachedPackagesLoaded state) {
     return Column(
       children: [
         Expanded(
@@ -301,7 +297,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     );
   }
 
-  Widget _buildPaginationControls(BuildContext context, PackagesLoaded state) {
+  Widget _buildPaginationControls(BuildContext context, CachedPackagesLoaded state) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -317,8 +313,8 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
             icon: const Icon(Icons.chevron_left),
             onPressed: state.hasPrevPage
                 ? () {
-                    context.read<PackagesBloc>().add(
-                          LoadCachedPackages(
+                    context.read<CachedPackagesBloc>().add(
+                          CachedPackagesLoadRequested(
                             page: state.page - 1,
                             limit: state.limit,
                             search: state.searchQuery,
@@ -339,8 +335,8 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
             icon: const Icon(Icons.chevron_right),
             onPressed: state.hasNextPage
                 ? () {
-                    context.read<PackagesBloc>().add(
-                          LoadCachedPackages(
+                    context.read<CachedPackagesBloc>().add(
+                          CachedPackagesLoadRequested(
                             page: state.page + 1,
                             limit: state.limit,
                             search: state.searchQuery,
@@ -428,7 +424,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () {
-                context.read<PackagesBloc>().add(const LoadCachedPackages());
+                context.read<CachedPackagesBloc>().add(const CachedPackagesLoadRequested());
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
@@ -477,7 +473,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
             ),
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              context.read<PackagesBloc>().add(ClearPackageCache(pkg.name));
+              context.read<CachedPackagesBloc>().add(CachedPackageClearRequested(pkg.name));
             },
             child: const Text('Clear Cache'),
           ),
@@ -486,7 +482,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     );
   }
 
-  void _showClearAllCacheDialog(BuildContext context) {
+  void _showCachedPackagesClearAllRequestedDialog(BuildContext context) {
     final TextEditingController confirmController = TextEditingController();
 
     showDialog(
@@ -535,7 +531,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
             onPressed: () {
               if (confirmController.text == 'CLEAR ALL CACHE') {
                 Navigator.of(dialogContext).pop();
-                context.read<PackagesBloc>().add(const ClearAllCache());
+                context.read<CachedPackagesBloc>().add(const CachedPackagesClearAllRequested());
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

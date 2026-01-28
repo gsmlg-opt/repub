@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../blocs/packages/packages_bloc.dart';
-import '../blocs/packages/packages_event.dart';
-import '../blocs/packages/packages_state.dart';
+import '../blocs/local_packages/local_packages_bloc.dart';
+import '../blocs/local_packages/local_packages_event.dart';
+import '../blocs/local_packages/local_packages_state.dart';
 import '../models/package_info.dart';
 import '../widgets/admin_layout.dart';
 
@@ -24,7 +24,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
   void initState() {
     super.initState();
     // Load packages when screen initializes
-    context.read<PackagesBloc>().add(const LoadHostedPackages());
+    context.read<LocalPackagesBloc>().add(const LocalPackagesLoadRequested());
   }
 
   @override
@@ -37,7 +37,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      context.read<PackagesBloc>().add(SearchPackages(query));
+      context.read<LocalPackagesBloc>().add(LocalPackagesSearchChanged(query));
     });
   }
 
@@ -45,16 +45,16 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
   Widget build(BuildContext context) {
     return AdminLayout(
       currentPath: '/packages/local',
-      child: BlocConsumer<PackagesBloc, PackagesState>(
+      child: BlocConsumer<LocalPackagesBloc, LocalPackagesState>(
         listener: (context, state) {
-          if (state is PackageOperationSuccess) {
+          if (state is LocalPackageDeleted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Colors.green,
               ),
             );
-          } else if (state is PackageOperationError) {
+          } else if (state is LocalPackageDeleteError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -76,7 +76,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, PackagesState state) {
+  Widget _buildHeader(BuildContext context, LocalPackagesState state) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -97,7 +97,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
               ),
               Row(
                 children: [
-                  if (state is PackagesLoaded)
+                  if (state is LocalPackagesLoaded)
                     Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Chip(
@@ -110,8 +110,8 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
                     icon: const Icon(Icons.refresh),
                     onPressed: () {
                       context
-                          .read<PackagesBloc>()
-                          .add(const LoadHostedPackages());
+                          .read<LocalPackagesBloc>()
+                          .add(const LocalPackagesLoadRequested());
                     },
                     tooltip: 'Refresh',
                   ),
@@ -149,30 +149,30 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  Widget _buildContent(BuildContext context, PackagesState state) {
-    if (state is PackagesLoading) {
+  Widget _buildContent(BuildContext context, LocalPackagesState state) {
+    if (state is LocalPackagesLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (state is PackagesError) {
+    if (state is LocalPackagesError) {
       return _buildError(context, state.message);
     }
 
-    if (state is PackagesLoaded && state.viewType == PackageViewType.hosted) {
+    if (state is LocalPackagesLoaded) {
       if (state.packages.isEmpty) {
         return _buildEmptyState(context, state.searchQuery);
       }
       return _buildPackagesTable(context, state);
     }
 
-    if (state is PackageOperationInProgress) {
+    if (state is LocalPackageDeleting) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text('${state.operation} ${state.packageName}...'),
+            Text('Deleting ${state.packageName}...'),
           ],
         ),
       );
@@ -182,7 +182,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     return const Center(child: CircularProgressIndicator());
   }
 
-  Widget _buildPackagesTable(BuildContext context, PackagesLoaded state) {
+  Widget _buildPackagesTable(BuildContext context, LocalPackagesLoaded state) {
     return Column(
       children: [
         Expanded(
@@ -326,7 +326,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  Widget _buildPaginationControls(BuildContext context, PackagesLoaded state) {
+  Widget _buildPaginationControls(BuildContext context, LocalPackagesLoaded state) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -342,8 +342,8 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             icon: const Icon(Icons.chevron_left),
             onPressed: state.hasPrevPage
                 ? () {
-                    context.read<PackagesBloc>().add(
-                          LoadHostedPackages(
+                    context.read<LocalPackagesBloc>().add(
+                          LocalPackagesLoadRequested(
                             page: state.page - 1,
                             limit: state.limit,
                             search: state.searchQuery,
@@ -364,8 +364,8 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             icon: const Icon(Icons.chevron_right),
             onPressed: state.hasNextPage
                 ? () {
-                    context.read<PackagesBloc>().add(
-                          LoadHostedPackages(
+                    context.read<LocalPackagesBloc>().add(
+                          LocalPackagesLoadRequested(
                             page: state.page + 1,
                             limit: state.limit,
                             search: state.searchQuery,
@@ -453,7 +453,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () {
-                context.read<PackagesBloc>().add(const LoadHostedPackages());
+                context.read<LocalPackagesBloc>().add(const LocalPackagesLoadRequested());
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
@@ -512,7 +512,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             onPressed: () {
               if (confirmController.text == pkg.name) {
                 Navigator.of(dialogContext).pop();
-                context.read<PackagesBloc>().add(DeletePackage(pkg.name));
+                context.read<LocalPackagesBloc>().add(LocalPackageDeleteRequested(pkg.name));
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -572,8 +572,11 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
           FilledButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              context.read<PackagesBloc>().add(
-                    DiscontinuePackage(pkg.name, !pkg.isDiscontinued),
+              context.read<LocalPackagesBloc>().add(
+                    LocalPackageDiscontinueRequested(
+                      pkg.name,
+                      discontinued: !pkg.isDiscontinued,
+                    ),
                   );
             },
             child: Text(pkg.isDiscontinued ? 'Reactivate' : 'Discontinue'),
