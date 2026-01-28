@@ -11,7 +11,6 @@ targets:
         release_options:
           compiler: dart2js
           dart2js_args:
-            - --minify
             - -O2
         dev_options:
           compiler: dartdevc
