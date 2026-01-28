@@ -23,7 +23,8 @@ Future<void> storageCommands(List<String> args) async {
     case '-h':
       _printStorageUsage();
     default:
-      Logger.error('Unknown storage command', component: 'cli', metadata: {'command': command});
+      Logger.error('Unknown storage command',
+          component: 'cli', metadata: {'command': command});
       print('Unknown storage command: $command');
       _printStorageUsage();
       exit(1);
@@ -122,7 +123,8 @@ Future<void> _runMigrate(List<String> args) async {
 
       case 's3-to-local':
         if (targetPath == null) {
-          Logger.error('Target path required for s3-to-local migration', component: 'cli');
+          Logger.error('Target path required for s3-to-local migration',
+              component: 'cli');
           print('Error: --target <path> is required for s3-to-local migration');
           exit(1);
         }
@@ -137,7 +139,8 @@ Future<void> _runMigrate(List<String> args) async {
         break;
 
       default:
-        Logger.error('Invalid migration direction', component: 'cli', metadata: {'direction': direction});
+        Logger.error('Invalid migration direction',
+            component: 'cli', metadata: {'direction': direction});
         print('Error: Invalid direction. Use "local-to-s3" or "s3-to-local"');
         exit(1);
     }
@@ -208,13 +211,15 @@ Future<void> _runMigrate(List<String> args) async {
 
     await metadata.close();
   } on MigrationException catch (e) {
-    Logger.error('Migration failed', component: 'cli', metadata: {'error': e.message});
+    Logger.error('Migration failed',
+        component: 'cli', metadata: {'error': e.message});
     print('');
     print('Error: ${e.message}');
     await metadata.close();
     exit(1);
   } catch (e) {
-    Logger.error('Migration failed with unexpected error', component: 'cli', metadata: {'error': e.toString()});
+    Logger.error('Migration failed with unexpected error',
+        component: 'cli', metadata: {'error': e.toString()});
     print('');
     print('Error: $e');
     await metadata.close();
@@ -222,7 +227,7 @@ Future<void> _runMigrate(List<String> args) async {
   }
 }
 
-Future<void> _runVerify(List<String> args) async{
+Future<void> _runVerify(List<String> args) async {
   final includeCache = args.contains('--include-cache');
   final directionArgs = args.where((a) => !a.startsWith('--')).toList();
 
@@ -234,7 +239,8 @@ Future<void> _runVerify(List<String> args) async{
   }
 
   if (directionArgs.isEmpty) {
-    Logger.error('Missing migration direction for verification', component: 'cli');
+    Logger.error('Missing migration direction for verification',
+        component: 'cli');
     print('Error: Missing migration direction');
     print('Usage: dart run repub_cli storage verify <local-to-s3|s3-to-local>');
     exit(1);
@@ -260,7 +266,8 @@ Future<void> _runVerify(List<String> args) async{
 
       case 's3-to-local':
         if (targetPath == null) {
-          Logger.error('Target path required for s3-to-local verification', component: 'cli');
+          Logger.error('Target path required for s3-to-local verification',
+              component: 'cli');
           print(
               'Error: --target <path> is required for s3-to-local verification');
           exit(1);
@@ -274,7 +281,8 @@ Future<void> _runVerify(List<String> args) async{
         break;
 
       default:
-        Logger.error('Invalid verification direction', component: 'cli', metadata: {'direction': direction});
+        Logger.error('Invalid verification direction',
+            component: 'cli', metadata: {'direction': direction});
         print('Error: Invalid direction. Use "local-to-s3" or "s3-to-local"');
         exit(1);
     }
@@ -309,13 +317,15 @@ Future<void> _runVerify(List<String> args) async{
       exit(1);
     }
   } on MigrationException catch (e) {
-    Logger.error('Verification failed', component: 'cli', metadata: {'error': e.message});
+    Logger.error('Verification failed',
+        component: 'cli', metadata: {'error': e.message});
     print('');
     print('Error: ${e.message}');
     await metadata.close();
     exit(1);
   } catch (e) {
-    Logger.error('Verification failed with unexpected error', component: 'cli', metadata: {'error': e.toString()});
+    Logger.error('Verification failed with unexpected error',
+        component: 'cli', metadata: {'error': e.toString()});
     print('');
     print('Error: $e');
     await metadata.close();

@@ -8,9 +8,9 @@ String escapeCsvField(String? value) {
   if (value == null || value.isEmpty) return '';
 
   final needsQuotes = value.contains(',') ||
-                      value.contains('\n') ||
-                      value.contains('"') ||
-                      value.contains('\r');
+      value.contains('\n') ||
+      value.contains('"') ||
+      value.contains('\r');
 
   if (!needsQuotes) return value;
 
@@ -47,7 +47,8 @@ String mapListToCsv(List<Map<String, dynamic>> data) {
 }
 
 /// Converts a list of objects with toJson() method to CSV format.
-String objectListToCsv<T>(List<T> data, Map<String, dynamic> Function(T) toJson) {
+String objectListToCsv<T>(
+    List<T> data, Map<String, dynamic> Function(T) toJson) {
   final maps = data.map(toJson).toList();
   return mapListToCsv(maps);
 }

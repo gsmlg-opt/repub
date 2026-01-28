@@ -112,7 +112,8 @@ void main() {
         _TestUser('Bob', 'bob@example.com'),
       ];
       final csv = objectListToCsv(users, (u) => u.toMap());
-      expect(csv, equals('name,email\nAlice,alice@example.com\nBob,bob@example.com'));
+      expect(csv,
+          equals('name,email\nAlice,alice@example.com\nBob,bob@example.com'));
     });
 
     test('handles empty list', () {
@@ -126,7 +127,10 @@ void main() {
         _TestPackage('pkg2', '2.0.0', false),
       ];
       final csv = objectListToCsv(packages, (p) => p.toMap());
-      expect(csv, equals('name,version,discontinued\npkg1,1.0.0,true\npkg2,2.0.0,false'));
+      expect(
+          csv,
+          equals(
+              'name,version,discontinued\npkg1,1.0.0,true\npkg2,2.0.0,false'));
     });
   });
 }

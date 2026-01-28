@@ -35,7 +35,8 @@ Future<void> adminCommands(List<String> args, Config config) async {
         await _deleteAdmin(metadata, commandArgs);
         break;
       default:
-        Logger.error('Unknown admin command', component: 'cli', metadata: {'command': command});
+        Logger.error('Unknown admin command',
+            component: 'cli', metadata: {'command': command});
         print('Unknown admin command: $command');
         _printUsage();
     }
@@ -76,14 +77,18 @@ Future<void> _createAdmin(MetadataStore metadata, List<String> args) async {
 
   // Validate username
   if (username.isEmpty || username.length < 3) {
-    Logger.error('Invalid username', component: 'cli', metadata: {'reason': 'Username must be at least 3 characters'});
+    Logger.error('Invalid username',
+        component: 'cli',
+        metadata: {'reason': 'Username must be at least 3 characters'});
     print('Error: Username must be at least 3 characters long');
     return;
   }
 
   // Validate password
   if (password.length < 8) {
-    Logger.error('Invalid password', component: 'cli', metadata: {'reason': 'Password must be at least 8 characters'});
+    Logger.error('Invalid password',
+        component: 'cli',
+        metadata: {'reason': 'Password must be at least 8 characters'});
     print('Error: Password must be at least 8 characters long');
     return;
   }
@@ -91,7 +96,8 @@ Future<void> _createAdmin(MetadataStore metadata, List<String> args) async {
   // Check if username already exists
   final existing = await metadata.getAdminUserByUsername(username);
   if (existing != null) {
-    Logger.error('Admin user already exists', component: 'cli', metadata: {'username': username});
+    Logger.error('Admin user already exists',
+        component: 'cli', metadata: {'username': username});
     print('Error: Admin user "$username" already exists');
     return;
   }
@@ -152,7 +158,8 @@ Future<void> _resetPassword(MetadataStore metadata, List<String> args) async {
   // Find admin user
   final admin = await metadata.getAdminUserByUsername(username);
   if (admin == null) {
-    Logger.error('Admin user not found', component: 'cli', metadata: {'username': username});
+    Logger.error('Admin user not found',
+        component: 'cli', metadata: {'username': username});
     print('Error: Admin user "$username" not found');
     return;
   }
@@ -169,7 +176,8 @@ Future<void> _resetPassword(MetadataStore metadata, List<String> args) async {
   if (updated) {
     print('Password reset successfully for admin user "$username"');
   } else {
-    Logger.error('Failed to reset password', component: 'cli', metadata: {'username': username});
+    Logger.error('Failed to reset password',
+        component: 'cli', metadata: {'username': username});
     print('Error: Failed to reset password');
   }
 }
@@ -185,7 +193,8 @@ Future<void> _activateAdmin(MetadataStore metadata, List<String> args) async {
   // Find admin user
   final admin = await metadata.getAdminUserByUsername(username);
   if (admin == null) {
-    Logger.error('Admin user not found', component: 'cli', metadata: {'username': username});
+    Logger.error('Admin user not found',
+        component: 'cli', metadata: {'username': username});
     print('Error: Admin user "$username" not found');
     return;
   }
@@ -201,7 +210,8 @@ Future<void> _activateAdmin(MetadataStore metadata, List<String> args) async {
   if (updated) {
     print('Admin user "$username" activated successfully');
   } else {
-    Logger.error('Failed to activate admin user', component: 'cli', metadata: {'username': username});
+    Logger.error('Failed to activate admin user',
+        component: 'cli', metadata: {'username': username});
     print('Error: Failed to activate admin user');
   }
 }
@@ -217,7 +227,8 @@ Future<void> _deactivateAdmin(MetadataStore metadata, List<String> args) async {
   // Find admin user
   final admin = await metadata.getAdminUserByUsername(username);
   if (admin == null) {
-    Logger.error('Admin user not found', component: 'cli', metadata: {'username': username});
+    Logger.error('Admin user not found',
+        component: 'cli', metadata: {'username': username});
     print('Error: Admin user "$username" not found');
     return;
   }
@@ -234,7 +245,8 @@ Future<void> _deactivateAdmin(MetadataStore metadata, List<String> args) async {
     print('Admin user "$username" deactivated successfully');
     print('Note: Existing sessions will remain valid until expiry');
   } else {
-    Logger.error('Failed to deactivate admin user', component: 'cli', metadata: {'username': username});
+    Logger.error('Failed to deactivate admin user',
+        component: 'cli', metadata: {'username': username});
     print('Error: Failed to deactivate admin user');
   }
 }
@@ -250,7 +262,8 @@ Future<void> _deleteAdmin(MetadataStore metadata, List<String> args) async {
   // Find admin user
   final admin = await metadata.getAdminUserByUsername(username);
   if (admin == null) {
-    Logger.error('Admin user not found', component: 'cli', metadata: {'username': username});
+    Logger.error('Admin user not found',
+        component: 'cli', metadata: {'username': username});
     print('Error: Admin user "$username" not found');
     return;
   }
@@ -262,7 +275,8 @@ Future<void> _deleteAdmin(MetadataStore metadata, List<String> args) async {
     print('Admin user "$username" deleted successfully');
     print('All associated sessions have been removed');
   } else {
-    Logger.error('Failed to delete admin user', component: 'cli', metadata: {'username': username});
+    Logger.error('Failed to delete admin user',
+        component: 'cli', metadata: {'username': username});
     print('Error: Failed to delete admin user');
   }
 }

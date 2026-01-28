@@ -59,9 +59,8 @@ class UpstreamClient {
     int concurrency = 5,
   }) async {
     // Cap batch size to prevent resource exhaustion
-    final cappedNames = names.length > _maxBatchSize
-        ? names.sublist(0, _maxBatchSize)
-        : names;
+    final cappedNames =
+        names.length > _maxBatchSize ? names.sublist(0, _maxBatchSize) : names;
 
     if (names.length > _maxBatchSize) {
       Logger.warn(
