@@ -5,6 +5,7 @@ import 'package:repub_storage/repub_storage.dart';
 import 'admin_commands.dart';
 import 'backup_commands.dart';
 import 'storage_commands.dart';
+import 'db_commands.dart';
 
 /// Print usage information.
 void printUsage() {
@@ -17,6 +18,7 @@ Usage:
 Commands:
   serve           Start the HTTP server
   migrate         Run database migrations
+  db:reset        Drop all tables, recreate schema, and optionally seed data
   admin <cmd>     Admin user management (create, list, reset-password, etc.)
   backup <cmd>    Database backup and restore (export, import)
   storage <cmd>   Storage migration (local <-> S3)
@@ -89,4 +91,9 @@ Future<void> runBackupCommand(List<String> args) async {
 /// Handle storage commands.
 Future<void> runStorageCommand(List<String> args) async {
   await storageCommands(args);
+}
+
+/// Handle database reset command.
+Future<void> runDbResetCommand(List<String> args) async {
+  await dbResetCommand(args);
 }

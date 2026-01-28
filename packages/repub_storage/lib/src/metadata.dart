@@ -64,6 +64,10 @@ abstract class MetadataStore {
   /// Run database migrations.
   Future<int> runMigrations();
 
+  /// Drop all tables from the database.
+  /// WARNING: This is a destructive operation that will delete all data!
+  Future<void> dropAllTables();
+
   /// Close the database connection.
   Future<void> close();
 
@@ -457,6 +461,21 @@ class PostgresMetadataStore extends MetadataStore {
       count++;
     }
     return count;
+  }
+
+  @override
+  Future<void> dropAllTables() async {
+    await _conn.execute('''
+      DO \$\$
+      DECLARE
+          r RECORD;
+      BEGIN
+          FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public')
+          LOOP
+              EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+          END LOOP;
+      END \$\$;
+    ''');
   }
 
   @override
@@ -2395,6 +2414,21 @@ class SqliteMetadataStore extends MetadataStore {
       }
     }
     return count;
+  }
+
+  @override
+  Future<void> dropAllTables() async {
+    // Get all table names except sqlite internal tables
+    final result = _db.select('''
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name NOT LIKE 'sqlite_%'
+    ''');
+
+    // Drop each table
+    for (final row in result) {
+      final tableName = row['name'] as String;
+      _db.execute('DROP TABLE IF EXISTS $tableName');
+    }
   }
 
   @override

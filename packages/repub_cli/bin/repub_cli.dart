@@ -16,6 +16,8 @@ void main(List<String> args) async {
       await runServe(subArgs);
     case 'migrate':
       await runMigrate();
+    case 'db:reset':
+      await runDbResetCommand(subArgs);
     case 'admin':
       await runAdminCommand(subArgs);
     case 'backup':

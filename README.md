@@ -554,6 +554,13 @@ dart run -C packages/repub_cli repub_cli serve
 # Run migrations
 dart run -C packages/repub_cli repub_cli migrate
 
+# Database reset (drop all tables, recreate schema, seed data)
+# WARNING: This deletes ALL data!
+dart run -C packages/repub_cli repub_cli db:reset              # Interactive (prompts for confirmation)
+dart run -C packages/repub_cli repub_cli db:reset --force      # Non-interactive (no prompts)
+dart run -C packages/repub_cli repub_cli db:reset --seed       # Force seed data without prompting
+dart run -C packages/repub_cli repub_cli db:reset --force -s   # Non-interactive with seed data
+
 # Admin user management (CLI-only for security)
 dart run -C packages/repub_cli repub_cli admin create <username> <password> [name]
 dart run -C packages/repub_cli repub_cli admin list
