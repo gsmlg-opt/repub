@@ -901,6 +901,117 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /admin/api/export/packages:
+    get:
+      tags: [admin]
+      summary: Export packages list as CSV
+      description: Downloads a CSV file containing packages list with metadata
+      operationId: adminExportPackagesCsv
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of packages to export
+          schema:
+            type: integer
+            default: 1000
+            maximum: 10000
+        - name: type
+          in: query
+          description: Package type filter
+          schema:
+            type: string
+            enum: [hosted, cached]
+            default: hosted
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="hosted_packages.csv"'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/export/activity:
+    get:
+      tags: [admin]
+      summary: Export activity log as CSV
+      description: Downloads a CSV file containing recent activity log entries
+      operationId: adminExportActivityCsv
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of entries to export
+          schema:
+            type: integer
+            default: 1000
+            maximum: 10000
+        - name: type
+          in: query
+          description: Filter by activity type
+          schema:
+            type: string
+        - name: actor
+          in: query
+          description: Filter by actor type
+          schema:
+            type: string
+            enum: [user, admin, system]
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="activity_log.csv"'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/api/export/downloads:
+    get:
+      tags: [admin]
+      summary: Export download statistics as CSV
+      description: Downloads a CSV file containing package download statistics
+      operationId: adminExportDownloadsCsv
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of packages to include
+          schema:
+            type: integer
+            default: 10000
+            maximum: 10000
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="download_stats.csv"'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   # ============================================================================
   # Admin - Package Management
   # ============================================================================
