@@ -427,7 +427,7 @@ void main() {
         final handler = middleware(testHandler);
 
         // Valid IP should work
-        var response =
+        final response =
             await handler(createRequest('/admin/api/stats', ip: '10.0.0.1'));
         expect(response.statusCode, equals(200));
       });
@@ -470,7 +470,7 @@ void main() {
         final handler = middleware(testHandler);
 
         // Exact match should work
-        var response = await handler(
+        final response = await handler(
             createRequest('/admin/api/stats', ip: '::ffff:192.168.1.100'));
         expect(response.statusCode, equals(200));
       });
@@ -483,7 +483,7 @@ void main() {
         final handler = middleware(testHandler);
 
         // Lowercase should match uppercase whitelist entry
-        var response = await handler(
+        final response = await handler(
             createRequest('/admin/api/stats', ip: '2001:db8::1'));
         expect(response.statusCode, equals(200));
       });
