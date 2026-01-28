@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:repub_model/repub_model.dart' show Logger;
 import 'package:yaml/yaml.dart';
 
 /// Result of validating and parsing a package tarball.
@@ -102,10 +103,16 @@ Future<PublishResult> validateTarball(Uint8List tarballBytes) async {
       tarballBytes: tarballBytes,
     );
   } on ArchiveException catch (e) {
+    Logger.warn('Invalid archive during publish',
+        component: 'publish', error: e);
     return PublishError('Invalid archive: ${e.message}');
   } on FormatException catch (e) {
+    Logger.warn('Invalid pubspec.yaml format',
+        component: 'publish', error: e);
     return PublishError('Invalid pubspec.yaml format: ${e.message}');
-  } catch (e) {
+  } catch (e, stackTrace) {
+    Logger.error('Unexpected error processing archive',
+        component: 'publish', error: e, stackTrace: stackTrace);
     return PublishError('Failed to process archive: $e');
   }
 }

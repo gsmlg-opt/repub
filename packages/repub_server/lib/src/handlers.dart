@@ -642,7 +642,9 @@ class ApiHandlers {
         jsonEncode(upstreamResult.toJson(config.baseUrl)),
         headers: {'content-type': 'application/json'},
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Failed to search upstream packages',
+          component: 'upstream', error: e, stackTrace: stackTrace);
       return Response(
         500,
         body: jsonEncode({
@@ -688,7 +690,12 @@ class ApiHandlers {
       }
 
       return _buildUpstreamPackageResponse(upstreamPkg);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Failed to fetch upstream package',
+          component: 'upstream',
+          error: e,
+          stackTrace: stackTrace,
+          metadata: {'package': name});
       return Response(
         500,
         body: jsonEncode({
@@ -3492,6 +3499,8 @@ class ApiHandlers {
         'type': storageType,
       };
     } catch (e) {
+      Logger.warn('Storage health check failed',
+          component: 'health', error: e);
       storageHealth = {
         'status': 'unhealthy',
         'type': storageType,
