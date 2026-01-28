@@ -77,7 +77,7 @@ void main() {
         expect(response.statusCode, equals(403));
       });
 
-      test('allows localhost expansion', () async {
+      test('allows localhost expansion for IPv4', () async {
         final middleware = ipWhitelistMiddleware(
           whitelist: ['localhost'],
           pathPrefix: '/admin',
@@ -86,6 +86,68 @@ void main() {
 
         final response =
             await handler(createRequest('/admin/api/stats', ip: '127.0.0.1'));
+        expect(response.statusCode, equals(200));
+      });
+
+      test('allows localhost expansion for IPv6', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['localhost'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '::1'));
+        expect(response.statusCode, equals(200));
+      });
+    });
+
+    group('IPv6 matching', () {
+      test('allows exact IPv6 address', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['2001:db8::1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '2001:db8::1'));
+        expect(response.statusCode, equals(200));
+      });
+
+      test('blocks non-matching IPv6 address', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['2001:db8::1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '2001:db8::2'));
+        expect(response.statusCode, equals(403));
+      });
+
+      test('allows IPv6 loopback ::1', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['::1'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '::1'));
+        expect(response.statusCode, equals(200));
+      });
+
+      test('allows full-form IPv6 address', () async {
+        final middleware = ipWhitelistMiddleware(
+          whitelist: ['2001:0db8:0000:0000:0000:0000:0000:0001'],
+          pathPrefix: '/admin',
+        );
+        final handler = middleware(testHandler);
+
+        final response = await handler(createRequest('/admin/api/stats',
+            ip: '2001:0db8:0000:0000:0000:0000:0000:0001'));
         expect(response.statusCode, equals(200));
       });
     });

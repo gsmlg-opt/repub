@@ -10,7 +10,8 @@ import 'rate_limit.dart' show extractClientIp;
 /// The whitelist supports:
 /// - IPv4 addresses (e.g., '192.168.1.100')
 /// - IPv4 CIDR ranges (e.g., '192.168.1.0/24')
-/// - Special value 'localhost' (expands to '127.0.0.1')
+/// - IPv6 addresses (e.g., '::1', '2001:db8::1')
+/// - Special value 'localhost' (expands to '127.0.0.1' and '::1')
 /// - Special value '*' (allows all IPs, effectively disabling whitelist)
 ///
 /// Example:
@@ -111,9 +112,10 @@ List<_WhitelistRule> _parseWhitelist(List<String> whitelist) {
       continue;
     }
 
-    // Localhost expansion
+    // Localhost expansion (IPv4 and IPv6)
     if (trimmed == 'localhost') {
       rules.add(_ExactIpRule('127.0.0.1'));
+      rules.add(_ExactIpRule('::1'));
       continue;
     }
 
@@ -126,8 +128,8 @@ List<_WhitelistRule> _parseWhitelist(List<String> whitelist) {
       continue;
     }
 
-    // Exact IP address
-    if (_isValidIpv4(trimmed)) {
+    // Exact IP address (IPv4 or IPv6)
+    if (_isValidIpv4(trimmed) || _isValidIpv6(trimmed)) {
       rules.add(_ExactIpRule(trimmed));
     }
   }
@@ -174,6 +176,45 @@ int? _parseIpv4(String ip) {
 /// Check if string is a valid IPv4 address.
 bool _isValidIpv4(String ip) {
   return _parseIpv4(ip) != null;
+}
+
+/// Check if string is a valid IPv6 address.
+/// Supports full form, compressed form (::), and mixed notation.
+bool _isValidIpv6(String ip) {
+  // Handle IPv4-mapped IPv6 (::ffff:192.168.1.1)
+  if (ip.contains('.')) {
+    // Could be IPv4-mapped, but for simplicity we'll just check for ::
+    if (!ip.startsWith('::')) return false;
+  }
+
+  // Must contain at least one colon
+  if (!ip.contains(':')) return false;
+
+  // Can't have more than 7 colons (max 8 groups)
+  if (ip.split(':').length > 8) return false;
+
+  // Can't have more than one :: sequence
+  if (ip.indexOf('::') != ip.lastIndexOf('::') && ip.contains('::')) {
+    return false;
+  }
+
+  // Validate each group
+  final parts = ip.split(':');
+  for (final part in parts) {
+    if (part.isEmpty) continue; // Empty parts are allowed with ::
+
+    // Check for IPv4 embedded (last part might be IPv4)
+    if (part.contains('.')) {
+      if (_parseIpv4(part) == null) return false;
+      continue;
+    }
+
+    // Each part should be 1-4 hex digits
+    if (part.length > 4) return false;
+    if (!RegExp(r'^[0-9a-fA-F]+$').hasMatch(part)) return false;
+  }
+
+  return true;
 }
 
 /// Check if IP matches any rule in the whitelist.
