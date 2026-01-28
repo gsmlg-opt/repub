@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../models/package_info.dart';
+import '../../models/local_package_info.dart';
 
 /// Base class for all local packages states.
 abstract class LocalPackagesState extends Equatable {
@@ -21,7 +21,7 @@ class LocalPackagesLoading extends LocalPackagesState {
 
 /// State when packages are successfully loaded.
 class LocalPackagesLoaded extends LocalPackagesState {
-  final List<PackageInfo> packages;
+  final List<LocalPackageInfo> packages;
   final int total;
   final int page;
   final int limit;
@@ -40,7 +40,7 @@ class LocalPackagesLoaded extends LocalPackagesState {
   bool get hasNextPage => page < totalPages;
 
   LocalPackagesLoaded copyWith({
-    List<PackageInfo>? packages,
+    List<LocalPackageInfo>? packages,
     int? total,
     int? page,
     int? limit,

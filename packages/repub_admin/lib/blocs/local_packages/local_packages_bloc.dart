@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:repub_model/repub_model.dart' as repub_model;
 import '../../services/admin_api_client.dart';
-import '../../models/package_info.dart';
+import '../../models/local_package_info.dart';
 import 'local_packages_event.dart';
 import 'local_packages_state.dart';
 
@@ -33,7 +33,7 @@ class LocalPackagesBloc
       );
 
       final packages = response.packages.map((pkgInfo) {
-        return PackageInfo(
+        return LocalPackageInfo(
           name: pkgInfo.package.name,
           description: _extractDescription(pkgInfo),
           latestVersion: _getLatestVersion(pkgInfo),

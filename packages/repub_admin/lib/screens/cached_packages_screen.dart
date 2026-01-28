@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/cached_packages/cached_packages_bloc.dart';
 import '../blocs/cached_packages/cached_packages_event.dart';
 import '../blocs/cached_packages/cached_packages_state.dart';
-import '../models/package_info.dart';
+import '../models/cached_package_info.dart';
 import '../widgets/admin_layout.dart';
 
 class CachedPackagesScreen extends StatefulWidget {
@@ -275,7 +275,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, PackageInfo pkg) {
+  Widget _buildActionButtons(BuildContext context, CachedPackageInfo pkg) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -435,7 +435,7 @@ class _CachedPackagesScreenState extends State<CachedPackagesScreen> {
     );
   }
 
-  void _showClearCacheDialog(BuildContext context, PackageInfo pkg) {
+  void _showClearCacheDialog(BuildContext context, CachedPackageInfo pkg) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(

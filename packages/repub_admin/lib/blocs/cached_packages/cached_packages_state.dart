@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../models/package_info.dart';
+import '../../models/cached_package_info.dart';
 
 /// Base class for all cached packages states.
 abstract class CachedPackagesState extends Equatable {
@@ -21,7 +21,7 @@ class CachedPackagesLoading extends CachedPackagesState {
 
 /// State when packages are successfully loaded.
 class CachedPackagesLoaded extends CachedPackagesState {
-  final List<PackageInfo> packages;
+  final List<CachedPackageInfo> packages;
   final int total;
   final int page;
   final int limit;
@@ -42,7 +42,7 @@ class CachedPackagesLoaded extends CachedPackagesState {
   bool get hasNextPage => page < totalPages;
 
   CachedPackagesLoaded copyWith({
-    List<PackageInfo>? packages,
+    List<CachedPackageInfo>? packages,
     int? total,
     int? page,
     int? limit,

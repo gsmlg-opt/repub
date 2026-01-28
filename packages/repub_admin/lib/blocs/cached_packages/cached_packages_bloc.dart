@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:repub_model/repub_model.dart' as repub_model;
 import '../../services/admin_api_client.dart';
-import '../../models/package_info.dart';
+import '../../models/cached_package_info.dart';
 import 'cached_packages_event.dart';
 import 'cached_packages_state.dart';
 
@@ -33,16 +33,14 @@ class CachedPackagesBloc
       );
 
       final packages = response.packages.map((pkgInfo) {
-        return PackageInfo(
+        return CachedPackageInfo(
           name: pkgInfo.package.name,
           description: _extractDescription(pkgInfo),
           latestVersion: _getLatestVersion(pkgInfo),
           createdAt: pkgInfo.package.createdAt,
           updatedAt: pkgInfo.package.updatedAt,
-          downloadCount: 0,
-          isDiscontinued: pkgInfo.package.isDiscontinued,
           versions: pkgInfo.versions.map((v) => v.version).toList(),
-          uploaderEmail: _getUploaderEmail(pkgInfo),
+          source: 'pub.dev',
         );
       }).toList();
 
@@ -133,13 +131,5 @@ class CachedPackagesBloc
   String _getLatestVersion(repub_model.PackageInfo pkgInfo) {
     if (pkgInfo.versions.isEmpty) return '0.0.0';
     return pkgInfo.versions.first.version;
-  }
-
-  String? _getUploaderEmail(repub_model.PackageInfo pkgInfo) {
-    if (pkgInfo.versions.isEmpty) return null;
-    final latestVersion = pkgInfo.versions.first;
-    final pubspec = latestVersion.pubspec;
-    final author = pubspec['author'] as String?;
-    return author;
   }
 }

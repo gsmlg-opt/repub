@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../blocs/local_packages/local_packages_bloc.dart';
 import '../blocs/local_packages/local_packages_event.dart';
 import '../blocs/local_packages/local_packages_state.dart';
-import '../models/package_info.dart';
+import '../models/local_package_info.dart';
 import '../widgets/admin_layout.dart';
 
 class LocalPackagesScreen extends StatefulWidget {
@@ -269,7 +269,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  Widget _buildStatusBadge(BuildContext context, PackageInfo pkg) {
+  Widget _buildStatusBadge(BuildContext context, LocalPackageInfo pkg) {
     if (pkg.isDiscontinued) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -304,7 +304,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, PackageInfo pkg) {
+  Widget _buildActionButtons(BuildContext context, LocalPackageInfo pkg) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -464,7 +464,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, PackageInfo pkg) {
+  void _showDeleteDialog(BuildContext context, LocalPackageInfo pkg) {
     final TextEditingController confirmController = TextEditingController();
 
     showDialog(
@@ -529,7 +529,7 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  void _showDiscontinueDialog(BuildContext context, PackageInfo pkg) {
+  void _showDiscontinueDialog(BuildContext context, LocalPackageInfo pkg) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
