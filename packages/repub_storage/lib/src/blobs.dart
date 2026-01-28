@@ -15,6 +15,7 @@ abstract class BlobStore {
       return FileBlobStore(
         basePath: config.storagePath!,
         baseUrl: config.baseUrl,
+        isCache: false,
       );
     }
 
@@ -26,14 +27,15 @@ abstract class BlobStore {
       );
     }
 
-    return S3BlobStore.fromConfig(config);
+    return S3BlobStore.fromConfig(config, keyPrefix: 'hosted-packages/');
   }
 
   /// Create a blob store for cached upstream packages.
   /// Uses effectiveCachePath for local storage (defaults to ./data/cache),
-  /// or S3 with 'cache/' prefix if S3 is configured and no local path set.
+  /// or S3 with 'cached-packages/' prefix if S3 is configured and no local path set.
   factory BlobStore.cacheFromConfig(Config config) {
-    // Always use local file storage for cache (has default ./data/cache)
+    // Use local file storage for cache by default
+    // TODO: Support S3 cache storage with 'cached-packages/' prefix
     return FileBlobStore(
       basePath: config.effectiveCachePath,
       baseUrl: config.baseUrl,
@@ -123,7 +125,9 @@ class S3BlobStore implements BlobStore {
 
   @override
   String archiveKey(String packageName, String version, String sha256) {
-    return 'packages/$packageName/$version/$sha256.tar.gz';
+    // Don't add 'packages/' prefix - use the keyPrefix set in constructor
+    // which will be 'hosted-packages/' or 'cached-packages/'
+    return '$packageName/$version/$sha256.tar.gz';
   }
 
   @override
@@ -221,7 +225,8 @@ class FileBlobStore implements BlobStore {
 
   @override
   String archiveKey(String packageName, String version, String sha256) {
-    return 'packages/$packageName/$version/$sha256.tar.gz';
+    final prefix = _isCache ? 'cached-packages' : 'hosted-packages';
+    return '$prefix/$packageName/$version/$sha256.tar.gz';
   }
 
   String _filePath(String key) => p.join(_basePath, key);
@@ -240,9 +245,17 @@ class FileBlobStore implements BlobStore {
   @override
   Future<String> getDownloadUrl(String key) async {
     // Return the server's download endpoint URL
-    // The key format is: packages/<name>/<version>/<sha256>.tar.gz
+    // The key format is: hosted-packages/<name>/<version>/<sha256>.tar.gz
+    //                 or: cached-packages/<name>/<version>/<sha256>.tar.gz
     // We need to extract name and version for the API endpoint
     final parts = key.split('/');
+    if (parts.length >= 3 &&
+        (parts[0] == 'hosted-packages' || parts[0] == 'cached-packages')) {
+      final name = parts[1];
+      final version = parts[2];
+      return '$_baseUrl/api/packages/$name/versions/$version/archive.tar.gz';
+    }
+    // Legacy fallback for old 'packages/' prefix
     if (parts.length >= 3 && parts[0] == 'packages') {
       final name = parts[1];
       final version = parts[2];
