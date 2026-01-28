@@ -437,6 +437,16 @@ class ApiHandlers {
     return await metadata.getAdminUser(session.userId);
   }
 
+  /// Read the full request body as a Uint8List.
+  ///
+  /// This helper method collects all bytes from the request body stream
+  /// into a single byte array. Use this instead of manually calling
+  /// `request.read().expand((x) => x).toList()`.
+  Future<Uint8List> _readRequestBody(Request request) async {
+    final bytes = await request.read().expand((chunk) => chunk).toList();
+    return Uint8List.fromList(bytes);
+  }
+
   /// Validate webhook URL for SSRF protection.
   /// Returns null if valid, or error Response if invalid.
   Response? _validateWebhookUrl(String url) {
@@ -507,7 +517,9 @@ class ApiHandlers {
       }
 
       return null; // Valid URL
-    } catch (_) {
+    } catch (e) {
+      Logger.debug('Invalid webhook URL format',
+          component: 'webhook', metadata: {'url': url, 'error': e.toString()});
       return Response(
         400,
         headers: {'content-type': 'application/json'},
@@ -953,8 +965,7 @@ class ApiHandlers {
     if (contentType.contains('multipart/form-data')) {
       tarballBytes = await _parseMultipartUpload(request);
     } else {
-      final bytes = await request.read().expand((x) => x).toList();
-      tarballBytes = Uint8List.fromList(bytes);
+      tarballBytes = await _readRequestBody(request);
     }
 
     if (tarballBytes.isEmpty) {
@@ -1392,8 +1403,7 @@ class ApiHandlers {
 
     final boundary = boundaryMatch.group(1)!;
     final boundaryBytes = utf8.encode('--$boundary');
-    final bytes = await request.read().expand((x) => x).toList();
-    final body = Uint8List.fromList(bytes);
+    final body = await _readRequestBody(request);
 
     // Find boundary positions in raw bytes
     final headerEndMarker = utf8.encode('\r\n\r\n');
@@ -2190,7 +2200,7 @@ class ApiHandlers {
     // Parse body for newOwnerId
     String? newOwnerId;
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       if (bodyBytes.isNotEmpty) {
         final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
         newOwnerId = body['newOwnerId'] as String?;
@@ -2286,13 +2296,15 @@ class ApiHandlers {
     // Parse body for optional replacedBy
     String? replacedBy;
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       if (bodyBytes.isNotEmpty) {
         final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
         replacedBy = body['replacedBy'] as String?;
       }
-    } catch (_) {
-      // Ignore body parsing errors
+    } catch (e) {
+      // Body parsing errors are acceptable for this optional field
+      Logger.debug('Could not parse discontinue body',
+          component: 'admin', metadata: {'package': name, 'error': e.toString()});
     }
 
     final success =
@@ -2570,7 +2582,7 @@ class ApiHandlers {
     if (authError != null) return authError;
 
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
       final value = body['value']?.toString();
 
@@ -2626,7 +2638,7 @@ class ApiHandlers {
     }
 
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final email = body['email'] as String?;
@@ -2773,7 +2785,7 @@ class ApiHandlers {
   /// POST `/api/auth/login`
   Future<Response> authLogin(Request request) async {
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final email = body['email'] as String?;
@@ -2935,7 +2947,7 @@ class ApiHandlers {
     }
 
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final name = body['name'] as String?;
@@ -3051,7 +3063,7 @@ class ApiHandlers {
     }
 
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final label = body['label'] as String?;
@@ -3171,7 +3183,7 @@ class ApiHandlers {
     final userAgent = request.headers['user-agent'];
 
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final username = body['username'] as String?;
@@ -3377,7 +3389,7 @@ class ApiHandlers {
     }
 
     try {
-      final bodyBytes = await request.read().expand((x) => x).toList();
+      final bodyBytes = await _readRequestBody(request);
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final currentPassword = body['currentPassword'] as String?;
