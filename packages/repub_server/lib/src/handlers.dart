@@ -1553,25 +1553,29 @@ class ApiHandlers {
       limit: 100, // Top 100 packages
     );
 
-    final rows = <Map<String, dynamic>>[];
+    // Track packages with their download counts for sorting
+    final packageData = <({String name, int downloads, String version})>[];
 
     for (final pkg in packages.packages) {
       final stats = await metadata.getPackageDownloadStats(pkg.package.name);
       if (stats.totalDownloads > 0) {
-        rows.add({
-          'package_name': pkg.package.name,
-          'total_downloads': stats.totalDownloads.toString(),
-          'latest_version': pkg.latest?.version ?? '',
-        });
+        packageData.add((
+          name: pkg.package.name,
+          downloads: stats.totalDownloads,
+          version: pkg.latest?.version ?? '',
+        ));
       }
     }
 
     // Sort by downloads descending
-    rows.sort((a, b) {
-      final aDownloads = int.parse(a['total_downloads'] as String);
-      final bDownloads = int.parse(b['total_downloads'] as String);
-      return bDownloads.compareTo(aDownloads);
-    });
+    packageData.sort((a, b) => b.downloads.compareTo(a.downloads));
+
+    // Convert to CSV rows
+    final rows = packageData.map((p) => {
+          'package_name': p.name,
+          'total_downloads': p.downloads.toString(),
+          'latest_version': p.version,
+        }).toList();
 
     final csv = mapListToCsv(rows.take(limit).toList());
 

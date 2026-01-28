@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shelf/shelf.dart';
@@ -98,7 +99,7 @@ Middleware rateLimitMiddleware({
   final windowDuration = Duration(seconds: config.windowSeconds);
 
   // Periodically cleanup old entries (every 5 minutes)
-  Future.delayed(const Duration(minutes: 5), () {
+  Timer.periodic(const Duration(minutes: 5), (_) {
     limitStore.cleanup(windowDuration);
   });
 
