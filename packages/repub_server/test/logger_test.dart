@@ -1,4 +1,4 @@
-import 'package:repub_server/src/logger.dart';
+import 'package:repub_model/repub_model.dart' show Logger, LogLevel;
 import 'package:test/test.dart';
 
 void main() {

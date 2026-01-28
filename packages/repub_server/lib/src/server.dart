@@ -8,7 +8,6 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'handlers.dart';
 import 'ip_whitelist.dart';
-import 'logger.dart';
 import 'rate_limit.dart';
 
 /// Start the repub server.

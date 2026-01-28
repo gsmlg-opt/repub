@@ -116,7 +116,8 @@ class S3BlobStore implements BlobStore {
     final exists = await _minio.bucketExists(_bucket);
     if (!exists) {
       await _minio.makeBucket(_bucket);
-      print('Created bucket: $_bucket');
+      Logger.info('Created S3 bucket',
+          component: 'storage', metadata: {'bucket': _bucket});
     }
   }
 
@@ -197,7 +198,8 @@ class FileBlobStore implements BlobStore {
     if (!await dir.exists()) {
       await dir.create(recursive: true);
       final storageType = _isCache ? 'cache' : 'storage';
-      print('Created $storageType directory: $_basePath');
+      Logger.info('Created $storageType directory',
+          component: 'storage', metadata: {'path': _basePath});
     }
   }
 

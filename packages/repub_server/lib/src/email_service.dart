@@ -1,8 +1,7 @@
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
+import 'package:repub_model/repub_model.dart' show Logger;
 import 'package:repub_storage/repub_storage.dart';
-
-import 'logger.dart';
 
 /// SMTP configuration loaded from site config.
 class SmtpConfig {

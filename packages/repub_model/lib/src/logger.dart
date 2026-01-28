@@ -9,7 +9,7 @@ enum LogLevel {
   error,
 }
 
-/// Structured logger for the repub server.
+/// Structured logger for the repub application.
 ///
 /// Features:
 /// - Configurable log levels via REPUB_LOG_LEVEL env var

@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-
-import 'logger.dart';
+import 'package:repub_model/repub_model.dart' show Logger;
 
 /// Client for fetching packages from upstream pub server (e.g., pub.dev).
 class UpstreamClient {

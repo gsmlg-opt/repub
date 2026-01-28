@@ -44,7 +44,8 @@ abstract class MetadataStore {
         );
       } catch (e) {
         if (i == 29) rethrow;
-        print('Waiting for database... (${i + 1}/30)');
+        Logger.info('Waiting for database connection...',
+            component: 'database', metadata: {'attempt': i + 1, 'maxAttempts': 30});
         await Future.delayed(const Duration(seconds: 1));
       }
     }
@@ -429,7 +430,8 @@ class PostgresMetadataStore extends MetadataStore {
 
     var count = 0;
     for (final migration in pending) {
-      print('Applying migration: ${migration.key}');
+      Logger.info('Applying migration',
+          component: 'database', metadata: {'migration': migration.key});
       await _conn.runTx((session) async {
         final statements = _splitStatements(migration.value);
         for (final statement in statements) {
@@ -2355,7 +2357,8 @@ class SqliteMetadataStore extends MetadataStore {
 
     var count = 0;
     for (final migration in pending) {
-      print('Applying migration: ${migration.key}');
+      Logger.info('Applying migration',
+          component: 'database', metadata: {'migration': migration.key});
       _db.execute('BEGIN TRANSACTION');
       try {
         final statements = _splitStatements(migration.value);

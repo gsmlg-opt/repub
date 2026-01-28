@@ -14,7 +14,6 @@ import 'package:shelf_static/shelf_static.dart';
 import 'csv_export.dart';
 import 'email_service.dart';
 import 'feed.dart';
-import 'logger.dart';
 import 'publish.dart';
 import 'upstream.dart';
 import 'webhook_service.dart';

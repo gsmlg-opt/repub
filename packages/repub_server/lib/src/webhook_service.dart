@@ -6,8 +6,6 @@ import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:uuid/uuid.dart';
 
-import 'logger.dart';
-
 /// Service for triggering webhooks on events.
 class WebhookService {
   static const _uuid = Uuid();
