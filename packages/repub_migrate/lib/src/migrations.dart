@@ -194,6 +194,45 @@ const migrations = <String, String>{
     -- Index for filtering retracted versions
     CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(is_retracted);
   ''',
+  '012_performance_indexes': '''
+    -- Performance optimization indexes based on query pattern analysis
+    -- These indexes improve the performance of frequently-used queries
+
+    -- CRITICAL: Optimize package search with LIKE patterns
+    -- Used by searchPackages() which filters on is_upstream_cache and searches name
+    CREATE INDEX IF NOT EXISTS idx_packages_search
+      ON packages(is_upstream_cache, name);
+
+    -- CRITICAL: Optimize package list query with filter+order
+    -- Used by listPackages() which filters by is_upstream_cache and orders by updated_at
+    CREATE INDEX IF NOT EXISTS idx_packages_list
+      ON packages(is_upstream_cache, updated_at DESC);
+
+    -- HIGH: Optimize user login by email lookup
+    -- Used by getUserByEmail() during authentication
+    CREATE INDEX IF NOT EXISTS idx_users_email
+      ON users(email);
+
+    -- HIGH: Optimize admin authentication by username
+    -- Used by getAdminUserByUsername() during admin login
+    CREATE INDEX IF NOT EXISTS idx_admin_users_username
+      ON admin_users(username);
+
+    -- MEDIUM: Optimize token expiration validation
+    -- Used for token cleanup and validation queries
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires
+      ON auth_tokens(expires_at);
+
+    -- MEDIUM: Optimize activity log filtering with type+time
+    -- Used by getRecentActivity() when filtering by activity type
+    CREATE INDEX IF NOT EXISTS idx_activity_log_type_timestamp
+      ON activity_log(activity_type, timestamp DESC);
+
+    -- MEDIUM: Optimize download statistics aggregations
+    -- Used by getPackageDownloadStats() for time-based download analytics
+    CREATE INDEX IF NOT EXISTS idx_package_downloads_package_time
+      ON package_downloads(package_name, downloaded_at DESC);
+  ''',
 };
 
 /// Get all migrations that haven't been applied yet.
