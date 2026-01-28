@@ -374,7 +374,6 @@ class ApiHandlers {
       for (final sessionId in expiredSessions) {
         _uploadData.remove(sessionId);
         _uploadSessionCreatedAt.remove(sessionId);
-        _uploadSessionCreatedAt.remove(sessionId);
       }
     }
   }
@@ -391,6 +390,31 @@ class ApiHandlers {
 
   /// Get the email service (lazy initialization).
   EmailService get emails => _emailService ??= EmailService(metadata: metadata);
+
+  /// Create a JSON error response with consistent format.
+  ///
+  /// This helper ensures all API errors follow the format:
+  /// ```json
+  /// {"error": {"code": "error_code", "message": "Human-readable message"}}
+  /// ```
+  Response _errorResponse(int statusCode, String code, String message) {
+    return Response(
+      statusCode,
+      body: jsonEncode({
+        'error': {'code': code, 'message': message},
+      }),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// Create a JSON success response with the given data.
+  Response _jsonResponse(Map<String, dynamic> data, {int statusCode = 200}) {
+    return Response(
+      statusCode,
+      body: jsonEncode(data),
+      headers: {'content-type': 'application/json'},
+    );
+  }
 
   /// Verify admin session. Returns error Response if invalid, null if valid.
   Future<Response?> _requireAdminAuth(Request request) async {
@@ -2206,26 +2230,11 @@ class ApiHandlers {
         newOwnerId = body['newOwnerId'] as String?;
       }
     } catch (e) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': {'code': 'bad_request', 'message': 'Invalid request body'},
-        }),
-        headers: {'content-type': 'application/json'},
-      );
+      return _errorResponse(400, 'bad_request', 'Invalid request body');
     }
 
     if (newOwnerId == null || newOwnerId.isEmpty) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': {
-            'code': 'bad_request',
-            'message': 'newOwnerId is required',
-          },
-        }),
-        headers: {'content-type': 'application/json'},
-      );
+      return _errorResponse(400, 'bad_request', 'newOwnerId is required');
     }
 
     // Get current package info for logging
@@ -2311,23 +2320,15 @@ class ApiHandlers {
         await metadata.discontinuePackage(name, replacedBy: replacedBy);
 
     if (!success) {
-      return Response.notFound(
-        jsonEncode({
-          'error': {'code': 'not_found', 'message': 'Package not found: $name'},
-        }),
-        headers: {'content-type': 'application/json'},
-      );
+      return _errorResponse(404, 'not_found', 'Package not found: $name');
     }
 
-    return Response.ok(
-      jsonEncode({
-        'success': {
-          'message': 'Package $name marked as discontinued',
-          if (replacedBy != null) 'replacedBy': replacedBy,
-        },
-      }),
-      headers: {'content-type': 'application/json'},
-    );
+    return _jsonResponse({
+      'success': {
+        'message': 'Package $name marked as discontinued',
+        if (replacedBy != null) 'replacedBy': replacedBy,
+      },
+    });
   }
 
   /// DELETE `/api/admin/cache`
@@ -2445,20 +2446,10 @@ class ApiHandlers {
 
     final user = await metadata.getUser(userId);
     if (user == null) {
-      return Response(500,
-          body: jsonEncode({
-            'error': {
-              'code': 'create_failed',
-              'message': 'Failed to create user'
-            }
-          }),
-          headers: {'content-type': 'application/json'});
+      return _errorResponse(500, 'create_failed', 'Failed to create user');
     }
 
-    return Response.ok(
-      jsonEncode({'user': user.toJson()}),
-      headers: {'content-type': 'application/json'},
-    );
+    return _jsonResponse({'user': user.toJson()});
   }
 
   /// PUT `/admin/api/users/<id>`
