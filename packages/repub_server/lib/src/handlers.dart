@@ -2314,7 +2314,9 @@ class ApiHandlers {
 
     if (email == null || email.isEmpty) {
       return Response(400,
-          body: jsonEncode({'error': 'Email is required'}),
+          body: jsonEncode({
+            'error': {'code': 'missing_email', 'message': 'Email is required'}
+          }),
           headers: {'content-type': 'application/json'});
     }
 
@@ -2322,7 +2324,12 @@ class ApiHandlers {
     final existing = await metadata.getUserByEmail(email);
     if (existing != null) {
       return Response(409,
-          body: jsonEncode({'error': 'User with this email already exists'}),
+          body: jsonEncode({
+            'error': {
+              'code': 'user_exists',
+              'message': 'User with this email already exists'
+            }
+          }),
           headers: {'content-type': 'application/json'});
     }
 
@@ -2341,7 +2348,12 @@ class ApiHandlers {
     final user = await metadata.getUser(userId);
     if (user == null) {
       return Response(500,
-          body: jsonEncode({'error': 'Failed to create user'}),
+          body: jsonEncode({
+            'error': {
+              'code': 'create_failed',
+              'message': 'Failed to create user'
+            }
+          }),
           headers: {'content-type': 'application/json'});
     }
 
@@ -2378,7 +2390,9 @@ class ApiHandlers {
 
     if (!success) {
       return Response(404,
-          body: jsonEncode({'error': 'User not found'}),
+          body: jsonEncode({
+            'error': {'code': 'not_found', 'message': 'User not found'}
+          }),
           headers: {'content-type': 'application/json'});
     }
 
@@ -2397,7 +2411,12 @@ class ApiHandlers {
     // Prevent deleting anonymous user
     if (id == User.anonymousId) {
       return Response(400,
-          body: jsonEncode({'error': 'Cannot delete anonymous user'}),
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_operation',
+              'message': 'Cannot delete anonymous user'
+            }
+          }),
           headers: {'content-type': 'application/json'});
     }
 
@@ -2405,7 +2424,9 @@ class ApiHandlers {
 
     if (!success) {
       return Response(404,
-          body: jsonEncode({'error': 'User not found'}),
+          body: jsonEncode({
+            'error': {'code': 'not_found', 'message': 'User not found'}
+          }),
           headers: {'content-type': 'application/json'});
     }
 
@@ -2426,7 +2447,9 @@ class ApiHandlers {
     final user = await metadata.getUser(id);
     if (user == null) {
       return Response(404,
-          body: jsonEncode({'error': 'User not found'}),
+          body: jsonEncode({
+            'error': {'code': 'not_found', 'message': 'User not found'}
+          }),
           headers: {'content-type': 'application/json'});
     }
 
