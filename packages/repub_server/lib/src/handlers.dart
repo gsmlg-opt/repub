@@ -11,6 +11,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
+import 'csv_export.dart';
 import 'email_service.dart';
 import 'feed.dart';
 import 'logger.dart';
@@ -110,6 +111,9 @@ Router createRouter({
   router.get(
       '/admin/api/analytics/downloads', handlers.adminGetDownloadsPerHour);
   router.get('/admin/api/activity', handlers.adminGetRecentActivity);
+  router.get('/admin/api/export/packages', handlers.adminExportPackagesCsv);
+  router.get('/admin/api/export/activity', handlers.adminExportActivityCsv);
+  router.get('/admin/api/export/downloads', handlers.adminExportDownloadsCsv);
   router.get('/admin/api/hosted-packages', handlers.adminListHostedPackages);
   router.get('/admin/api/cached-packages', handlers.adminListCachedPackages);
   router.get('/admin/api/packages/<name>/stats', handlers.adminGetPackageStats);
@@ -1437,6 +1441,136 @@ class ApiHandlers {
         'activities': activities.map((a) => a.toJson()).toList(),
       }),
       headers: {'content-type': 'application/json'},
+    );
+  }
+
+  /// GET `/admin/api/export/packages` - Export packages list as CSV
+  Future<Response> adminExportPackagesCsv(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '1000') ?? 1000;
+    final isUpstreamCache =
+        request.url.queryParameters['type'] == 'cached' ? true : false;
+
+    final result = await metadata.listPackagesByType(
+      isUpstreamCache: isUpstreamCache,
+      page: 1,
+      limit: limit.clamp(1, 10000),
+    );
+
+    // Flatten package data for CSV
+    final rows = result.packages.map((pkg) {
+      return {
+        'name': pkg.package.name,
+        'latest_version': pkg.latest?.version ?? '',
+        'description': pkg.latest?.pubspec['description']?.toString() ?? '',
+        'is_discontinued': pkg.package.isDiscontinued ? 'yes' : 'no',
+        'replaced_by': pkg.package.replacedBy ?? '',
+        'total_versions': pkg.versions.length.toString(),
+        'is_upstream_cache': isUpstreamCache ? 'yes' : 'no',
+      };
+    }).toList();
+
+    final csv = mapListToCsv(rows);
+    final filename = isUpstreamCache ? 'cached_packages.csv' : 'hosted_packages.csv';
+
+    return Response.ok(
+      csv,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="$filename"',
+      },
+    );
+  }
+
+  /// GET `/admin/api/export/activity` - Export activity log as CSV
+  Future<Response> adminExportActivityCsv(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '1000') ?? 1000;
+    final activityType = request.url.queryParameters['type'];
+    final actorType = request.url.queryParameters['actor'];
+
+    final activities = await metadata.getRecentActivity(
+      limit: limit.clamp(1, 10000),
+      activityType: activityType,
+      actorType: actorType,
+    );
+
+    // Convert to CSV-friendly format
+    final rows = activities.map((activity) {
+      return {
+        'timestamp': activity.timestamp.toIso8601String(),
+        'activity_type': activity.activityType,
+        'actor_type': activity.actorType,
+        'actor_email': activity.actorEmail ?? '',
+        'actor_username': activity.actorUsername ?? '',
+        'target_type': activity.targetType ?? '',
+        'target_id': activity.targetId ?? '',
+        'ip_address': activity.ipAddress ?? '',
+        'description': activity.description,
+      };
+    }).toList();
+
+    final csv = mapListToCsv(rows);
+
+    return Response.ok(
+      csv,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="activity_log.csv"',
+      },
+    );
+  }
+
+  /// GET `/admin/api/export/downloads` - Export download statistics as CSV
+  Future<Response> adminExportDownloadsCsv(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    final limit =
+        int.tryParse(request.url.queryParameters['limit'] ?? '10000') ?? 10000;
+
+    // Fetch raw download records (we'll need to add a method for this)
+    // For now, we'll export aggregated data per package
+    final packages = await metadata.listPackagesByType(
+      isUpstreamCache: false,
+      page: 1,
+      limit: 100, // Top 100 packages
+    );
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final pkg in packages.packages) {
+      final stats = await metadata.getPackageDownloadStats(pkg.package.name);
+      if (stats.totalDownloads > 0) {
+        rows.add({
+          'package_name': pkg.package.name,
+          'total_downloads': stats.totalDownloads.toString(),
+          'latest_version': pkg.latest?.version ?? '',
+        });
+      }
+    }
+
+    // Sort by downloads descending
+    rows.sort((a, b) {
+      final aDownloads = int.parse(a['total_downloads'] as String);
+      final bDownloads = int.parse(b['total_downloads'] as String);
+      return bDownloads.compareTo(aDownloads);
+    });
+
+    final csv = mapListToCsv(rows.take(limit).toList());
+
+    return Response.ok(
+      csv,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="download_stats.csv"',
+      },
     );
   }
 
