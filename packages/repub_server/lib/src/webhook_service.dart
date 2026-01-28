@@ -19,10 +19,62 @@ class WebhookService {
   /// Timeout for webhook delivery requests.
   static const deliveryTimeout = Duration(seconds: 10);
 
+  /// Maximum number of concurrent webhook deliveries.
+  static const maxConcurrentDeliveries = 5;
+
+  /// Blocked host patterns for SSRF protection.
+  /// This provides defense-in-depth at delivery time in case a webhook
+  /// was created before SSRF protection was added, or via direct DB manipulation.
+  static const _blockedPatterns = [
+    'localhost',
+    '127.', // Loopback
+    '0.0.0.0',
+    '10.', // Private class A
+    '192.168.', // Private class C
+    '169.254.', // Link-local (AWS metadata service)
+    '[::1]',
+    '::1', // IPv6 localhost
+    'fd00:',
+    'fe80:', // IPv6 private/link-local
+  ];
+
   WebhookService({
     required this.metadata,
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();
+
+  /// Check if a URL is safe to call (SSRF protection).
+  /// Returns true if safe, false if blocked.
+  bool _isUrlSafe(String url) {
+    try {
+      final uri = Uri.parse(url);
+      if (!uri.hasScheme || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+        return false;
+      }
+
+      final host = uri.host.toLowerCase();
+
+      // Check blocked patterns
+      if (_blockedPatterns.any((pattern) => host.startsWith(pattern))) {
+        return false;
+      }
+
+      // Check for private class B (172.16.0.0 - 172.31.255.255)
+      if (host.startsWith('172.')) {
+        final parts = host.split('.');
+        if (parts.length >= 2) {
+          final second = int.tryParse(parts[1]);
+          if (second != null && second >= 16 && second <= 31) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Trigger webhooks for an event.
   ///
@@ -47,10 +99,11 @@ class WebhookService {
         data: data,
       );
 
-      // Deliver to all webhooks concurrently
-      await Future.wait(
-        webhooks.map((webhook) => _deliver(webhook, payload)),
-      );
+      // Deliver to all webhooks with concurrency limit to prevent resource exhaustion
+      for (var i = 0; i < webhooks.length; i += maxConcurrentDeliveries) {
+        final batch = webhooks.skip(i).take(maxConcurrentDeliveries);
+        await Future.wait(batch.map((webhook) => _deliver(webhook, payload)));
+      }
     } catch (e, stack) {
       Logger.error(
         'Error triggering webhooks for $eventType',
@@ -66,6 +119,44 @@ class WebhookService {
     final startTime = DateTime.now();
     int statusCode = 0;
     String? error;
+
+    // SSRF protection: Validate URL at delivery time
+    // This protects against webhooks created before SSRF protection was added
+    if (!_isUrlSafe(webhook.url)) {
+      error = 'Blocked: URL targets internal or private network';
+      Logger.warn(
+        'SSRF protection blocked webhook delivery',
+        component: 'webhook',
+        metadata: {
+          'webhookId': webhook.id,
+          'url': webhook.url,
+          'event': payload.eventType,
+        },
+      );
+
+      // Disable the webhook to prevent repeated attempts
+      await metadata.updateWebhook(
+        webhook.copyWith(
+          isActive: false,
+          lastTriggeredAt: DateTime.now(),
+        ),
+      );
+
+      // Log the blocked delivery
+      final delivery = WebhookDelivery(
+        id: _uuid.v4(),
+        webhookId: webhook.id,
+        eventType: payload.eventType,
+        payload: payload.toJson(),
+        statusCode: 0,
+        success: false,
+        error: error,
+        duration: Duration.zero,
+        deliveredAt: DateTime.now(),
+      );
+      await metadata.logWebhookDelivery(delivery);
+      return;
+    }
 
     try {
       final body = jsonEncode(payload.toJson());

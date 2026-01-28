@@ -275,6 +275,164 @@ void main() {
       });
     });
 
+    group('SSRF Protection', () {
+      test('blocks localhost URLs', () async {
+        // Create webhook via storage layer (bypasses handler validation)
+        // This simulates a webhook created before SSRF protection was added
+        final webhook = await metadata.createWebhook(
+          url: 'http://localhost/webhook',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        // Should not make any HTTP requests
+        expect(capturedRequests, isEmpty);
+
+        // Webhook should be disabled
+        final updated = await metadata.getWebhook(webhook.id);
+        expect(updated!.isActive, isFalse);
+      });
+
+      test('blocks 127.0.0.1 URLs', () async {
+        final webhook = await metadata.createWebhook(
+          url: 'http://127.0.0.1:8080/webhook',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        expect(capturedRequests, isEmpty);
+
+        final updated = await metadata.getWebhook(webhook.id);
+        expect(updated!.isActive, isFalse);
+      });
+
+      test('blocks AWS metadata service IP (169.254.169.254)', () async {
+        final webhook = await metadata.createWebhook(
+          url: 'http://169.254.169.254/latest/meta-data/',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        expect(capturedRequests, isEmpty);
+
+        final updated = await metadata.getWebhook(webhook.id);
+        expect(updated!.isActive, isFalse);
+      });
+
+      test('blocks private network 10.x.x.x URLs', () async {
+        final webhook = await metadata.createWebhook(
+          url: 'http://10.0.0.1/internal',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        expect(capturedRequests, isEmpty);
+
+        final updated = await metadata.getWebhook(webhook.id);
+        expect(updated!.isActive, isFalse);
+      });
+
+      test('blocks private network 192.168.x.x URLs', () async {
+        final webhook = await metadata.createWebhook(
+          url: 'http://192.168.1.1/webhook',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        expect(capturedRequests, isEmpty);
+
+        final updated = await metadata.getWebhook(webhook.id);
+        expect(updated!.isActive, isFalse);
+      });
+
+      test('blocks private network 172.16-31.x.x URLs', () async {
+        final webhook = await metadata.createWebhook(
+          url: 'http://172.16.0.1/webhook',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        expect(capturedRequests, isEmpty);
+
+        final updated = await metadata.getWebhook(webhook.id);
+        expect(updated!.isActive, isFalse);
+      });
+
+      test('allows 172.15.x.x URLs (not private)', () async {
+        await metadata.createWebhook(
+          url: 'http://172.15.0.1/webhook',
+          events: ['package.published'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        // Should make HTTP request since 172.15.x.x is not a private range
+        expect(capturedRequests, hasLength(1));
+      });
+
+      test('logs delivery failure for blocked URLs', () async {
+        final webhook = await metadata.createWebhook(
+          url: 'http://localhost/webhook',
+          events: ['*'],
+        );
+
+        await webhookService.triggerEvent(
+          eventType: 'package.published',
+          data: {'package': 'test_pkg'},
+        );
+
+        await Future.delayed(Duration(milliseconds: 100));
+
+        // Check that delivery was logged with error
+        final deliveries = await metadata.getWebhookDeliveries(webhook.id);
+        expect(deliveries, hasLength(1));
+        expect(deliveries.first.success, isFalse);
+        expect(deliveries.first.error, contains('Blocked'));
+        expect(deliveries.first.statusCode, equals(0));
+      });
+    });
+
     group('WebhookEventType', () {
       test('validates known event types', () {
         expect(WebhookEventType.isValid('package.published'), isTrue);
