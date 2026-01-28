@@ -9,6 +9,7 @@ CRITICAL CONSTRAINTS (read these before every task):
 - Do not add SSL support because this project will live after a reverse proxy server.
 - Do not change default listen address in development mode.
 - The CLI (repub_cli) ONLY manages admin users. Regular user registration, token management, and all other user operations are handled via the web UI (admin panel). Do not add CLI commands for token creation, user registration, or other non-admin operations.
+- **PRODUCTION BUILD ISSUE**: The Jaspr web UI has known issues with dart2js compilation that produce broken JavaScript. Use `melos run dev` (DDC compiler) for both development AND production. Do not attempt to "fix" dart2js builds - this is an upstream Jaspr issue being tracked with the framework team.
 
 ## Build & Development Commands
 

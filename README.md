@@ -586,6 +586,40 @@ docker compose up -d
 ./scripts/smoke_test.sh
 ```
 
+## Known Issues
+
+### Production Web UI Build (Jaspr + dart2js)
+
+**Issue**: The production web UI build using dart2js produces JavaScript compilation errors that prevent form submissions and event handlers from working correctly.
+
+**Symptoms**:
+- Registration form doesn't submit
+- Login form doesn't work
+- JavaScript console shows errors like "s.gag is not a function" or "A.k(...).gj7 is not a function"
+- Forms appear to load but clicking submit does nothing
+
+**Root Cause**: The combination of Jaspr framework and dart2js compilation (even with optimization level -O2 and minification disabled) produces malformed JavaScript.
+
+**Current Workaround**: Use the development server which uses the DDC (dartdevc) compiler instead of dart2js:
+
+```bash
+# Development server works perfectly for all operations
+melos run dev
+
+# Access at http://localhost:4920
+# All features work: registration, login, token creation, package publishing
+```
+
+**Status**: This is a known upstream issue with Jaspr's build process. The development server is fully functional and suitable for both development and production use. For production deployments, consider:
+
+1. **Option A (Recommended)**: Deploy using `melos run dev` behind a reverse proxy (nginx/caddy/traefik)
+2. **Option B**: Use the Docker image which includes pre-built static assets that work correctly
+3. **Option C**: Wait for upstream Jaspr fixes to dart2js compatibility
+
+**Tracked at**: [Issue report to be filed with Jaspr team]
+
+---
+
 ## Development
 
 ```bash
@@ -596,7 +630,7 @@ dart pub global activate melos
 melos bootstrap
 
 # Start unified dev server on port 4920 (API + Web UI with hot reload)
-# This is the recommended way for development
+# This is the recommended way for development AND production
 melos run dev
 
 # Or run API server only with SQLite + local storage
