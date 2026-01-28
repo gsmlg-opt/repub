@@ -495,12 +495,14 @@ class ApiHandlers {
       }
     }
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
-    final result =
-        await metadata.listPackages(page: page, limit: limit.clamp(1, 100));
+    final result = await metadata.listPackages(page: page, limit: limit);
 
     return Response.ok(
       jsonEncode(result.toJson(config.baseUrl)),
@@ -536,12 +538,15 @@ class ApiHandlers {
       );
     }
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
-    final result = await metadata.searchPackages(query,
-        page: page, limit: limit.clamp(1, 100));
+    final result =
+        await metadata.searchPackages(query, page: page, limit: limit);
 
     return Response.ok(
       jsonEncode(result.toJson(config.baseUrl)),
@@ -579,9 +584,12 @@ class ApiHandlers {
       );
     }
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
     try {
       final packageNames = await upstream!.searchPackages(query, page: page);
@@ -599,7 +607,7 @@ class ApiHandlers {
       }
 
       // Fetch full package info in parallel with concurrency limit
-      final namesToFetch = packageNames.take(limit.clamp(1, 100)).toList();
+      final namesToFetch = packageNames.take(limit).toList();
       final upstreamPackages = await upstream!.getPackagesBatch(namesToFetch);
 
       final upstreamInfos = upstreamPackages.map((upstreamPkg) {
@@ -1450,14 +1458,15 @@ class ApiHandlers {
     if (authError != null) return authError;
 
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '1000') ?? 1000;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '1000') ?? 1000)
+            .clamp(1, 10000);
     final isUpstreamCache =
         request.url.queryParameters['type'] == 'cached' ? true : false;
 
     final result = await metadata.listPackagesByType(
       isUpstreamCache: isUpstreamCache,
       page: 1,
-      limit: limit.clamp(1, 10000),
+      limit: limit,
     );
 
     // Flatten package data for CSV
@@ -1491,12 +1500,13 @@ class ApiHandlers {
     if (authError != null) return authError;
 
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '1000') ?? 1000;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '1000') ?? 1000)
+            .clamp(1, 10000);
     final activityType = request.url.queryParameters['type'];
     final actorType = request.url.queryParameters['actor'];
 
     final activities = await metadata.getRecentActivity(
-      limit: limit.clamp(1, 10000),
+      limit: limit,
       activityType: activityType,
       actorType: actorType,
     );
@@ -1579,14 +1589,17 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
     final result = await metadata.listPackagesByType(
       isUpstreamCache: false,
       page: page,
-      limit: limit.clamp(1, 100),
+      limit: limit,
     );
 
     return Response.ok(
@@ -1600,14 +1613,17 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
     final result = await metadata.listPackagesByType(
       isUpstreamCache: true,
       page: page,
-      limit: limit.clamp(1, 100),
+      limit: limit,
     );
 
     return Response.ok(
@@ -2265,12 +2281,14 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
-    final users =
-        await metadata.listUsers(page: page, limit: limit.clamp(1, 100));
+    final users = await metadata.listUsers(page: page, limit: limit);
 
     return Response.ok(
       jsonEncode({
@@ -3350,12 +3368,14 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final page = int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1;
+    final page =
+        (int.tryParse(request.url.queryParameters['page'] ?? '1') ?? 1)
+            .clamp(1, 10000);
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '20') ?? 20)
+            .clamp(1, 100);
 
-    final adminUsers =
-        await metadata.listAdminUsers(page: page, limit: limit.clamp(1, 100));
+    final adminUsers = await metadata.listAdminUsers(page: page, limit: limit);
 
     return Response.ok(
       jsonEncode({
@@ -3412,11 +3432,12 @@ class ApiHandlers {
     }
 
     final limit =
-        int.tryParse(request.url.queryParameters['limit'] ?? '50') ?? 50;
+        (int.tryParse(request.url.queryParameters['limit'] ?? '50') ?? 50)
+            .clamp(1, 200);
 
     final loginHistory = await metadata.getAdminLoginHistory(
       adminUserId: id,
-      limit: limit.clamp(1, 200),
+      limit: limit,
     );
 
     return Response.ok(

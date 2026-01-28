@@ -163,6 +163,62 @@ void main() {
         final body = jsonDecode(await response.readAsString()) as Map;
         expect(body['page'], equals(1));
       });
+
+      test('clamps negative page to 1', () async {
+        final request = Request(
+          'GET',
+          Uri.parse('http://localhost/api/packages?page=-5'),
+        );
+
+        final response = await handlers.listPackages(request);
+        expect(response.statusCode, equals(200));
+
+        // Negative page should be clamped to 1
+        final body = jsonDecode(await response.readAsString()) as Map;
+        expect(body['page'], equals(1));
+      });
+
+      test('clamps zero page to 1', () async {
+        final request = Request(
+          'GET',
+          Uri.parse('http://localhost/api/packages?page=0'),
+        );
+
+        final response = await handlers.listPackages(request);
+        expect(response.statusCode, equals(200));
+
+        // Zero page should be clamped to 1
+        final body = jsonDecode(await response.readAsString()) as Map;
+        expect(body['page'], equals(1));
+      });
+
+      test('clamps negative limit to 1', () async {
+        final request = Request(
+          'GET',
+          Uri.parse('http://localhost/api/packages?limit=-10'),
+        );
+
+        final response = await handlers.listPackages(request);
+        expect(response.statusCode, equals(200));
+
+        // Negative limit should be clamped to 1
+        final body = jsonDecode(await response.readAsString()) as Map;
+        expect(body['limit'], equals(1));
+      });
+
+      test('clamps page to maximum 10000', () async {
+        final request = Request(
+          'GET',
+          Uri.parse('http://localhost/api/packages?page=999999'),
+        );
+
+        final response = await handlers.listPackages(request);
+        expect(response.statusCode, equals(200));
+
+        // Extremely high page should be clamped
+        final body = jsonDecode(await response.readAsString()) as Map;
+        expect(body['page'], lessThanOrEqualTo(10000));
+      });
     });
 
     group('GET /api/packages/search (searchPackages)', () {
