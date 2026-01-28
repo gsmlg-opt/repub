@@ -329,6 +329,15 @@ class ApiHandlers {
   // Upload session TTL (1 hour)
   static const _uploadSessionTtl = Duration(hours: 1);
 
+  // Pre-compiled regex patterns for password validation (performance optimization)
+  static final _uppercaseRegex = RegExp(r'[A-Z]');
+  static final _lowercaseRegex = RegExp(r'[a-z]');
+  static final _digitRegex = RegExp(r'[0-9]');
+
+  // Pre-compiled email validation regex
+  static final _emailRegex =
+      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+
   // Cleanup timer for orphaned upload sessions
   Timer? _uploadSessionCleanupTimer;
 
@@ -414,6 +423,53 @@ class ApiHandlers {
       body: jsonEncode(data),
       headers: {'content-type': 'application/json'},
     );
+  }
+
+  /// Extract client IP address from request headers.
+  ///
+  /// Checks X-Forwarded-For and X-Real-IP headers in order of precedence.
+  /// Returns null if no IP can be determined.
+  String? _extractClientIp(Request request) {
+    // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+    final forwardedFor = request.headers['x-forwarded-for'];
+    if (forwardedFor != null && forwardedFor.isNotEmpty) {
+      final firstIp = forwardedFor.split(',').first.trim();
+      if (firstIp.isNotEmpty) {
+        return firstIp;
+      }
+    }
+
+    // Fall back to X-Real-IP
+    final realIp = request.headers['x-real-ip'];
+    if (realIp != null && realIp.isNotEmpty) {
+      return realIp;
+    }
+
+    return null;
+  }
+
+  /// Trigger webhook with error logging (fire-and-forget but logged).
+  void _triggerWebhook(Future<void> Function() action, String eventName) {
+    action().catchError((Object error, StackTrace stack) {
+      Logger.error(
+        'Webhook trigger failed',
+        component: 'webhook',
+        metadata: {'event': eventName, 'error': error.toString()},
+        stackTrace: stack,
+      );
+    });
+  }
+
+  /// Send email notification with error logging (fire-and-forget but logged).
+  void _sendEmail(Future<void> Function() action, String emailType) {
+    action().catchError((Object error, StackTrace stack) {
+      Logger.error(
+        'Email notification failed',
+        component: 'email',
+        metadata: {'type': emailType, 'error': error.toString()},
+        stackTrace: stack,
+      );
+    });
   }
 
   /// Verify admin session. Returns error Response if invalid, null if valid.
@@ -1204,24 +1260,29 @@ class ApiHandlers {
       targetType: 'package',
       targetId: success.packageName,
       metadata: {'version': success.version},
-      ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
-          request.headers['x-real-ip'],
+      ipAddress: _extractClientIp(request),
     );
 
-    // Trigger webhook
-    webhooks.onPackagePublished(
-      packageName: success.packageName,
-      version: success.version,
-      publisherEmail: user?.email,
-    );
-
-    // Send email notification (fire-and-forget)
-    if (user?.email != null) {
-      emails.onPackagePublished(
+    // Trigger webhook (fire-and-forget with error logging)
+    _triggerWebhook(
+      () => webhooks.onPackagePublished(
         packageName: success.packageName,
         version: success.version,
-        publisherEmail: user!.email,
-        baseUrl: config.baseUrl,
+        publisherEmail: user?.email,
+      ),
+      'package.published',
+    );
+
+    // Send email notification (fire-and-forget with error logging)
+    if (user?.email != null) {
+      _sendEmail(
+        () => emails.onPackagePublished(
+          packageName: success.packageName,
+          version: success.version,
+          publisherEmail: user!.email,
+          baseUrl: config.baseUrl,
+        ),
+        'package_published',
       );
     }
 
@@ -1247,9 +1308,7 @@ class ApiHandlers {
     String version,
   ) async {
     // Extract IP address and user agent for analytics
-    final ipAddress =
-        request.headers['x-forwarded-for']?.split(',').first.trim() ??
-            request.headers['x-real-ip'];
+    final ipAddress = _extractClientIp(request);
     final userAgent = request.headers['user-agent'];
 
     // Check auth if required
@@ -1903,8 +1962,7 @@ class ApiHandlers {
       targetType: 'package',
       targetId: name,
       metadata: {'versionCount': versionCount},
-      ipAddress: request.headers['x-forwarded-for']?.split(',').first.trim() ??
-          request.headers['x-real-ip'],
+      ipAddress: _extractClientIp(request),
     );
 
     return Response.ok(
@@ -2348,7 +2406,8 @@ class ApiHandlers {
     } catch (e) {
       // Body parsing errors are acceptable for this optional field
       Logger.debug('Could not parse discontinue body',
-          component: 'admin', metadata: {'package': name, 'error': e.toString()});
+          component: 'admin',
+          metadata: {'package': name, 'error': e.toString()});
     }
 
     final success =
@@ -2681,10 +2740,8 @@ class ApiHandlers {
         );
       }
 
-      // Validate email format
-      final emailRegex =
-          RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-      if (!emailRegex.hasMatch(email)) {
+      // Validate email format (uses pre-compiled regex for performance)
+      if (!_emailRegex.hasMatch(email)) {
         return Response(
           400,
           body: jsonEncode({
@@ -2710,10 +2767,10 @@ class ApiHandlers {
         );
       }
 
-      // Validate password complexity
-      if (!password.contains(RegExp(r'[A-Z]')) ||
-          !password.contains(RegExp(r'[a-z]')) ||
-          !password.contains(RegExp(r'[0-9]'))) {
+      // Validate password complexity (uses pre-compiled regexes for performance)
+      if (!_uppercaseRegex.hasMatch(password) ||
+          !_lowercaseRegex.hasMatch(password) ||
+          !_digitRegex.hasMatch(password)) {
         return Response(
           400,
           body: jsonEncode({
@@ -2758,19 +2815,23 @@ class ApiHandlers {
         actorEmail: email,
         targetType: 'user',
         targetId: userId,
-        ipAddress:
-            request.headers['x-forwarded-for']?.split(',').first.trim() ??
-                request.headers['x-real-ip'],
+        ipAddress: _extractClientIp(request),
       );
 
-      // Trigger webhook
-      webhooks.onUserRegistered(email: email);
+      // Trigger webhook (fire-and-forget with error logging)
+      _triggerWebhook(
+        () => webhooks.onUserRegistered(email: email),
+        'user.registered',
+      );
 
-      // Send welcome email (fire-and-forget)
-      emails.onUserRegistered(
-        email: email,
-        name: name ?? '',
-        baseUrl: config.baseUrl,
+      // Send welcome email (fire-and-forget with error logging)
+      _sendEmail(
+        () => emails.onUserRegistered(
+          email: email,
+          name: name ?? '',
+          baseUrl: config.baseUrl,
+        ),
+        'user_registered',
       );
 
       // Create session
@@ -3202,10 +3263,7 @@ class ApiHandlers {
   /// POST `/admin/api/auth/login` - Admin login
   Future<Response> adminLogin(Request request) async {
     // Extract IP address and user agent for logging
-    final ipAddress =
-        request.headers['x-forwarded-for']?.split(',').first.trim() ??
-            request.headers['x-real-ip'] ??
-            'unknown';
+    final ipAddress = _extractClientIp(request) ?? 'unknown';
     final userAgent = request.headers['user-agent'];
 
     try {
