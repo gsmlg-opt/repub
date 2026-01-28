@@ -510,6 +510,10 @@ User passwords must meet the following complexity requirements:
 | `REPUB_ADMIN_IP_WHITELIST` | (disabled) | Comma-separated IPs/CIDRs allowed to access admin panel |
 | `REPUB_RATE_LIMIT_REQUESTS` | 100 | Max requests per window |
 | `REPUB_RATE_LIMIT_WINDOW_SECONDS` | 60 | Rate limit window in seconds |
+| `REPUB_DATABASE_RETRY_ATTEMPTS` | 30 | Number of database connection retry attempts |
+| `REPUB_DATABASE_RETRY_DELAY_SECONDS` | 1 | Delay between database connection retries |
+| `REPUB_LOG_LEVEL` | info | Logging level (debug, info, warn, error) |
+| `REPUB_LOG_JSON` | false | Enable JSON format logging for log aggregators |
 
 **CORS Examples:**
 ```bash

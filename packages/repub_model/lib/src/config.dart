@@ -47,6 +47,13 @@ class Config {
   /// and special values like 'localhost' (expands to 127.0.0.1).
   final List<String> adminIpWhitelist;
 
+  /// Number of database connection retry attempts before failing.
+  /// Default is 30 (with 1 second delay between retries).
+  final int databaseRetryAttempts;
+
+  /// Delay between database connection retry attempts in seconds.
+  final int databaseRetryDelaySeconds;
+
   const Config({
     required this.listenAddr,
     required this.listenPort,
@@ -67,6 +74,8 @@ class Config {
     required this.rateLimitRequests,
     required this.rateLimitWindowSeconds,
     this.adminIpWhitelist = const [],
+    this.databaseRetryAttempts = 30,
+    this.databaseRetryDelaySeconds = 1,
   });
 
   /// Get the database type based on the URL scheme.
@@ -135,6 +144,8 @@ class Config {
       rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
       adminIpWhitelist:
           _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
+      databaseRetryAttempts: _envInt('REPUB_DATABASE_RETRY_ATTEMPTS', 30),
+      databaseRetryDelaySeconds: _envInt('REPUB_DATABASE_RETRY_DELAY_SECONDS', 1),
     );
   }
 

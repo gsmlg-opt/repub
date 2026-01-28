@@ -19,12 +19,20 @@ abstract class MetadataStore {
     if (config.databaseType == DatabaseType.sqlite) {
       return SqliteMetadataStore.open(config.sqlitePath);
     } else {
-      final conn = await _connectPostgres(config.databaseUrl);
+      final conn = await _connectPostgres(
+        config.databaseUrl,
+        retryAttempts: config.databaseRetryAttempts,
+        retryDelaySeconds: config.databaseRetryDelaySeconds,
+      );
       return PostgresMetadataStore(conn);
     }
   }
 
-  static Future<Connection> _connectPostgres(String databaseUrl) async {
+  static Future<Connection> _connectPostgres(
+    String databaseUrl, {
+    int retryAttempts = 30,
+    int retryDelaySeconds = 1,
+  }) async {
     final uri = Uri.parse(databaseUrl);
     final userInfo = uri.userInfo.split(':');
 
@@ -36,17 +44,18 @@ abstract class MetadataStore {
       password: userInfo.length > 1 ? userInfo[1] : 'repub',
     );
 
-    for (var i = 0; i < 30; i++) {
+    for (var i = 0; i < retryAttempts; i++) {
       try {
         return await Connection.open(
           endpoint,
           settings: ConnectionSettings(sslMode: SslMode.disable),
         );
       } catch (e) {
-        if (i == 29) rethrow;
+        if (i == retryAttempts - 1) rethrow;
         Logger.info('Waiting for database connection...',
-            component: 'database', metadata: {'attempt': i + 1, 'maxAttempts': 30});
-        await Future.delayed(const Duration(seconds: 1));
+            component: 'database',
+            metadata: {'attempt': i + 1, 'maxAttempts': retryAttempts});
+        await Future.delayed(Duration(seconds: retryDelaySeconds));
       }
     }
     throw StateError('Could not connect to database');
