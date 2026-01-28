@@ -6,11 +6,10 @@ targets:
       build_web_compilers:entrypoint:
         generate_for:
           - web/main.dart
-        # Use DDC for development (faster builds, better debugging)
-        # dart2js is used for release builds
+        # Use DDC for both development and production builds
+        # dart2js has compatibility issues with Jaspr that break event handlers
+        # See JASPR_ISSUE_REPORT.md for details
         release_options:
-          compiler: dart2js
-          dart2js_args:
-            - -O2
+          compiler: dartdevc
         dev_options:
           compiler: dartdevc
