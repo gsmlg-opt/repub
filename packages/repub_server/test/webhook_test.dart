@@ -324,7 +324,7 @@ void main() {
         expect(disabledReason, contains('SSRF protection'));
       });
 
-      test('triggers multiple webhooks concurrently', () async{
+      test('triggers multiple webhooks concurrently', () async {
         await metadata.createWebhook(
           url: 'https://example1.com/webhook',
           events: ['package.published'],

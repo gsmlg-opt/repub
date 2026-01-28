@@ -404,7 +404,8 @@ void main() {
 
       // Should be able to track up to the limit
       for (var i = 0; i < 10; i++) {
-        final count = store.checkAndRecord('large-limit', maxRequests, windowDuration);
+        final count =
+            store.checkAndRecord('large-limit', maxRequests, windowDuration);
         expect(count, equals(i + 1));
       }
 
@@ -458,7 +459,7 @@ void main() {
         Uri.parse('http://localhost/test'),
         headers: {
           'x-forwarded-for': '192.168.1.100',
-          'authorization': 'Bearer',  // Missing space and token
+          'authorization': 'Bearer', // Missing space and token
         },
       );
 

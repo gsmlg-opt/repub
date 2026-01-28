@@ -326,7 +326,8 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
     );
   }
 
-  Widget _buildPaginationControls(BuildContext context, LocalPackagesLoaded state) {
+  Widget _buildPaginationControls(
+      BuildContext context, LocalPackagesLoaded state) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -453,7 +454,9 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () {
-                context.read<LocalPackagesBloc>().add(const LocalPackagesLoadRequested());
+                context
+                    .read<LocalPackagesBloc>()
+                    .add(const LocalPackagesLoadRequested());
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
@@ -512,7 +515,9 @@ class _LocalPackagesScreenState extends State<LocalPackagesScreen> {
             onPressed: () {
               if (confirmController.text == pkg.name) {
                 Navigator.of(dialogContext).pop();
-                context.read<LocalPackagesBloc>().add(LocalPackageDeleteRequested(pkg.name));
+                context
+                    .read<LocalPackagesBloc>()
+                    .add(LocalPackageDeleteRequested(pkg.name));
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

@@ -56,22 +56,26 @@ void main() {
       test('handles package names with underscores', () {
         final key = blobStore.archiveKey('my_great_package', '2.0.0', 'def456');
 
-        expect(key, equals('hosted-packages/my_great_package/2.0.0/def456.tar.gz'));
+        expect(key,
+            equals('hosted-packages/my_great_package/2.0.0/def456.tar.gz'));
       });
 
       test('handles prerelease versions', () {
         final key =
             blobStore.archiveKey('test_pkg', '1.0.0-beta.1', 'sha256hash');
 
-        expect(key, equals('hosted-packages/test_pkg/1.0.0-beta.1/sha256hash.tar.gz'));
+        expect(key,
+            equals('hosted-packages/test_pkg/1.0.0-beta.1/sha256hash.tar.gz'));
       });
 
       test('handles build metadata versions', () {
         final key =
             blobStore.archiveKey('test_pkg', '1.0.0+build.123', 'sha256hash');
 
-        expect(key,
-            equals('hosted-packages/test_pkg/1.0.0+build.123/sha256hash.tar.gz'));
+        expect(
+            key,
+            equals(
+                'hosted-packages/test_pkg/1.0.0+build.123/sha256hash.tar.gz'));
       });
     });
 

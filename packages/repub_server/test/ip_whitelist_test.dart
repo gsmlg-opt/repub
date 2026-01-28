@@ -483,8 +483,8 @@ void main() {
         final handler = middleware(testHandler);
 
         // Lowercase should match uppercase whitelist entry
-        final response = await handler(
-            createRequest('/admin/api/stats', ip: '2001:db8::1'));
+        final response =
+            await handler(createRequest('/admin/api/stats', ip: '2001:db8::1'));
         expect(response.statusCode, equals(200));
       });
     });

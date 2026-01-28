@@ -563,8 +563,7 @@ void main() {
           'GET',
           Uri.parse('http://localhost:4920/api/packages'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithoutReadScope',
+            'authorization': 'Bearer $tokenWithoutReadScope',
           },
         );
         final responseNoScope = await handlers.listPackages(requestNoScope);
@@ -575,12 +574,10 @@ void main() {
           'GET',
           Uri.parse('http://localhost:4920/api/packages'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithReadScope',
+            'authorization': 'Bearer $tokenWithReadScope',
           },
         );
-        final responseWithScope =
-            await handlers.listPackages(requestWithScope);
+        final responseWithScope = await handlers.listPackages(requestWithScope);
         expect(responseWithScope.statusCode, equals(200));
       });
 
@@ -590,8 +587,7 @@ void main() {
           'GET',
           Uri.parse('http://localhost:4920/api/packages/search?q=test'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithoutReadScope',
+            'authorization': 'Bearer $tokenWithoutReadScope',
           },
         );
         final responseNoScope = await handlers.searchPackages(requestNoScope);
@@ -601,8 +597,7 @@ void main() {
           'GET',
           Uri.parse('http://localhost:4920/api/packages/search?q=test'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithReadScope',
+            'authorization': 'Bearer $tokenWithReadScope',
           },
         );
         final responseWithScope =
@@ -616,8 +611,7 @@ void main() {
           'GET',
           Uri.parse('http://localhost:4920/api/packages/test_package'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithoutReadScope',
+            'authorization': 'Bearer $tokenWithoutReadScope',
           },
         );
         final responseNoScope =
@@ -628,8 +622,7 @@ void main() {
           'GET',
           Uri.parse('http://localhost:4920/api/packages/test_package'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithReadScope',
+            'authorization': 'Bearer $tokenWithReadScope',
           },
         );
         final responseWithScope =
@@ -644,12 +637,11 @@ void main() {
           Uri.parse(
               'http://localhost:4920/api/packages/test_package/versions/1.0.0'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithoutReadScope',
+            'authorization': 'Bearer $tokenWithoutReadScope',
           },
         );
-        final responseNoScope = await handlers.getVersion(
-            requestNoScope, 'test_package', '1.0.0');
+        final responseNoScope =
+            await handlers.getVersion(requestNoScope, 'test_package', '1.0.0');
         expect(responseNoScope.statusCode, equals(403));
 
         final requestWithScope = Request(
@@ -657,8 +649,7 @@ void main() {
           Uri.parse(
               'http://localhost:4920/api/packages/test_package/versions/1.0.0'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithReadScope',
+            'authorization': 'Bearer $tokenWithReadScope',
           },
         );
         final responseWithScope = await handlers.getVersion(
@@ -673,8 +664,7 @@ void main() {
           Uri.parse(
               'http://localhost:4920/packages/test_package/versions/1.0.0.tar.gz'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithoutReadScope',
+            'authorization': 'Bearer $tokenWithoutReadScope',
           },
         );
         final responseNoScope = await handlers.downloadPackage(
@@ -688,8 +678,7 @@ void main() {
           Uri.parse(
               'http://localhost:4920/packages/test_package/versions/1.0.0.tar.gz'),
           headers: {
-            'authorization':
-                'Bearer $tokenWithReadScope',
+            'authorization': 'Bearer $tokenWithReadScope',
           },
         );
         final responseWithScope = await handlers.downloadPackage(

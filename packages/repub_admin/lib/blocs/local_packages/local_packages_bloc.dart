@@ -7,8 +7,7 @@ import 'local_packages_event.dart';
 import 'local_packages_state.dart';
 
 /// BLoC that manages local (hosted) packages state and handles package events.
-class LocalPackagesBloc
-    extends Bloc<LocalPackagesEvent, LocalPackagesState> {
+class LocalPackagesBloc extends Bloc<LocalPackagesEvent, LocalPackagesState> {
   final AdminApiClient _apiClient;
 
   LocalPackagesBloc({AdminApiClient? apiClient})
