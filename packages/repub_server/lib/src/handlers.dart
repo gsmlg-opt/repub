@@ -967,6 +967,31 @@ class ApiHandlers {
       );
     }
 
+    // Check upload size limit
+    if (tarballBytes.length > config.maxUploadSizeBytes) {
+      final maxSizeMb = config.maxUploadSizeBytes / (1024 * 1024);
+      Logger.warn(
+        'Upload rejected: exceeds size limit',
+        component: 'upload',
+        metadata: {
+          'sessionId': sessionId,
+          'uploadSize': tarballBytes.length,
+          'maxSize': config.maxUploadSizeBytes,
+        },
+      );
+      return Response(
+        413,
+        body: jsonEncode({
+          'error': {
+            'code': 'payload_too_large',
+            'message':
+                'Upload size exceeds maximum allowed (${maxSizeMb.toStringAsFixed(0)}MB)',
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
     // Store temporarily with creation time for TTL-based cleanup
     _uploadData[sessionId] = tarballBytes;
     _uploadSessionCreatedAt[sessionId] = DateTime.now();

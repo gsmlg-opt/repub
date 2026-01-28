@@ -54,6 +54,10 @@ class Config {
   /// Delay between database connection retry attempts in seconds.
   final int databaseRetryDelaySeconds;
 
+  /// Maximum upload size in bytes (default: 100MB).
+  /// Uploads exceeding this limit will be rejected with 413.
+  final int maxUploadSizeBytes;
+
   const Config({
     required this.listenAddr,
     required this.listenPort,
@@ -76,6 +80,7 @@ class Config {
     this.adminIpWhitelist = const [],
     this.databaseRetryAttempts = 30,
     this.databaseRetryDelaySeconds = 1,
+    this.maxUploadSizeBytes = 100 * 1024 * 1024, // 100MB default
   });
 
   /// Get the database type based on the URL scheme.
@@ -118,9 +123,7 @@ class Config {
     final listenAddrFull = _env('REPUB_LISTEN_ADDR', '0.0.0.0:4920');
     final parts = listenAddrFull.split(':');
     final addr = parts.length > 1 ? parts[0] : '0.0.0.0';
-    final port = parts.length > 1
-        ? (int.tryParse(parts[1]) ?? 4920)
-        : 4920;
+    final port = parts.length > 1 ? (int.tryParse(parts[1]) ?? 4920) : 4920;
 
     return Config(
       listenAddr: addr,
@@ -147,7 +150,10 @@ class Config {
       adminIpWhitelist:
           _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
       databaseRetryAttempts: _envInt('REPUB_DATABASE_RETRY_ATTEMPTS', 30),
-      databaseRetryDelaySeconds: _envInt('REPUB_DATABASE_RETRY_DELAY_SECONDS', 1),
+      databaseRetryDelaySeconds:
+          _envInt('REPUB_DATABASE_RETRY_DELAY_SECONDS', 1),
+      maxUploadSizeBytes:
+          _envInt('REPUB_MAX_UPLOAD_SIZE_BYTES', 100 * 1024 * 1024),
     );
   }
 

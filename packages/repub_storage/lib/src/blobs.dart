@@ -165,8 +165,24 @@ class S3BlobStore implements BlobStore {
     try {
       await _minio.statObject(_bucket, _prefixedKey(key));
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      final errorStr = e.toString().toLowerCase();
+      // Object not found - return false
+      if (errorStr.contains('not found') ||
+          errorStr.contains('nosuchkey') ||
+          errorStr.contains('404') ||
+          errorStr.contains('does not exist')) {
+        return false;
+      }
+      // Unexpected S3 error - log for debugging
+      Logger.error(
+        'S3 exists check failed with unexpected error',
+        component: 'storage',
+        error: e,
+        metadata: {'key': key, 'bucket': _bucket},
+      );
+      // Rethrow to let caller handle (don't silently return false)
+      rethrow;
     }
   }
 
