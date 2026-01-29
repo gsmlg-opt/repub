@@ -72,8 +72,9 @@ WORKDIR /app
 COPY --from=build /app/bin/repub_server /app/bin/repub_server
 COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
 
-# Copy web UI build output
+# Copy web UI build output (includes both web and packages directories)
 COPY --from=build /app/packages/repub_web/build/web /app/web
+COPY --from=build /app/packages/repub_web/build/packages /app/web/packages
 
 # Copy Flutter admin UI build output
 COPY --from=build /app/packages/repub_admin/build/web /app/admin
