@@ -42,6 +42,11 @@ COPY packages/ packages/
 # Build web UI
 RUN cd packages/repub_web && dart run build_runner build --release --output build
 
+# Fix symlink issue: replace packages symlink with actual directory
+RUN cd packages/repub_web/build/web && \
+    rm -f packages && \
+    cp -r ../packages packages
+
 # Build Flutter admin UI with base href for /admin/ subdirectory
 RUN cd packages/repub_admin && flutter build web --release --base-href /admin/
 
@@ -72,9 +77,8 @@ WORKDIR /app
 COPY --from=build /app/bin/repub_server /app/bin/repub_server
 COPY --from=build /app/bin/repub_cli /app/bin/repub_cli
 
-# Copy web UI build output (includes both web and packages directories)
+# Copy web UI build output (packages directory is now real, not a symlink)
 COPY --from=build /app/packages/repub_web/build/web /app/web
-COPY --from=build /app/packages/repub_web/build/packages /app/web/packages
 
 # Copy Flutter admin UI build output
 COPY --from=build /app/packages/repub_admin/build/web /app/admin
