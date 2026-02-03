@@ -230,8 +230,11 @@ Router createRouter({
 
       // Serve static assets
       router.all('/<path|.*>', (Request req, String path) async {
-        // Check if it's an API route first
-        if (path.startsWith('api/') || path.startsWith('packages/')) {
+        // Check if it's an API route or package download route
+        // Allow DDC modules at /packages/build_web_compilers/* but block
+        // Dart package downloads at /packages/<name>/versions/<version>.tar.gz
+        if (path.startsWith('api/') ||
+            (path.startsWith('packages/') && path.contains('/versions/'))) {
           return Response.notFound('Not found');
         }
 
