@@ -44,11 +44,15 @@ class _LoginScreenState extends State<LoginScreen> {
             // Redirect to dashboard on success
             context.go('/');
           } else if (state is AuthError) {
-            // Show error message
+            // Show error message with selectable text
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.error ?? 'Login failed'),
+                content: SelectableText(
+                  state.error ?? 'Login failed',
+                  style: const TextStyle(color: Colors.white),
+                ),
                 backgroundColor: Colors.red,
+                duration: const Duration(seconds: 10),
               ),
             );
           }
