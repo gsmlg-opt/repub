@@ -2888,13 +2888,15 @@ class ApiHandlers {
               maxAge: Duration(hours: ttlHours)),
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Registration error',
+          component: 'auth', error: e, stackTrace: stackTrace);
       return Response(
         400,
         body: jsonEncode({
           'error': {
             'code': 'invalid_request',
-            'message': 'Invalid request body'
+            'message': 'Invalid request body: ${e.toString()}'
           },
         }),
         headers: {'content-type': 'application/json'},
