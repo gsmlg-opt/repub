@@ -14,6 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -44,17 +45,15 @@ class _LoginScreenState extends State<LoginScreen> {
             // Redirect to dashboard on success
             context.go('/');
           } else if (state is AuthError) {
-            // Show error message with selectable text
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: SelectableText(
-                  state.error ?? 'Login failed',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 10),
-              ),
-            );
+            // Update error message state
+            setState(() {
+              _errorMessage = state.error ?? 'Login failed';
+            });
+          } else if (state is AuthLoading) {
+            // Clear error when starting new login attempt
+            setState(() {
+              _errorMessage = null;
+            });
           }
         },
         builder: (context, state) {
@@ -119,6 +118,37 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                           onFieldSubmitted: (_) => _handleLogin(),
                         ),
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              border: Border.all(color: Colors.red.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  color: Colors.red.shade700,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SelectableText(
+                                    _errorMessage!,
+                                    style: TextStyle(
+                                      color: Colors.red.shade900,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
                         FilledButton(
                           onPressed: isLoading ? null : _handleLogin,
