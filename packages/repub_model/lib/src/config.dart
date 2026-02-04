@@ -145,7 +145,8 @@ class Config {
       signedUrlTtlSeconds: _envInt('REPUB_SIGNED_URL_TTL_SECONDS', 3600),
       upstreamUrl: _env('REPUB_UPSTREAM_URL', 'https://pub.dev'),
       enableUpstreamProxy: _envBool('REPUB_ENABLE_UPSTREAM_PROXY', true),
-      rateLimitRequests: _envInt('REPUB_RATE_LIMIT_REQUESTS', 100),
+      rateLimitRequests:
+          _envInt('REPUB_RATE_LIMIT_REQUESTS', 0), // 0 = unlimited
       rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
       adminIpWhitelist:
           _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),

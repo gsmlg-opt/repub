@@ -105,6 +105,11 @@ Middleware rateLimitMiddleware({
 
   return (Handler innerHandler) {
     return (Request request) async {
+      // Skip rate limiting if maxRequests is 0 or less (unlimited)
+      if (config.maxRequests <= 0) {
+        return innerHandler(request);
+      }
+
       // Check if path is excluded
       final path = request.url.path;
       if (excludePaths != null) {

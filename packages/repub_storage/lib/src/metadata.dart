@@ -4213,16 +4213,17 @@ const _postgresMigrations = <String, String>{
   '009_activity_log': '''
     -- Activity log table
     CREATE TABLE IF NOT EXISTS activity_log (
-      id SERIAL PRIMARY KEY,
+      id TEXT PRIMARY KEY,
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       activity_type VARCHAR(50) NOT NULL,
       actor_type VARCHAR(50) NOT NULL,
       actor_id TEXT,
+      actor_email TEXT,
+      actor_username TEXT,
       target_type VARCHAR(50),
       target_id TEXT,
-      description TEXT NOT NULL,
       metadata JSONB,
-      ip_address TEXT,
-      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      ip_address TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
@@ -4263,6 +4264,13 @@ const _postgresMigrations = <String, String>{
     ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retracted_at TIMESTAMPTZ;
     ALTER TABLE package_versions ADD COLUMN IF NOT EXISTS retraction_message TEXT;
     CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
+  ''',
+  '012_fix_activity_log': '''
+    -- Fix activity_log table schema (add missing columns)
+    ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS actor_email TEXT;
+    ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS actor_username TEXT;
+    -- Note: If you have an existing activity_log table with wrong schema,
+    -- you may need to manually drop and recreate it or alter the id column type
   ''',
 };
 
@@ -4484,6 +4492,9 @@ const _sqliteMigrations = <String, String>{
 
     -- Index for filtering retracted versions
     CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
+  ''',
+  '012_fix_activity_log': '''
+    -- No-op: SQLite schema already has correct columns from migration 009
   ''',
 };
 
