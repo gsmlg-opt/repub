@@ -8,6 +8,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'handlers.dart';
 import 'ip_whitelist.dart';
+import 'password_crypto.dart';
 import 'rate_limit.dart';
 
 /// Start the repub server.
@@ -58,12 +59,21 @@ Future<void> startServer({Config? config}) async {
   await blobs.ensureReady();
   await cacheBlobs.ensureReady();
 
+  // Initialize password encryption
+  Logger.info('Initializing password encryption...', component: 'security');
+  final passwordCrypto = PasswordCrypto();
+  Logger.info('RSA key pair generated', component: 'security', metadata: {
+    'keySize': 2048,
+    'algorithm': 'RSA-OAEP',
+  });
+
   // Create router
   final router = createRouter(
     config: cfg,
     metadata: metadata,
     blobs: blobs,
     cacheBlobs: cacheBlobs,
+    passwordCrypto: passwordCrypto,
   );
 
   // Log IP whitelist configuration if enabled

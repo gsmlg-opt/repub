@@ -15,6 +15,7 @@ import 'package:shelf_static/shelf_static.dart';
 import 'csv_export.dart';
 import 'email_service.dart';
 import 'feed.dart';
+import 'password_crypto.dart';
 import 'publish.dart';
 import 'upstream.dart';
 import 'webhook_service.dart';
@@ -26,11 +27,16 @@ Router createRouter({
   required MetadataStore metadata,
   required BlobStore blobs,
   required BlobStore cacheBlobs,
+  required PasswordCrypto passwordCrypto,
   bool serveStaticFiles = true,
 }) {
   final router = Router();
   final handlers = ApiHandlers(
-      config: config, metadata: metadata, blobs: blobs, cacheBlobs: cacheBlobs);
+      config: config,
+      metadata: metadata,
+      blobs: blobs,
+      cacheBlobs: cacheBlobs,
+      passwordCrypto: passwordCrypto);
 
   // List all packages (for web UI)
   router.get('/api/packages', handlers.listPackages);
@@ -153,6 +159,9 @@ Router createRouter({
   router.get('/admin/api/webhooks/<id>/deliveries',
       handlers.adminGetWebhookDeliveries);
   router.post('/admin/api/webhooks/<id>/test', handlers.adminTestWebhook);
+
+  // Public key endpoint (for password encryption)
+  router.get('/api/public-key', handlers.getPublicKey);
 
   // Auth endpoints (user authentication)
   router.post('/api/auth/register', handlers.authRegister);
@@ -322,6 +331,7 @@ class ApiHandlers {
   final MetadataStore metadata;
   final BlobStore blobs;
   final BlobStore cacheBlobs;
+  final PasswordCrypto passwordCrypto;
 
   // In-memory storage for upload data (sessionId -> bytes)
   final Map<String, Uint8List> _uploadData = {};
@@ -358,6 +368,7 @@ class ApiHandlers {
     required this.metadata,
     required this.blobs,
     required this.cacheBlobs,
+    required this.passwordCrypto,
   }) {
     // Start periodic cleanup for orphaned upload sessions (every 10 minutes)
     _uploadSessionCleanupTimer =
@@ -2738,6 +2749,15 @@ class ApiHandlers {
 
   // ============ Auth Handlers ============
 
+  /// GET `/api/public-key`
+  /// Returns the server's RSA public key for client-side password encryption
+  Response getPublicKey(Request request) {
+    return Response.ok(
+      jsonEncode(passwordCrypto.getPublicKeyJson()),
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
   /// POST `/api/auth/register`
   Future<Response> authRegister(Request request) async {
     // Check if registration is allowed
@@ -2760,7 +2780,7 @@ class ApiHandlers {
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final email = body['email'] as String?;
-      final password = body['password'] as String?;
+      final encryptedPassword = body['password'] as String?;
       final name = body['name'] as String?;
 
       if (email == null || email.isEmpty) {
@@ -2787,7 +2807,34 @@ class ApiHandlers {
         );
       }
 
-      if (password == null || password.length < 8) {
+      // Decrypt password
+      if (encryptedPassword == null || encryptedPassword.isEmpty) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {'code': 'missing_password', 'message': 'Password is required'},
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      String password;
+      try {
+        password = passwordCrypto.decryptPassword(encryptedPassword);
+      } catch (e) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_password_format',
+              'message': 'Password must be encrypted with server public key'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      if (password.length < 8) {
         return Response(
           400,
           body: jsonEncode({
@@ -2911,15 +2958,32 @@ class ApiHandlers {
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final email = body['email'] as String?;
-      final password = body['password'] as String?;
+      final encryptedPassword = body['password'] as String?;
 
-      if (email == null || password == null) {
+      if (email == null || encryptedPassword == null) {
         return Response(
           400,
           body: jsonEncode({
             'error': {
               'code': 'missing_credentials',
               'message': 'Email and password are required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Decrypt password
+      String password;
+      try {
+        password = passwordCrypto.decryptPassword(encryptedPassword);
+      } catch (e) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_password_format',
+              'message': 'Password must be encrypted with server public key'
             },
           }),
           headers: {'content-type': 'application/json'},
@@ -3306,15 +3370,34 @@ class ApiHandlers {
       final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
 
       final username = body['username'] as String?;
-      final password = body['password'] as String?;
+      final encryptedPassword = body['password'] as String?;
 
-      if (username == null || password == null) {
+      if (username == null || encryptedPassword == null) {
         return Response(
           400,
           body: jsonEncode({
             'error': {
               'code': 'missing_credentials',
               'message': 'Username and password are required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Decrypt password
+      String password;
+      try {
+        password = passwordCrypto.decryptPassword(encryptedPassword);
+      } catch (e) {
+        Logger.error('Password decryption failed',
+            component: 'auth', error: e);
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_password_format',
+              'message': 'Password must be encrypted with server public key'
             },
           }),
           headers: {'content-type': 'application/json'},

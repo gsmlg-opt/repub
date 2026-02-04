@@ -9,6 +9,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_proxy/shelf_proxy.dart';
 
 import 'package:repub_server/src/handlers.dart';
+import 'package:repub_server/src/password_crypto.dart';
 
 /// Development server that unifies API and web UI on a single port.
 ///
@@ -41,12 +42,17 @@ Future<void> main(List<String> args) async {
   final cacheBlobs = BlobStore.cacheFromConfig(cfg);
   await cacheBlobs.ensureReady();
 
+  // Initialize password encryption
+  print('Initializing password encryption...');
+  final passwordCrypto = PasswordCrypto();
+
   // Create API router (disable static files - use webdev proxy instead)
   final apiRouter = createRouter(
     config: cfg,
     metadata: metadata,
     blobs: blobs,
     cacheBlobs: cacheBlobs,
+    passwordCrypto: passwordCrypto,
     serveStaticFiles: false,
   );
 
