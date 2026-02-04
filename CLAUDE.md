@@ -126,3 +126,7 @@ docker run -p 4920:4920 -v repub_data:/data ghcr.io/gsmlg-dev/repub:latest
 # With PostgreSQL + MinIO
 docker compose up -d
 ```
+
+## Auth Rules
+- At login, encrypt the user's password with the server's public key before transmission. Never send plaintext passwords.
+
