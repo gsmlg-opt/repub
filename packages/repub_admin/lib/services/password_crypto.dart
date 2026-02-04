@@ -39,6 +39,7 @@ class PasswordCrypto {
     _cachedEncrypter = Encrypter(RSA(
       publicKey: publicKey,
       encoding: RSAEncoding.OAEP,
+      digest: RSADigest.SHA256,
     ));
 
     return publicKey;
