@@ -17,6 +17,7 @@ class PasswordCrypto {
       publicKey: publicKey,
       privateKey: privateKey,
       encoding: RSAEncoding.OAEP,
+      digest: RSADigest.SHA256,
     ));
   }
 

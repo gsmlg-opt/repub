@@ -32,6 +32,10 @@ class PasswordCrypto {
     const exponentHex = json.exponent;
 
     function hexToBytes(hex) {
+      // Pad with leading zero if odd length
+      if (hex.length % 2 !== 0) {
+        hex = '0' + hex;
+      }
       const bytes = new Uint8Array(hex.length / 2);
       for (let i = 0; i < hex.length; i += 2) {
         bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
@@ -51,7 +55,6 @@ class PasswordCrypto {
       kty: 'RSA',
       n: base64UrlEncode(modulus),
       e: base64UrlEncode(exponent),
-      alg: 'RSA-OAEP',
       ext: true,
     };
 
