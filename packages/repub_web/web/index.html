@@ -42,5 +42,34 @@
     <style>#initial-loader { animation: fadeIn 0.3s ease-in; } @keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }</style>
   </div>
   <script defer src="main.dart.js"></script>
+  <script>
+  // Auto-run Dart app when $dartRunMain becomes available
+  (function() {
+    var attempts = 0;
+    var maxAttempts = 200; // 20 seconds max
+
+    function tryRun() {
+      attempts++;
+      if (typeof window.$dartRunMain === 'function') {
+        // Remove initial loader to prevent Jaspr DOM conflicts
+        var loader = document.getElementById('initial-loader');
+        if (loader && loader.parentNode) {
+          loader.parentNode.removeChild(loader);
+        }
+
+        // Start the app
+        window.$dartRunMain();
+        return true;
+      }
+      if (attempts < maxAttempts) {
+        setTimeout(tryRun, 100);
+      }
+      return false;
+    }
+
+    // Start trying after a short delay
+    setTimeout(tryRun, 100);
+  })();
+  </script>
 </body>
 </html>
