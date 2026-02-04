@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:repub_model/repub_model.dart';
 import 'package:repub_server/src/handlers.dart';
+import 'package:repub_server/src/password_crypto.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
@@ -51,6 +52,7 @@ void main() {
         metadata: metadata,
         blobs: blobs,
         cacheBlobs: cacheBlobs,
+        passwordCrypto: PasswordCrypto(),
       );
 
       // Create admin user and session for all tests
