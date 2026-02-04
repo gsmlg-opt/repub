@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:web/web.dart' as web;
 
+import 'password_crypto.dart';
+
 /// User data from the API.
 class UserData {
   final String id;
@@ -93,12 +95,15 @@ class AuthApiClient {
     required String password,
     String? name,
   }) async {
+    // Encrypt password with server's public key
+    final encryptedPassword = await PasswordCrypto.encryptPassword(password, baseUrl);
+
     final response = await _client.post(
       Uri.parse('$baseUrl/api/auth/register'),
       headers: _headers,
       body: jsonEncode({
         'email': email,
-        'password': password,
+        'password': encryptedPassword,
         if (name != null) 'name': name,
       }),
     );
@@ -122,12 +127,15 @@ class AuthApiClient {
     required String email,
     required String password,
   }) async {
+    // Encrypt password with server's public key
+    final encryptedPassword = await PasswordCrypto.encryptPassword(password, baseUrl);
+
     final response = await _client.post(
       Uri.parse('$baseUrl/api/auth/login'),
       headers: _headers,
       body: jsonEncode({
         'email': email,
-        'password': password,
+        'password': encryptedPassword,
       }),
     );
 
@@ -182,13 +190,21 @@ class AuthApiClient {
     String? password,
     String? currentPassword,
   }) async {
+    // Encrypt passwords with server's public key
+    final encryptedPassword = password != null
+        ? await PasswordCrypto.encryptPassword(password, baseUrl)
+        : null;
+    final encryptedCurrentPassword = currentPassword != null
+        ? await PasswordCrypto.encryptPassword(currentPassword, baseUrl)
+        : null;
+
     final response = await _client.put(
       Uri.parse('$baseUrl/api/auth/me'),
       headers: _headers,
       body: jsonEncode({
         if (name != null) 'name': name,
-        if (password != null) 'password': password,
-        if (currentPassword != null) 'currentPassword': currentPassword,
+        if (encryptedPassword != null) 'password': encryptedPassword,
+        if (encryptedCurrentPassword != null) 'currentPassword': encryptedCurrentPassword,
       }),
     );
 
