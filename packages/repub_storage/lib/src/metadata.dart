@@ -4266,11 +4266,25 @@ const _postgresMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_package_versions_retracted ON package_versions(package_name, is_retracted);
   ''',
   '012_fix_activity_log': '''
-    -- Fix activity_log table schema (add missing columns)
-    ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS actor_email TEXT;
-    ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS actor_username TEXT;
-    -- Note: If you have an existing activity_log table with wrong schema,
-    -- you may need to manually drop and recreate it or alter the id column type
+    -- Fix activity_log table schema (add missing columns and fix id type)
+    -- Drop and recreate table with correct schema
+    DROP TABLE IF EXISTS activity_log;
+    CREATE TABLE activity_log (
+      id TEXT PRIMARY KEY,
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      activity_type VARCHAR(50) NOT NULL,
+      actor_type VARCHAR(50) NOT NULL,
+      actor_id TEXT,
+      actor_email TEXT,
+      actor_username TEXT,
+      target_type VARCHAR(50),
+      target_id TEXT,
+      metadata JSONB,
+      ip_address TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
   ''',
 };
 
