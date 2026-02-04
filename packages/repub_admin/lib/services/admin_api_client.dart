@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
 
 import '../models/webhook_info.dart';
+import 'password_crypto.dart';
 import 'url_detector_stub.dart' if (dart.library.html) 'url_detector_web.dart';
 
 class AdminStats {
@@ -616,12 +617,15 @@ class AdminApiClient {
     required String password,
     String? name,
   }) async {
+    // Encrypt password with server's public key
+    final encryptedPassword = await PasswordCrypto.encryptPassword(password, baseUrl);
+
     final response = await _client.post(
       Uri.parse('$baseUrl/admin/api/users'),
       headers: _headers,
       body: jsonEncode({
         'email': email,
-        'password': password,
+        'password': encryptedPassword,
         if (name != null) 'name': name,
       }),
     );
@@ -643,12 +647,17 @@ class AdminApiClient {
     String? password,
     bool? isActive,
   }) async {
+    // Encrypt password with server's public key if provided
+    final encryptedPassword = password != null
+        ? await PasswordCrypto.encryptPassword(password, baseUrl)
+        : null;
+
     final response = await _client.put(
       Uri.parse('$baseUrl/admin/api/users/$id'),
       headers: _headers,
       body: jsonEncode({
         if (name != null) 'name': name,
-        if (password != null) 'password': password,
+        if (encryptedPassword != null) 'password': encryptedPassword,
         if (isActive != null) 'isActive': isActive,
       }),
     );

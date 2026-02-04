@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
 
+import 'password_crypto.dart';
 import 'url_detector_stub.dart' if (dart.library.html) 'url_detector_web.dart';
 
 // Events
@@ -111,12 +112,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading(user: state.user));
 
     try {
+      // Encrypt password with server's public key
+      final encryptedPassword = await PasswordCrypto.encryptPassword(
+        event.password,
+        baseUrl,
+      );
+
       final response = await _client.post(
         Uri.parse('$baseUrl/admin/api/auth/login'),
         headers: _headers,
         body: jsonEncode({
           'username': event.username,
-          'password': event.password,
+          'password': encryptedPassword,
         }),
       );
 
