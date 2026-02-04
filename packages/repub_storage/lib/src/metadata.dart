@@ -4268,7 +4268,7 @@ const _postgresMigrations = <String, String>{
   '012_fix_activity_log': '''
     -- Fix activity_log table schema (add missing columns and fix id type)
     -- Drop and recreate table with correct schema
-    DROP TABLE IF EXISTS activity_log;
+    DROP TABLE IF EXISTS activity_log CASCADE;
     CREATE TABLE activity_log (
       id TEXT PRIMARY KEY,
       timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
