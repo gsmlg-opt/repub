@@ -40,6 +40,7 @@ RUN dart pub global run melos bootstrap
 COPY packages/ packages/
 
 # Build web UI (build.yaml configures DDC for production builds)
+# Cache bust: 2026-02-05-v2
 RUN cd packages/repub_web && dart run build_runner build --release --output build
 
 # Fix symlink issue: replace packages symlink with actual directory
