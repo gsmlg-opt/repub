@@ -2697,9 +2697,31 @@ class ApiHandlers {
 
     final configs = await metadata.getAllConfig();
 
+    // Determine actual database and storage types from runtime config
+    final databaseType = config.databaseType == DatabaseType.postgresql
+        ? 'postgresql'
+        : 'sqlite';
+    final storageType = config.useLocalStorage ? 'local' : 's3';
+
+    // Get additional config values
+    final allowRegistration = await metadata.getConfig('allow_registration');
+    final sessionTtl = await metadata.getConfig('session_ttl_hours');
+    final tokenMaxTtl = await metadata.getConfig('token_max_ttl_days');
+
     return Response.ok(
       jsonEncode({
-        'config': configs.map((c) => c.toJson()).toList(),
+        'config': [
+          {
+            'base_url': config.baseUrl,
+            'listen_addr': '${config.listenAddr}:${config.listenPort}',
+            'require_download_auth': config.requireDownloadAuth,
+            'database_type': databaseType,
+            'storage_type': storageType,
+            'max_upload_size_mb': (config.maxUploadSizeBytes / (1024 * 1024)).round(),
+            'allow_public_registration': allowRegistration?.boolValue ?? true,
+            'token_max_ttl_days': tokenMaxTtl?.intValue ?? 0,
+          }
+        ],
       }),
       headers: {'content-type': 'application/json'},
     );
