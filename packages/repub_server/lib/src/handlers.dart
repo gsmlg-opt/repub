@@ -2695,36 +2695,53 @@ class ApiHandlers {
     final authError = await _requireAdminAuth(request);
     if (authError != null) return authError;
 
-    final configs = await metadata.getAllConfig();
+    try {
+      // Determine actual database and storage types from runtime config
+      final databaseType = config.databaseType == DatabaseType.postgresql
+          ? 'postgresql'
+          : 'sqlite';
+      final storageType = config.useLocalStorage ? 'local' : 's3';
 
-    // Determine actual database and storage types from runtime config
-    final databaseType = config.databaseType == DatabaseType.postgresql
-        ? 'postgresql'
-        : 'sqlite';
-    final storageType = config.useLocalStorage ? 'local' : 's3';
+      // Get additional config values from database
+      final allowRegistration = await metadata.getConfig('allow_registration');
+      final tokenMaxTtl = await metadata.getConfig('token_max_ttl_days');
 
-    // Get additional config values
-    final allowRegistration = await metadata.getConfig('allow_registration');
-    final sessionTtl = await metadata.getConfig('session_ttl_hours');
-    final tokenMaxTtl = await metadata.getConfig('token_max_ttl_days');
-
-    return Response.ok(
-      jsonEncode({
-        'config': [
-          {
-            'base_url': config.baseUrl,
-            'listen_addr': '${config.listenAddr}:${config.listenPort}',
-            'require_download_auth': config.requireDownloadAuth,
-            'database_type': databaseType,
-            'storage_type': storageType,
-            'max_upload_size_mb': (config.maxUploadSizeBytes / (1024 * 1024)).round(),
-            'allow_public_registration': allowRegistration?.boolValue ?? true,
-            'token_max_ttl_days': tokenMaxTtl?.intValue ?? 0,
-          }
-        ],
-      }),
-      headers: {'content-type': 'application/json'},
-    );
+      return Response.ok(
+        jsonEncode({
+          'config': [
+            {
+              'base_url': config.baseUrl,
+              'listen_addr': '${config.listenAddr}:${config.listenPort}',
+              'require_download_auth': config.requireDownloadAuth,
+              'database_type': databaseType,
+              'storage_type': storageType,
+              'max_upload_size_mb':
+                  (config.maxUploadSizeBytes / (1024 * 1024)).round(),
+              'allow_public_registration':
+                  allowRegistration?.boolValue ?? true,
+              'token_max_ttl_days': tokenMaxTtl?.intValue ?? 0,
+              'smtp_host': null,
+              'smtp_port': null,
+              'smtp_from': null,
+            }
+          ],
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e, stackTrace) {
+      Logger.error('Failed to get config',
+          component: 'admin', error: e, stackTrace: stackTrace);
+      return Response(
+        500,
+        body: jsonEncode({
+          'error': {
+            'code': 'internal_error',
+            'message': 'Failed to retrieve configuration: ${e.toString()}'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
   }
 
   /// PUT `/admin/api/config/<name>`
