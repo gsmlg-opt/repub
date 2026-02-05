@@ -2717,8 +2717,7 @@ class ApiHandlers {
               'storage_type': storageType,
               'max_upload_size_mb':
                   (config.maxUploadSizeBytes / (1024 * 1024)).round(),
-              'allow_public_registration':
-                  allowRegistration?.boolValue ?? true,
+              'allow_public_registration': allowRegistration?.boolValue ?? true,
               'token_max_ttl_days': tokenMaxTtl?.intValue ?? 0,
               'smtp_host': null,
               'smtp_port': null,
@@ -2851,7 +2850,10 @@ class ApiHandlers {
         return Response(
           400,
           body: jsonEncode({
-            'error': {'code': 'missing_password', 'message': 'Password is required'},
+            'error': {
+              'code': 'missing_password',
+              'message': 'Password is required'
+            },
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -3429,8 +3431,7 @@ class ApiHandlers {
       try {
         password = passwordCrypto.decryptPassword(encryptedPassword);
       } catch (e) {
-        Logger.error('Password decryption failed',
-            component: 'auth', error: e);
+        Logger.error('Password decryption failed', component: 'auth', error: e);
         return Response(
           400,
           body: jsonEncode({

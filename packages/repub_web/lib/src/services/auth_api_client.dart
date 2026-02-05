@@ -96,7 +96,8 @@ class AuthApiClient {
     String? name,
   }) async {
     // Encrypt password with server's public key
-    final encryptedPassword = await PasswordCrypto.encryptPassword(password, baseUrl);
+    final encryptedPassword =
+        await PasswordCrypto.encryptPassword(password, baseUrl);
 
     final response = await _client.post(
       Uri.parse('$baseUrl/api/auth/register'),
@@ -128,7 +129,8 @@ class AuthApiClient {
     required String password,
   }) async {
     // Encrypt password with server's public key
-    final encryptedPassword = await PasswordCrypto.encryptPassword(password, baseUrl);
+    final encryptedPassword =
+        await PasswordCrypto.encryptPassword(password, baseUrl);
 
     final response = await _client.post(
       Uri.parse('$baseUrl/api/auth/login'),
@@ -204,7 +206,8 @@ class AuthApiClient {
       body: jsonEncode({
         if (name != null) 'name': name,
         if (encryptedPassword != null) 'password': encryptedPassword,
-        if (encryptedCurrentPassword != null) 'currentPassword': encryptedCurrentPassword,
+        if (encryptedCurrentPassword != null)
+          'currentPassword': encryptedCurrentPassword,
       }),
     );
 

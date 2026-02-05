@@ -618,7 +618,8 @@ class AdminApiClient {
     String? name,
   }) async {
     // Encrypt password with server's public key
-    final encryptedPassword = await PasswordCrypto.encryptPassword(password, baseUrl);
+    final encryptedPassword =
+        await PasswordCrypto.encryptPassword(password, baseUrl);
 
     final response = await _client.post(
       Uri.parse('$baseUrl/admin/api/users'),

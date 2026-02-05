@@ -126,7 +126,8 @@ class PasswordCrypto {
       _ensureInitialized();
       print('[PasswordCrypto] Initialization complete');
 
-      final crypto = (web.window as JSObject)['__repub_password_crypto'] as JSObject;
+      final crypto =
+          (web.window as JSObject)['__repub_password_crypto'] as JSObject;
       print('[PasswordCrypto] Got crypto object');
 
       final encryptFn = crypto['encryptPassword'] as JSFunction;
