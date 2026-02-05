@@ -57,9 +57,12 @@ class _RegisterPageState extends State<RegisterPage> {
         _error = e.message;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Log detailed error for debugging
+      print('Registration error: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
-        _error = 'An unexpected error occurred';
+        _error = 'Error: ${e.toString()}';
         _loading = false;
       });
     } finally {
