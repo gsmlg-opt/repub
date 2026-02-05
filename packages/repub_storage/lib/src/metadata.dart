@@ -4286,6 +4286,20 @@ const _postgresMigrations = <String, String>{
     CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
     CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log(actor_type, actor_id);
   ''',
+  '013_fix_admin_sessions': '''
+    -- Fix admin session foreign key constraint
+    -- The user_sessions table stores both regular user and admin sessions
+    -- (differentiated by session_type column), but the foreign key constraint
+    -- only allows user IDs from the users table, not admin_users table.
+    -- We need to drop this constraint to allow admin user IDs.
+
+    -- Drop the foreign key constraint on user_sessions.user_id
+    ALTER TABLE user_sessions DROP CONSTRAINT IF EXISTS user_sessions_user_id_fkey;
+
+    -- Note: We don't add a new constraint because sessions can reference either
+    -- users(id) or admin_users(id) depending on session_type.
+    -- The application logic enforces referential integrity.
+  ''',
 };
 
 // SQLite migrations
@@ -4509,6 +4523,10 @@ const _sqliteMigrations = <String, String>{
   ''',
   '012_fix_activity_log': '''
     -- No-op: SQLite schema already has correct columns from migration 009
+  ''',
+  '013_fix_admin_sessions': '''
+    -- No-op: SQLite doesn't enforce foreign keys by default (PRAGMA foreign_keys not enabled)
+    -- Admin sessions work without modification
   ''',
 };
 
