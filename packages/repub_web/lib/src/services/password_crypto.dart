@@ -111,8 +111,8 @@ class PasswordCrypto {
 
     final promise = encryptFn.callAsFunction(
       crypto,
-      password.toJS(),
-      baseUrl.toJS(),
+      password.toJS,
+      baseUrl.toJS,
     ) as JSPromise;
 
     final result = await promise.toDart;
