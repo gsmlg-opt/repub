@@ -2700,7 +2700,17 @@ class ApiHandlers {
       final databaseType = config.databaseType == DatabaseType.postgresql
           ? 'postgresql'
           : 'sqlite';
-      final storageType = config.useLocalStorage ? 'local' : 's3';
+
+      // Determine storage type based on actual configuration
+      // Local storage takes precedence if REPUB_STORAGE_PATH is set
+      final String storageType;
+      if (config.useLocalStorage) {
+        storageType = 'local';
+      } else if (config.hasS3Config) {
+        storageType = 's3';
+      } else {
+        storageType = 'not_configured';
+      }
 
       // Get additional config values from database
       final allowRegistration = await metadata.getConfig('allow_registration');
