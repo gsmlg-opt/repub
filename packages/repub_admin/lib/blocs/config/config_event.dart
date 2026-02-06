@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../models/site_config.dart';
+import '../../models/storage_config_info.dart';
 
 /// Base class for all config events.
 abstract class ConfigEvent extends Equatable {
@@ -33,4 +34,14 @@ class UpdateConfigValue extends ConfigEvent {
 
   @override
   List<Object?> get props => [name, value];
+}
+
+/// Event to save pending storage configuration.
+class SavePendingStorageConfig extends ConfigEvent {
+  final StorageConfigDetail pendingConfig;
+
+  const SavePendingStorageConfig(this.pendingConfig);
+
+  @override
+  List<Object?> get props => [pendingConfig];
 }

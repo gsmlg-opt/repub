@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../models/site_config.dart';
+import '../../models/storage_config_info.dart';
 
 /// Base class for all config states.
 abstract class ConfigState extends Equatable {
@@ -22,11 +23,12 @@ class ConfigLoading extends ConfigState {
 /// State when config is successfully loaded.
 class ConfigLoaded extends ConfigState {
   final SiteConfig config;
+  final StorageConfigInfo? storageConfig;
 
-  const ConfigLoaded(this.config);
+  const ConfigLoaded(this.config, {this.storageConfig});
 
   @override
-  List<Object?> get props => [config];
+  List<Object?> get props => [config, storageConfig];
 }
 
 /// State when config loading fails.

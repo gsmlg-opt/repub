@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:repub_model/repub_model.dart';
 
+import '../models/storage_config_info.dart';
 import '../models/webhook_info.dart';
 import 'password_crypto.dart';
 import 'url_detector_stub.dart' if (dart.library.html) 'url_detector_web.dart';
@@ -578,6 +579,58 @@ class AdminApiClient {
       throw AdminApiException(
         statusCode: response.statusCode,
         message: 'Failed to update config: ${response.body}',
+      );
+    }
+  }
+
+  Future<StorageConfigInfo> getStorageConfig() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/admin/api/storage/config'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: 'Failed to fetch storage config: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return StorageConfigInfo.fromJson(json);
+  }
+
+  Future<void> savePendingStorageConfig({
+    required String type,
+    String? localPath,
+    String? cachePath,
+    String? s3Endpoint,
+    String? s3Region,
+    String? s3AccessKey,
+    String? s3SecretKey,
+    String? s3Bucket,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$baseUrl/admin/api/storage/pending'),
+      headers: _headers,
+      body: jsonEncode({
+        'type': type,
+        'localPath': localPath,
+        'cachePath': cachePath,
+        's3Endpoint': s3Endpoint,
+        's3Region': s3Region,
+        's3AccessKey': s3AccessKey,
+        's3SecretKey': s3SecretKey,
+        's3Bucket': s3Bucket,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final error = json['error'] as Map<String, dynamic>?;
+      throw AdminApiException(
+        statusCode: response.statusCode,
+        message: error?['message'] as String? ?? 'Failed to save storage config',
       );
     }
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../services/admin_api_client.dart';
 import '../../models/site_config.dart';
+import '../../models/storage_config_info.dart';
 import 'config_event.dart';
 import 'config_state.dart';
 
@@ -15,6 +16,7 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
     on<LoadConfig>(_onLoadConfig);
     on<UpdateConfig>(_onUpdateConfig);
     on<UpdateConfigValue>(_onUpdateConfigValue);
+    on<SavePendingStorageConfig>(_onSavePendingStorageConfig);
   }
 
   Future<void> _onLoadConfig(
@@ -52,7 +54,15 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
         smtpFrom: configMap['smtp_from'],
       );
 
-      emit(ConfigLoaded(config));
+      // Load storage configuration (active + pending)
+      StorageConfigInfo? storageConfig;
+      try {
+        storageConfig = await _apiClient.getStorageConfig();
+      } catch (_) {
+        // Storage config endpoint may not be available yet
+      }
+
+      emit(ConfigLoaded(config, storageConfig: storageConfig));
     } catch (e) {
       emit(ConfigError('Failed to load configuration: $e'));
     }
@@ -130,6 +140,41 @@ class ConfigBloc extends Bloc<ConfigEvent, ConfigState> {
         add(const LoadConfig());
       } catch (e) {
         emit(ConfigUpdateError('Failed to update ${event.name}: $e'));
+      }
+    }
+  }
+
+  Future<void> _onSavePendingStorageConfig(
+    SavePendingStorageConfig event,
+    Emitter<ConfigState> emit,
+  ) async {
+    if (state is ConfigLoaded) {
+      final currentConfig = (state as ConfigLoaded).config;
+      emit(ConfigUpdating(currentConfig));
+
+      try {
+        final pending = event.pendingConfig;
+        await _apiClient.savePendingStorageConfig(
+          type: pending.type,
+          localPath: pending.localPath,
+          cachePath: pending.cachePath,
+          s3Endpoint: pending.s3Endpoint,
+          s3Region: pending.s3Region,
+          s3AccessKey: pending.s3AccessKey,
+          s3SecretKey: pending.s3SecretKey,
+          s3Bucket: pending.s3Bucket,
+        );
+
+        emit(ConfigUpdateSuccess(
+          'Pending storage configuration saved. '
+          'Stop the server and run "storage activate" via CLI to apply.',
+          currentConfig,
+        ));
+
+        // Reload config to reflect updated pending state
+        add(const LoadConfig());
+      } catch (e) {
+        emit(ConfigUpdateError('Failed to save pending storage config: $e'));
       }
     }
   }

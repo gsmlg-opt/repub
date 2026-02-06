@@ -5,6 +5,7 @@ import '../blocs/config/config_bloc.dart';
 import '../blocs/config/config_event.dart';
 import '../blocs/config/config_state.dart';
 import '../models/site_config.dart';
+import '../models/storage_config_info.dart';
 import '../widgets/admin_layout.dart';
 
 class SiteConfigScreen extends StatefulWidget {
@@ -18,6 +19,12 @@ class _SiteConfigScreenState extends State<SiteConfigScreen> {
   late SiteConfig _editedConfig;
   bool _hasChanges = false;
   final _formKey = GlobalKey<FormState>();
+
+  // Pending storage config editing state
+  StorageConfigInfo? _storageConfig;
+  StorageConfigDetail? _editedPendingStorage;
+  bool _hasStorageChanges = false;
+  final _storageFormKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -73,6 +80,12 @@ class _SiteConfigScreenState extends State<SiteConfigScreen> {
             setState(() {
               _editedConfig = state.config;
               _hasChanges = false;
+              _storageConfig = state.storageConfig;
+              // Initialize pending editor from existing pending or active config
+              _editedPendingStorage = state.storageConfig?.pending ??
+                  state.storageConfig?.active ??
+                  const StorageConfigDetail(initialized: false, type: 'local');
+              _hasStorageChanges = false;
             });
           }
         },
@@ -314,7 +327,7 @@ class _SiteConfigScreenState extends State<SiteConfigScreen> {
             const SizedBox(width: 16),
             Expanded(
               child: _buildReadOnlyField(
-                label: 'Storage Type',
+                label: 'Active Storage Type',
                 value: _editedConfig.storageType.toUpperCase(),
                 icon: _editedConfig.storageType == 'local'
                     ? Icons.folder
@@ -336,8 +349,380 @@ class _SiteConfigScreenState extends State<SiteConfigScreen> {
                 _editedConfig.copyWith(maxUploadSizeMb: value.round()));
           },
         ),
+        if (_storageConfig != null) ...[
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          _buildActiveStorageSection(context),
+          const SizedBox(height: 24),
+          _buildPendingStorageSection(context),
+        ],
       ],
     );
+  }
+
+  Widget _buildActiveStorageSection(BuildContext context) {
+    final active = _storageConfig?.active;
+    if (active == null) {
+      return const Text('No active storage configuration found.');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green[600], size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Active Configuration',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[700],
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildConfigRow('Type', active.type.toUpperCase()),
+              if (active.type == 'local') ...[
+                _buildConfigRow('Local Path', active.localPath ?? 'N/A'),
+                _buildConfigRow('Cache Path', active.cachePath ?? 'N/A'),
+              ],
+              if (active.type == 's3') ...[
+                _buildConfigRow('Endpoint', active.s3Endpoint ?? 'N/A'),
+                _buildConfigRow('Region', active.s3Region ?? 'N/A'),
+                _buildConfigRow('Bucket', active.s3Bucket ?? 'N/A'),
+                _buildConfigRow('Access Key', active.s3AccessKey ?? 'N/A'),
+                _buildConfigRow('Secret Key', active.s3SecretKey ?? 'N/A'),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfigRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingStorageSection(BuildContext context) {
+    final pending = _editedPendingStorage;
+    if (pending == null) return const SizedBox.shrink();
+
+    final hasPending = _storageConfig?.hasPending ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              hasPending ? Icons.pending : Icons.edit_note,
+              color: hasPending ? Colors.orange[600] : Colors.blue[600],
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              hasPending
+                  ? 'Pending Configuration (awaiting activation)'
+                  : 'Configure New Storage',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: hasPending ? Colors.orange[700] : Colors.blue[700],
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber[200]!),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.amber[800], size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Changes saved here are pending. To activate, stop the '
+                  'server and run: dart run repub_cli storage activate',
+                  style: TextStyle(fontSize: 13, color: Colors.amber[900]),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Form(
+          key: _storageFormKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                value: pending.type,
+                decoration: const InputDecoration(
+                  labelText: 'Storage Type',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                      value: 'local', child: Text('Local Filesystem')),
+                  DropdownMenuItem(value: 's3', child: Text('S3 / MinIO')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _editedPendingStorage = pending.copyWith(type: value);
+                      _hasStorageChanges = true;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              if (pending.type == 'local') ...[
+                TextFormField(
+                  key: ValueKey('local_path_${pending.type}'),
+                  initialValue: pending.localPath ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'Local Storage Path',
+                    hintText: './data/storage',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (pending.type == 'local' &&
+                        (value == null || value.isEmpty)) {
+                      return 'Storage path is required for local storage';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setState(() {
+                      _editedPendingStorage =
+                          pending.copyWith(localPath: value);
+                      _hasStorageChanges = true;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: ValueKey('cache_path_${pending.type}'),
+                  initialValue: pending.cachePath ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'Cache Path',
+                    hintText: './data/cache',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _editedPendingStorage =
+                          pending.copyWith(cachePath: value);
+                      _hasStorageChanges = true;
+                    });
+                  },
+                ),
+              ],
+              if (pending.type == 's3') ...[
+                TextFormField(
+                  key: ValueKey('s3_endpoint_${pending.type}'),
+                  initialValue: pending.s3Endpoint ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'S3 Endpoint',
+                    hintText: 'https://s3.amazonaws.com',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (pending.type == 's3' &&
+                        (value == null || value.isEmpty)) {
+                      return 'S3 endpoint is required';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setState(() {
+                      _editedPendingStorage =
+                          pending.copyWith(s3Endpoint: value);
+                      _hasStorageChanges = true;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        key: ValueKey('s3_region_${pending.type}'),
+                        initialValue: pending.s3Region ?? '',
+                        decoration: const InputDecoration(
+                          labelText: 'S3 Region',
+                          hintText: 'us-east-1',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _editedPendingStorage =
+                                pending.copyWith(s3Region: value);
+                            _hasStorageChanges = true;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        key: ValueKey('s3_bucket_${pending.type}'),
+                        initialValue: pending.s3Bucket ?? '',
+                        decoration: const InputDecoration(
+                          labelText: 'S3 Bucket',
+                          hintText: 'my-repub-bucket',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (pending.type == 's3' &&
+                              (value == null || value.isEmpty)) {
+                            return 'S3 bucket is required';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          setState(() {
+                            _editedPendingStorage =
+                                pending.copyWith(s3Bucket: value);
+                            _hasStorageChanges = true;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: ValueKey('s3_access_key_${pending.type}'),
+                  initialValue: pending.s3AccessKey ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'S3 Access Key',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (pending.type == 's3' &&
+                        (value == null || value.isEmpty)) {
+                      return 'S3 access key is required';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setState(() {
+                      _editedPendingStorage =
+                          pending.copyWith(s3AccessKey: value);
+                      _hasStorageChanges = true;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: ValueKey('s3_secret_key_${pending.type}'),
+                  initialValue: pending.s3SecretKey ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'S3 Secret Key',
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (pending.type == 's3' &&
+                        (value == null || value.isEmpty)) {
+                      return 'S3 secret key is required';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setState(() {
+                      _editedPendingStorage =
+                          pending.copyWith(s3SecretKey: value);
+                      _hasStorageChanges = true;
+                    });
+                  },
+                ),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (_hasStorageChanges) ...[
+                    OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _editedPendingStorage = _storageConfig?.pending ??
+                              _storageConfig?.active ??
+                              const StorageConfigDetail(
+                                initialized: false,
+                                type: 'local',
+                              );
+                          _hasStorageChanges = false;
+                        });
+                      },
+                      child: const Text('Reset'),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  FilledButton.icon(
+                    onPressed: _hasStorageChanges ? _savePendingStorage : null,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Save Pending Config'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _savePendingStorage() {
+    if (_storageFormKey.currentState?.validate() ?? false) {
+      final pending = _editedPendingStorage;
+      if (pending != null) {
+        context.read<ConfigBloc>().add(SavePendingStorageConfig(pending));
+      }
+    }
   }
 
   Widget _buildEmailCard(BuildContext context) {
