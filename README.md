@@ -231,7 +231,9 @@ export REPUB_DATABASE_URL=postgres://repub:repub@localhost:5432/repub
 
 ### Storage Options
 
-You can use either local file storage or S3-compatible storage. Set **one** of the following:
+Storage configuration is persisted to the database on first startup. Environment variables are only used during initial setup. After that, storage config is managed via the admin UI (to edit pending config) and CLI (to activate changes).
+
+**Initial setup** uses environment variables to set **one** of the following:
 
 #### Option 1: Local File Storage
 
@@ -262,6 +264,35 @@ export REPUB_S3_ACCESS_KEY=minioadmin
 export REPUB_S3_SECRET_KEY=minioadmin
 export REPUB_S3_BUCKET=repub
 ```
+
+#### Storage Configuration Management
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPUB_ENCRYPTION_KEY` | *(auto-generated)* | Hex-encoded 256-bit key for encrypting S3 credentials in the database |
+| `REPUB_FORCE_ENV_STORAGE_CONFIG` | `false` | Override database config and force environment variable usage (disaster recovery) |
+
+**How it works:**
+
+1. **First startup**: Server reads storage config from environment variables and persists it to the database. S3 credentials are encrypted with AES-256-GCM.
+2. **Subsequent startups**: Server reads storage config from the database (environment variables are ignored).
+3. **Changing storage config**: Edit the pending configuration in the admin UI at `/admin` > Site Configuration > Storage. Then stop the server and activate via CLI.
+4. **Disaster recovery**: Set `REPUB_FORCE_ENV_STORAGE_CONFIG=true` to bypass database config and use environment variables directly.
+
+**Changing storage backend (two-stage workflow):**
+
+```bash
+# 1. Edit pending storage config in admin UI at /admin > Site Configuration
+# 2. Stop the server
+# 3. Activate the pending config
+dart run -C packages/repub_cli repub_cli storage activate
+# 4. Migrate data between storage backends if needed
+dart run -C packages/repub_cli repub_cli storage migrate-to-s3
+# or: dart run -C packages/repub_cli repub_cli storage migrate-to-local
+# 5. Restart the server
+```
+
+**Important**: Changing storage backend does NOT automatically migrate data. Use the `storage migrate-*` CLI commands to copy package archives between backends.
 
 ### Email Notifications
 
@@ -568,6 +599,10 @@ dart run -C packages/repub_cli repub_cli admin reset-password <username> <new-pa
 dart run -C packages/repub_cli repub_cli admin activate <username>
 dart run -C packages/repub_cli repub_cli admin deactivate <username>
 dart run -C packages/repub_cli repub_cli admin delete <username>
+
+# Storage configuration management
+dart run -C packages/repub_cli repub_cli storage show              # Show active and pending storage config
+dart run -C packages/repub_cli repub_cli storage activate          # Activate pending storage config (server must be stopped)
 
 # Note: User token management is done via the web UI
 # Navigate to /account/tokens after logging in
