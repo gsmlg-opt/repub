@@ -270,6 +270,32 @@ abstract class MetadataStore {
   /// Get all site config values.
   Future<List<SiteConfig>> getAllConfig();
 
+  /// Get storage configuration from database.
+  /// Returns null if not initialized.
+  Future<StorageConfig?> getStorageConfig(String encryptionKey);
+
+  /// Initialize storage configuration on first startup.
+  /// Sets initialized flag and persists storage config to database.
+  Future<void> initializeStorageConfig(
+    StorageConfig config,
+    String encryptionKey,
+  );
+
+  /// Get pending storage configuration from database.
+  /// Returns null if no pending config exists.
+  Future<StorageConfig?> getPendingStorageConfig(String encryptionKey);
+
+  /// Save pending storage configuration (from admin UI).
+  /// Does not activate - requires CLI activation when server is stopped.
+  Future<void> savePendingStorageConfig(
+    StorageConfig config,
+    String encryptionKey,
+  );
+
+  /// Activate pending storage configuration (CLI only, server must be stopped).
+  /// Copies pending config to active config.
+  Future<void> activatePendingStorageConfig(String encryptionKey);
+
   // ============ User Sessions ============
 
   /// Create a user session, returns the session object with ID.
@@ -1476,6 +1502,139 @@ class PostgresMetadataStore extends MetadataStore {
               description: row[3] as String?,
             ))
         .toList();
+  }
+
+  @override
+  Future<StorageConfig?> getStorageConfig(String encryptionKey) async {
+    // Get all storage-related config values
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT name, value FROM site_config
+        WHERE name LIKE 'storage_%'
+      '''),
+    );
+
+    if (result.isEmpty) return null;
+
+    // Convert to map
+    final configMap = <String, String>{};
+    for (final row in result) {
+      configMap[row[0] as String] = row[1] as String;
+    }
+
+    // Check if initialized
+    final initialized = configMap['storage_config_initialized'] == 'true';
+    if (!initialized) return null;
+
+    return await StorageConfig.fromDatabase(configMap, encryptionKey);
+  }
+
+  @override
+  Future<void> initializeStorageConfig(
+    StorageConfig config,
+    String encryptionKey,
+  ) async {
+    // Convert config to database values (with encryption)
+    final values = await config
+        .copyWith(initialized: true)
+        .toDatabaseValues(encryptionKey);
+
+    // Update all storage config values
+    await _conn.runTx((session) async {
+      for (final entry in values.entries) {
+        await session.execute(
+          Sql.named('''
+            UPDATE site_config SET value = @value WHERE name = @name
+          '''),
+          parameters: {'name': entry.key, 'value': entry.value},
+        );
+      }
+    });
+  }
+
+  @override
+  Future<StorageConfig?> getPendingStorageConfig(String encryptionKey) async {
+    // Get all pending storage-related config values
+    final result = await _conn.execute(
+      Sql.named('''
+        SELECT name, value FROM site_config
+        WHERE name LIKE 'storage_pending_%'
+      '''),
+    );
+
+    if (result.isEmpty) return null;
+
+    // Convert to map
+    final configMap = <String, String>{};
+    for (final row in result) {
+      final name = row[0] as String;
+      final value = row[1] as String;
+      // Remove 'storage_pending_' prefix to match StorageConfig.fromDatabase expectations
+      final key = name.replaceFirst('storage_pending_', 'storage_');
+      configMap[key] = value;
+    }
+
+    // Check if initialized
+    final initialized = configMap['storage_config_initialized'] == 'true';
+    if (!initialized) return null;
+
+    return await StorageConfig.fromDatabase(configMap, encryptionKey);
+  }
+
+  @override
+  Future<void> savePendingStorageConfig(
+    StorageConfig config,
+    String encryptionKey,
+  ) async {
+    // Convert config to database values (with encryption)
+    final values = await config
+        .copyWith(initialized: true)
+        .toDatabaseValues(encryptionKey);
+
+    // Update all pending storage config values
+    await _conn.runTx((session) async {
+      for (final entry in values.entries) {
+        // Add 'pending' prefix to field names
+        final pendingName =
+            entry.key.replaceFirst('storage_', 'storage_pending_');
+        await session.execute(
+          Sql.named('''
+            UPDATE site_config SET value = @value WHERE name = @name
+          '''),
+          parameters: {'name': pendingName, 'value': entry.value},
+        );
+      }
+    });
+  }
+
+  @override
+  Future<void> activatePendingStorageConfig(String encryptionKey) async {
+    // Get pending config
+    final pendingConfig = await getPendingStorageConfig(encryptionKey);
+    if (pendingConfig == null || !pendingConfig.initialized) {
+      throw StateError('No pending storage configuration to activate');
+    }
+
+    // Copy pending to active
+    final values = await pendingConfig.toDatabaseValues(encryptionKey);
+
+    await _conn.runTx((session) async {
+      for (final entry in values.entries) {
+        await session.execute(
+          Sql.named('''
+            UPDATE site_config SET value = @value WHERE name = @name
+          '''),
+          parameters: {'name': entry.key, 'value': entry.value},
+        );
+      }
+
+      // Clear pending flag
+      await session.execute(
+        Sql.named('''
+          UPDATE site_config SET value = 'false' WHERE name = 'storage_pending_initialized'
+        '''),
+      );
+    });
   }
 
   // ============ User Sessions ============
@@ -3326,6 +3485,122 @@ class SqliteMetadataStore extends MetadataStore {
         .toList();
   }
 
+  @override
+  Future<StorageConfig?> getStorageConfig(String encryptionKey) async {
+    // Get all storage-related config values
+    final result = _db.select('''
+      SELECT name, value FROM site_config
+      WHERE name LIKE 'storage_%'
+    ''');
+
+    if (result.isEmpty) return null;
+
+    // Convert to map
+    final configMap = <String, String>{};
+    for (final row in result) {
+      configMap[row['name'] as String] = row['value'] as String;
+    }
+
+    // Check if initialized
+    final initialized = configMap['storage_config_initialized'] == 'true';
+    if (!initialized) return null;
+
+    return await StorageConfig.fromDatabase(configMap, encryptionKey);
+  }
+
+  @override
+  Future<void> initializeStorageConfig(
+    StorageConfig config,
+    String encryptionKey,
+  ) async {
+    // Convert config to database values (with encryption)
+    final values = await config
+        .copyWith(initialized: true)
+        .toDatabaseValues(encryptionKey);
+
+    // Update all storage config values
+    for (final entry in values.entries) {
+      _db.execute(
+        'UPDATE site_config SET value = ? WHERE name = ?',
+        [entry.value, entry.key],
+      );
+    }
+  }
+
+  @override
+  Future<StorageConfig?> getPendingStorageConfig(String encryptionKey) async {
+    // Get all pending storage-related config values
+    final result = _db.select('''
+      SELECT name, value FROM site_config
+      WHERE name LIKE 'storage_pending_%'
+    ''');
+
+    if (result.isEmpty) return null;
+
+    // Convert to map
+    final configMap = <String, String>{};
+    for (final row in result) {
+      final name = row['name'] as String;
+      final value = row['value'] as String;
+      // Remove 'storage_pending_' prefix to match StorageConfig.fromDatabase expectations
+      final key = name.replaceFirst('storage_pending_', 'storage_');
+      configMap[key] = value;
+    }
+
+    // Check if initialized
+    final initialized = configMap['storage_config_initialized'] == 'true';
+    if (!initialized) return null;
+
+    return await StorageConfig.fromDatabase(configMap, encryptionKey);
+  }
+
+  @override
+  Future<void> savePendingStorageConfig(
+    StorageConfig config,
+    String encryptionKey,
+  ) async {
+    // Convert config to database values (with encryption)
+    final values = await config
+        .copyWith(initialized: true)
+        .toDatabaseValues(encryptionKey);
+
+    // Update all pending storage config values
+    for (final entry in values.entries) {
+      // Add 'pending' prefix to field names
+      final pendingName =
+          entry.key.replaceFirst('storage_', 'storage_pending_');
+      _db.execute(
+        'UPDATE site_config SET value = ? WHERE name = ?',
+        [entry.value, pendingName],
+      );
+    }
+  }
+
+  @override
+  Future<void> activatePendingStorageConfig(String encryptionKey) async {
+    // Get pending config
+    final pendingConfig = await getPendingStorageConfig(encryptionKey);
+    if (pendingConfig == null || !pendingConfig.initialized) {
+      throw StateError('No pending storage configuration to activate');
+    }
+
+    // Copy pending to active
+    final values = await pendingConfig.toDatabaseValues(encryptionKey);
+
+    for (final entry in values.entries) {
+      _db.execute(
+        'UPDATE site_config SET value = ? WHERE name = ?',
+        [entry.value, entry.key],
+      );
+    }
+
+    // Clear pending flag
+    _db.execute(
+      'UPDATE site_config SET value = ? WHERE name = ?',
+      ['false', 'storage_pending_initialized'],
+    );
+  }
+
   // ============ User Sessions ============
 
   @override
@@ -4300,6 +4575,29 @@ const _postgresMigrations = <String, String>{
     -- users(id) or admin_users(id) depending on session_type.
     -- The application logic enforces referential integrity.
   ''',
+  '014_storage_config': '''
+    -- Storage configuration (active)
+    INSERT INTO site_config (name, value_type, value, description) VALUES
+      ('storage_config_initialized', 'boolean', 'false', 'Whether storage config has been initialized'),
+      ('storage_type', 'string', 'local', 'Storage backend: local or s3'),
+      ('storage_local_path', 'string', './data/storage', 'Local filesystem storage path'),
+      ('storage_cache_path', 'string', './data/cache', 'Cache path for upstream packages'),
+      ('storage_s3_endpoint', 'string', '', 'S3/MinIO endpoint URL'),
+      ('storage_s3_region', 'string', 'us-east-1', 'S3 region'),
+      ('storage_s3_access_key', 'string', '', 'S3 access key (encrypted)'),
+      ('storage_s3_secret_key', 'string', '', 'S3 secret key (encrypted)'),
+      ('storage_s3_bucket', 'string', '', 'S3 bucket name'),
+      ('storage_pending_initialized', 'boolean', 'false', 'Whether pending storage config exists'),
+      ('storage_pending_type', 'string', 'local', 'Pending storage backend: local or s3'),
+      ('storage_pending_local_path', 'string', './data/storage', 'Pending local filesystem storage path'),
+      ('storage_pending_cache_path', 'string', './data/cache', 'Pending cache path for upstream packages'),
+      ('storage_pending_s3_endpoint', 'string', '', 'Pending S3/MinIO endpoint URL'),
+      ('storage_pending_s3_region', 'string', 'us-east-1', 'Pending S3 region'),
+      ('storage_pending_s3_access_key', 'string', '', 'Pending S3 access key (encrypted)'),
+      ('storage_pending_s3_secret_key', 'string', '', 'Pending S3 secret key (encrypted)'),
+      ('storage_pending_s3_bucket', 'string', '', 'Pending S3 bucket name')
+    ON CONFLICT (name) DO NOTHING;
+  ''',
 };
 
 // SQLite migrations
@@ -4527,6 +4825,45 @@ const _sqliteMigrations = <String, String>{
   '013_fix_admin_sessions': '''
     -- No-op: SQLite doesn't enforce foreign keys by default (PRAGMA foreign_keys not enabled)
     -- Admin sessions work without modification
+  ''',
+  '014_storage_config': '''
+    -- Storage configuration (active)
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_config_initialized', 'boolean', 'false', 'Whether storage config has been initialized');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_type', 'string', 'local', 'Storage backend: local or s3');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_local_path', 'string', './data/storage', 'Local filesystem storage path');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_cache_path', 'string', './data/cache', 'Cache path for upstream packages');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_s3_endpoint', 'string', '', 'S3/MinIO endpoint URL');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_s3_region', 'string', 'us-east-1', 'S3 region');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_s3_access_key', 'string', '', 'S3 access key (encrypted)');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_s3_secret_key', 'string', '', 'S3 secret key (encrypted)');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_s3_bucket', 'string', '', 'S3 bucket name');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_initialized', 'boolean', 'false', 'Whether pending storage config exists');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_type', 'string', 'local', 'Pending storage backend: local or s3');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_local_path', 'string', './data/storage', 'Pending local filesystem storage path');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_cache_path', 'string', './data/cache', 'Pending cache path for upstream packages');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_s3_endpoint', 'string', '', 'Pending S3/MinIO endpoint URL');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_s3_region', 'string', 'us-east-1', 'Pending S3 region');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_s3_access_key', 'string', '', 'Pending S3 access key (encrypted)');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_s3_secret_key', 'string', '', 'Pending S3 secret key (encrypted)');
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_s3_bucket', 'string', '', 'Pending S3 bucket name');
   ''',
 };
 

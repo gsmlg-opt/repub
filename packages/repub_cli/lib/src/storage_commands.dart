@@ -14,6 +14,10 @@ Future<void> storageCommands(List<String> args) async {
   final subArgs = args.length > 1 ? args.sublist(1) : <String>[];
 
   switch (command) {
+    case 'show':
+      await _runShow(subArgs);
+    case 'activate':
+      await _runActivate(subArgs);
     case 'migrate':
       await _runMigrate(subArgs);
     case 'verify':
@@ -33,21 +37,40 @@ Future<void> storageCommands(List<String> args) async {
 
 void _printStorageUsage() {
   print('''
-Storage Migration Commands
+Storage Configuration & Migration Commands
 
 Usage:
   dart run repub_cli storage <command> [options]
 
-Commands:
-  migrate <direction>   Migrate package archives between storage backends
-  verify <direction>    Verify migration integrity
-  help                  Show this help message
+Configuration Commands:
+  show                 Display current and pending storage configuration
+  activate             Activate pending storage configuration (server must be stopped)
+
+Migration Commands:
+  migrate <direction>  Migrate package archives between storage backends
+  verify <direction>   Verify migration integrity
+
+Other:
+  help                 Show this help message
 
 Migration Directions:
-  local-to-s3          Migrate from local storage to S3
-  s3-to-local          Migrate from S3 to local storage
+  local-to-s3         Migrate from local storage to S3
+  s3-to-local         Migrate from S3 to local storage
+
+Configuration Workflow:
+  1. Edit storage configuration in Admin UI (saves as pending)
+  2. Stop the server
+  3. Run: dart run repub_cli storage activate
+  4. Migrate data if storage type changed: dart run repub_cli storage migrate <direction>
+  5. Start the server
 
 Examples:
+  # Show current and pending storage configuration
+  dart run repub_cli storage show
+
+  # Activate pending configuration (server must be stopped)
+  dart run repub_cli storage activate
+
   # Preview migration from local to S3
   dart run repub_cli storage migrate local-to-s3 --dry-run
 
@@ -67,17 +90,214 @@ Options for migrate:
   --target <path>      Target path for s3-to-local migration
 
 Environment Variables:
-  REPUB_STORAGE_PATH   Local storage path (source for local-to-s3)
-  REPUB_S3_ENDPOINT    S3 endpoint
-  REPUB_S3_ACCESS_KEY  S3 access key
-  REPUB_S3_SECRET_KEY  S3 secret key
-  REPUB_S3_BUCKET      S3 bucket name
-  REPUB_S3_REGION      S3 region (default: us-east-1)
+  REPUB_DATABASE_URL       Database connection string
+  REPUB_ENCRYPTION_KEY     Encryption key for sensitive values
+
+WARNING:
+  - Server MUST be stopped before activating configuration changes
+  - After changing storage type, you MUST migrate data
+  - Failure to migrate data will result in data loss
 
 Note:
-  - For local-to-s3: Set REPUB_STORAGE_PATH and S3 variables
-  - For s3-to-local: Set S3 variables and use --target flag
+  - Configuration is stored in the database (encrypted for S3 credentials)
+  - For first-time setup, environment variables are used (server initializes DB)
+  - For runtime changes, edit in Admin UI then activate via CLI
 ''');
+}
+
+/// Show current and pending storage configuration from database.
+Future<void> _runShow(List<String> args) async {
+  Logger.init();
+  final config = Config.fromEnv();
+
+  print('Connecting to database...');
+  final metadata = await MetadataStore.create(config);
+  await metadata.runMigrations();
+
+  try {
+    final activeConfig = await metadata.getStorageConfig(config.encryptionKey);
+    final pendingConfig =
+        await metadata.getPendingStorageConfig(config.encryptionKey);
+
+    // Show active configuration
+    print('');
+    print('═══ ACTIVE Storage Configuration ═══');
+    if (activeConfig == null || !activeConfig.initialized) {
+      print('');
+      print('Not initialized in database.');
+      print(
+          'The server will initialize it from environment variables on first startup.');
+      print('');
+      print('Current environment variables:');
+      print(
+          '  REPUB_STORAGE_PATH: ${Platform.environment['REPUB_STORAGE_PATH'] ?? '(not set)'}');
+      print(
+          '  REPUB_CACHE_PATH: ${Platform.environment['REPUB_CACHE_PATH'] ?? '(not set)'}');
+      print(
+          '  REPUB_S3_ENDPOINT: ${Platform.environment['REPUB_S3_ENDPOINT'] ?? '(not set)'}');
+      print(
+          '  REPUB_S3_BUCKET: ${Platform.environment['REPUB_S3_BUCKET'] ?? '(not set)'}');
+      print(
+          '  REPUB_S3_REGION: ${Platform.environment['REPUB_S3_REGION'] ?? '(not set)'}');
+    } else {
+      print('');
+      _printStorageConfig(activeConfig);
+    }
+
+    // Show pending configuration
+    print('');
+    print('═══ PENDING Storage Configuration ═══');
+    if (pendingConfig == null || !pendingConfig.initialized) {
+      print('');
+      print('No pending changes.');
+      print(
+          'Edit storage configuration in the Admin UI to create pending changes.');
+    } else {
+      print('');
+      _printStorageConfig(pendingConfig);
+      print('');
+      print(
+          '⚠️  To activate: Stop server, run `storage activate`, then restart server');
+    }
+
+    await metadata.close();
+  } catch (e) {
+    Logger.error('Failed to show storage config',
+        component: 'cli', metadata: {'error': e.toString()});
+    print('');
+    print('Error: $e');
+    await metadata.close();
+    exit(1);
+  }
+}
+
+/// Print storage configuration details.
+void _printStorageConfig(StorageConfig config) {
+  print('  Type: ${config.type.name}');
+  print('');
+
+  if (config.type == StorageType.local) {
+    print('  Local Storage:');
+    print('    Storage Path: ${config.localPath}');
+    print('    Cache Path: ${config.cachePath}');
+  } else {
+    print('  S3 Storage:');
+    print('    Endpoint: ${config.s3Endpoint}');
+    print('    Region: ${config.s3Region}');
+    print('    Bucket: ${config.s3Bucket}');
+    print('    Access Key: ${_maskCredential(config.s3AccessKey)}');
+    print('    Secret Key: ${_maskCredential(config.s3SecretKey)}');
+    print('    Cache Path: ${config.cachePath}');
+  }
+
+  print('');
+  final isValid = config.isValid();
+  if (isValid) {
+    print('  Status: ✓ Valid');
+  } else {
+    print('  Status: ✗ Invalid');
+    print('  Errors:');
+    for (final error in config.validationErrors) {
+      print('    - $error');
+    }
+  }
+}
+
+/// Activate pending storage configuration (server must be stopped).
+Future<void> _runActivate(List<String> args) async {
+  Logger.init();
+  final config = Config.fromEnv();
+
+  print('Connecting to database...');
+  final metadata = await MetadataStore.create(config);
+  await metadata.runMigrations();
+
+  try {
+    // Get active and pending configs
+    final activeConfig = await metadata.getStorageConfig(config.encryptionKey);
+    final pendingConfig =
+        await metadata.getPendingStorageConfig(config.encryptionKey);
+
+    // Check if there's a pending config
+    if (pendingConfig == null || !pendingConfig.initialized) {
+      print('');
+      print('No pending storage configuration to activate.');
+      print('Edit storage configuration in the Admin UI first.');
+      await metadata.close();
+      exit(1);
+    }
+
+    // Show what will change
+    print('');
+    print('═══ Current ACTIVE Configuration ═══');
+    if (activeConfig == null || !activeConfig.initialized) {
+      print('  (not initialized)');
+    } else {
+      _printStorageConfig(activeConfig);
+    }
+
+    print('');
+    print('═══ Pending Configuration (to be activated) ═══');
+    _printStorageConfig(pendingConfig);
+
+    // Warn about data migration if storage type is changing
+    if (activeConfig != null && activeConfig.type != pendingConfig.type) {
+      print('');
+      print('⚠️  WARNING: Storage type is changing!');
+      print('   You MUST migrate data after activation:');
+      print('');
+      if (pendingConfig.type == StorageType.s3) {
+        print('   dart run repub_cli storage migrate local-to-s3');
+      } else {
+        print(
+            '   dart run repub_cli storage migrate s3-to-local --target ${pendingConfig.localPath}');
+      }
+      print('');
+    }
+
+    // Confirm
+    print('');
+    stdout.write('Activate pending configuration? [y/N]: ');
+    final input = (stdin.readLineSync() ?? '').toLowerCase();
+    if (input != 'y' && input != 'yes') {
+      print('Activation cancelled.');
+      await metadata.close();
+      exit(0);
+    }
+
+    // Activate pending configuration
+    print('');
+    print('Activating configuration...');
+    await metadata.activatePendingStorageConfig(config.encryptionKey);
+
+    print('✓ Storage configuration activated successfully');
+    print('');
+    print('Next steps:');
+    print('  1. Start the server for changes to take effect');
+    if (activeConfig != null && activeConfig.type != pendingConfig.type) {
+      print('  2. Migrate data using the storage migrate command');
+    }
+
+    await metadata.close();
+  } catch (e) {
+    Logger.error('Failed to activate storage config',
+        component: 'cli', metadata: {'error': e.toString()});
+    print('');
+    print('Error: $e');
+    await metadata.close();
+    exit(1);
+  }
+}
+
+/// Mask credentials for display (show only last 4 characters).
+String _maskCredential(String? credential) {
+  if (credential == null || credential.isEmpty) {
+    return '(not set)';
+  }
+  if (credential.length <= 4) {
+    return '****';
+  }
+  return '${'*' * (credential.length - 4)}${credential.substring(credential.length - 4)}';
 }
 
 Future<void> _runMigrate(List<String> args) async {

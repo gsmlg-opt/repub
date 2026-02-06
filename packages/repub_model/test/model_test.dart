@@ -538,6 +538,9 @@ void main() {
   });
 
   group('Config', () {
+    const testKey =
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
     test('databaseType detects sqlite from sqlite URL', () {
       final config = Config(
         listenAddr: '0.0.0.0',
@@ -551,6 +554,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       expect(config.databaseType, DatabaseType.sqlite);
@@ -569,6 +573,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       expect(config.databaseType, DatabaseType.postgresql);
@@ -587,6 +592,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       expect(config.sqlitePath, './data/repub.db');
@@ -605,6 +611,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       expect(config.sqlitePath, './data/repub.db');
@@ -624,6 +631,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       expect(config.useLocalStorage, isTrue);

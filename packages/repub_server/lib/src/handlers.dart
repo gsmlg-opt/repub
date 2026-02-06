@@ -150,6 +150,11 @@ Router createRouter({
   router.get('/admin/api/config', handlers.adminGetAllConfig);
   router.put('/admin/api/config/<name>', handlers.adminSetConfig);
 
+  // Storage configuration (admin only)
+  router.get('/admin/api/storage/config', handlers.adminGetStorageConfig);
+  router.put(
+      '/admin/api/storage/pending', handlers.adminSavePendingStorageConfig);
+
   // Webhook management (admin only)
   router.get('/admin/api/webhooks', handlers.adminListWebhooks);
   router.post('/admin/api/webhooks', handlers.adminCreateWebhook);
@@ -2839,6 +2844,185 @@ class ApiHandlers {
         headers: {'content-type': 'application/json'},
       );
     }
+  }
+
+  /// GET `/admin/api/storage/config`
+  /// Returns both active and pending storage configuration
+  Future<Response> adminGetStorageConfig(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    try {
+      final activeConfig =
+          await metadata.getStorageConfig(config.encryptionKey);
+      final pendingConfig =
+          await metadata.getPendingStorageConfig(config.encryptionKey);
+
+      return Response.ok(
+        jsonEncode({
+          'active': activeConfig != null
+              ? {
+                  'initialized': activeConfig.initialized,
+                  'type': activeConfig.type.name,
+                  'localPath': activeConfig.localPath,
+                  'cachePath': activeConfig.cachePath,
+                  's3Endpoint': activeConfig.s3Endpoint,
+                  's3Region': activeConfig.s3Region,
+                  's3Bucket': activeConfig.s3Bucket,
+                  // Mask credentials in response
+                  's3AccessKey': activeConfig.s3AccessKey != null
+                      ? _maskCredential(activeConfig.s3AccessKey!)
+                      : null,
+                  's3SecretKey': activeConfig.s3SecretKey != null
+                      ? _maskCredential(activeConfig.s3SecretKey!)
+                      : null,
+                }
+              : null,
+          'pending': pendingConfig != null
+              ? {
+                  'initialized': pendingConfig.initialized,
+                  'type': pendingConfig.type.name,
+                  'localPath': pendingConfig.localPath,
+                  'cachePath': pendingConfig.cachePath,
+                  's3Endpoint': pendingConfig.s3Endpoint,
+                  's3Region': pendingConfig.s3Region,
+                  's3Bucket': pendingConfig.s3Bucket,
+                  // Mask credentials in response
+                  's3AccessKey': pendingConfig.s3AccessKey != null
+                      ? _maskCredential(pendingConfig.s3AccessKey!)
+                      : null,
+                  's3SecretKey': pendingConfig.s3SecretKey != null
+                      ? _maskCredential(pendingConfig.s3SecretKey!)
+                      : null,
+                }
+              : null,
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      Logger.error('Failed to get storage config',
+          component: 'admin-api', metadata: {'error': e.toString()});
+      return Response(
+        500,
+        body: jsonEncode({
+          'error': {
+            'code': 'internal_error',
+            'message': 'Failed to get storage config'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  /// PUT `/admin/api/storage/pending`
+  /// Save pending storage configuration (validates before saving)
+  Future<Response> adminSavePendingStorageConfig(Request request) async {
+    final authError = await _requireAdminAuth(request);
+    if (authError != null) return authError;
+
+    try {
+      final bodyBytes = await _readRequestBody(request);
+      final body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+
+      final type = body['type'] as String?;
+      if (type == null) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'missing_type',
+              'message': 'Storage type is required'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Parse storage type
+      late StorageType storageType;
+      try {
+        storageType = StorageType.fromString(type);
+      } catch (e) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_type',
+              'message': 'Invalid storage type. Must be "local" or "s3"'
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Build storage config
+      final storageConfig = StorageConfig(
+        initialized: true,
+        type: storageType,
+        localPath: body['localPath'] as String?,
+        cachePath: body['cachePath'] as String?,
+        s3Endpoint: body['s3Endpoint'] as String?,
+        s3Region: body['s3Region'] as String?,
+        s3AccessKey: body['s3AccessKey'] as String?,
+        s3SecretKey: body['s3SecretKey'] as String?,
+        s3Bucket: body['s3Bucket'] as String?,
+      );
+
+      // Validate config
+      if (!storageConfig.isValid()) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'error': {
+              'code': 'invalid_config',
+              'message': 'Invalid storage configuration',
+              'details': storageConfig.validationErrors,
+            },
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // Save pending config
+      await metadata.savePendingStorageConfig(
+        storageConfig,
+        config.encryptionKey,
+      );
+
+      Logger.info('Pending storage config saved',
+          component: 'admin-api', metadata: {'type': storageConfig.type.name});
+
+      return Response.ok(
+        jsonEncode({
+          'success': {
+            'message':
+                'Pending storage configuration saved. Stop server and run "dart run repub_cli storage activate" to apply.'
+          }
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      Logger.error('Failed to save pending storage config',
+          component: 'admin-api', metadata: {'error': e.toString()});
+      return Response(
+        500,
+        body: jsonEncode({
+          'error': {
+            'code': 'internal_error',
+            'message': 'Failed to save pending storage config'
+          },
+        }),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  }
+
+  String _maskCredential(String credential) {
+    if (credential.length <= 4) {
+      return '****';
+    }
+    return '${'*' * (credential.length - 4)}${credential.substring(credential.length - 4)}';
   }
 
   // ============ Auth Handlers ============

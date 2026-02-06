@@ -16,20 +16,13 @@ Future<void> startServer({Config? config}) async {
   // Initialize logger from environment
   Logger.init();
 
-  final cfg = config ?? Config.fromEnv();
+  final envConfig = config ?? Config.fromEnv();
 
   Logger.info('Starting Repub server...', component: 'startup');
-  Logger.info('Configuration loaded', component: 'startup', metadata: {
-    'baseUrl': cfg.baseUrl,
-    'database': cfg.databaseType.name,
-    'upstreamProxy': cfg.enableUpstreamProxy,
-    'upstreamUrl': cfg.enableUpstreamProxy ? cfg.upstreamUrl : null,
-    'rateLimit': '${cfg.rateLimitRequests}/${cfg.rateLimitWindowSeconds}s',
-  });
 
   // Create metadata store (handles connection and migrations)
   Logger.info('Connecting to database...', component: 'database');
-  final metadata = await MetadataStore.create(cfg);
+  final metadata = await MetadataStore.create(envConfig);
 
   // Run migrations
   Logger.info('Running migrations...', component: 'database');
@@ -38,6 +31,66 @@ Future<void> startServer({Config? config}) async {
     Logger.info('Applied migrations',
         component: 'database', metadata: {'count': migrated});
   }
+
+  // Load storage configuration
+  final forceEnv =
+      Platform.environment['REPUB_FORCE_ENV_STORAGE_CONFIG'] == 'true';
+
+  late StorageConfig storageConfig;
+  String storageSource;
+
+  if (forceEnv) {
+    // Disaster recovery mode: force environment variable usage
+    Logger.warn('FORCED: Using storage config from environment variables',
+        component: 'storage');
+    storageConfig = StorageConfig.fromEnv();
+    storageSource = 'environment (forced)';
+  } else {
+    // Try loading from database
+    final dbConfig = await metadata.getStorageConfig(envConfig.encryptionKey);
+
+    if (dbConfig == null || !dbConfig.initialized) {
+      // First startup: initialize from environment
+      Logger.info('First startup: initializing storage config from environment',
+          component: 'storage');
+      storageConfig = StorageConfig.fromEnv();
+
+      // Persist to database
+      await metadata.initializeStorageConfig(
+        storageConfig,
+        envConfig.encryptionKey,
+      );
+      Logger.info('Storage config persisted to database', component: 'storage');
+      storageSource = 'environment (first startup)';
+    } else {
+      // Subsequent startups: use database
+      Logger.info('Loading storage config from database', component: 'storage');
+      storageConfig = dbConfig;
+      storageSource = 'database';
+    }
+  }
+
+  // Validate storage configuration
+  if (!storageConfig.isValid()) {
+    Logger.error('Invalid storage configuration',
+        component: 'storage',
+        metadata: {'errors': storageConfig.validationErrors});
+    throw StateError(
+        'Storage config validation failed: ${storageConfig.validationErrors.join(', ')}');
+  }
+
+  // Create final config combining env + DB storage
+  final cfg = envConfig.withStorageFromDb(storageConfig);
+
+  Logger.info('Configuration loaded', component: 'startup', metadata: {
+    'baseUrl': cfg.baseUrl,
+    'database': cfg.databaseType.name,
+    'storageType': storageConfig.type.name,
+    'storageSource': storageSource,
+    'upstreamProxy': cfg.enableUpstreamProxy,
+    'upstreamUrl': cfg.enableUpstreamProxy ? cfg.upstreamUrl : null,
+    'rateLimit': '${cfg.rateLimitRequests}/${cfg.rateLimitWindowSeconds}s',
+  });
 
   // Ensure default admin user exists
   final createdAdmin = await metadata.ensureDefaultAdminUser(hashPassword);
@@ -49,6 +102,7 @@ Future<void> startServer({Config? config}) async {
   }
 
   // Create blob storage for local packages
+  Logger.info('Initializing blob storage...', component: 'storage');
   final blobs = BlobStore.fromConfig(cfg);
 
   // Create blob storage for cached upstream packages

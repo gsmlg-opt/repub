@@ -7,6 +7,7 @@ import 'package:repub_server/src/password_crypto.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
+import 'test_helper.dart';
 
 void main() {
   group('Public API Tests', () {
@@ -46,6 +47,7 @@ void main() {
         enableUpstreamProxy: false,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testEncryptionKey,
       );
 
       handlers = ApiHandlers(
@@ -577,6 +579,7 @@ void main() {
           enableUpstreamProxy: false,
           rateLimitRequests: 100,
           rateLimitWindowSeconds: 60,
+          encryptionKey: testEncryptionKey,
         );
 
         final authHandlers = ApiHandlers(
@@ -624,6 +627,7 @@ void main() {
           enableUpstreamProxy: false,
           rateLimitRequests: 100,
           rateLimitWindowSeconds: 60,
+          encryptionKey: testEncryptionKey,
         );
 
         final authHandlers = ApiHandlers(

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:repub_model/repub_model.dart';
 import 'package:repub_storage/repub_storage.dart';
 import 'package:test/test.dart';
+import 'test_helper.dart';
 
 void main() {
   group('Admin API Integration Tests', () {
@@ -26,6 +27,7 @@ void main() {
         enableUpstreamProxy: false,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testEncryptionKey,
       );
 
       metadata = await MetadataStore.create(config);

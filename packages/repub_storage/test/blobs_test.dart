@@ -269,6 +269,9 @@ void main() {
   });
 
   group('BlobStore.fromConfig', () {
+    const testKey =
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
     test('creates FileBlobStore when storagePath is set', () {
       final config = Config(
         listenAddr: '0.0.0.0',
@@ -283,6 +286,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       final store = BlobStore.fromConfig(config);
@@ -304,6 +308,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       expect(
@@ -314,6 +319,9 @@ void main() {
   });
 
   group('BlobStore.cacheFromConfig', () {
+    const testKey =
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
     test('creates FileBlobStore for cache', () {
       final config = Config(
         listenAddr: '0.0.0.0',
@@ -329,6 +337,7 @@ void main() {
         enableUpstreamProxy: true,
         rateLimitRequests: 100,
         rateLimitWindowSeconds: 60,
+        encryptionKey: testKey,
       );
 
       final cacheStore = BlobStore.cacheFromConfig(config);
