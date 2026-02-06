@@ -2705,24 +2705,70 @@ class ApiHandlers {
       // Get additional config values from database
       final allowRegistration = await metadata.getConfig('allow_registration');
       final tokenMaxTtl = await metadata.getConfig('token_max_ttl_days');
+      final smtpHost = await metadata.getConfig('smtp_host');
+      final smtpPort = await metadata.getConfig('smtp_port');
+      final smtpFrom = await metadata.getConfig('smtp_from_address');
 
+      // Return config as name/value pairs for the admin UI
       return Response.ok(
         jsonEncode({
           'config': [
             {
-              'base_url': config.baseUrl,
-              'listen_addr': '${config.listenAddr}:${config.listenPort}',
-              'require_download_auth': config.requireDownloadAuth,
-              'database_type': databaseType,
-              'storage_type': storageType,
-              'max_upload_size_mb':
-                  (config.maxUploadSizeBytes / (1024 * 1024)).round(),
-              'allow_public_registration': allowRegistration?.boolValue ?? true,
-              'token_max_ttl_days': tokenMaxTtl?.intValue ?? 0,
-              'smtp_host': null,
-              'smtp_port': null,
-              'smtp_from': null,
-            }
+              'name': 'base_url',
+              'type': 'string',
+              'value': config.baseUrl,
+            },
+            {
+              'name': 'listen_addr',
+              'type': 'string',
+              'value': '${config.listenAddr}:${config.listenPort}',
+            },
+            {
+              'name': 'require_download_auth',
+              'type': 'boolean',
+              'value': config.requireDownloadAuth.toString(),
+            },
+            {
+              'name': 'database_type',
+              'type': 'string',
+              'value': databaseType,
+            },
+            {
+              'name': 'storage_type',
+              'type': 'string',
+              'value': storageType,
+            },
+            {
+              'name': 'max_upload_size_mb',
+              'type': 'number',
+              'value': ((config.maxUploadSizeBytes / (1024 * 1024)).round())
+                  .toString(),
+            },
+            {
+              'name': 'allow_public_registration',
+              'type': 'boolean',
+              'value': (allowRegistration?.boolValue ?? true).toString(),
+            },
+            {
+              'name': 'token_max_ttl_days',
+              'type': 'number',
+              'value': (tokenMaxTtl?.intValue ?? 0).toString(),
+            },
+            {
+              'name': 'smtp_host',
+              'type': 'string',
+              'value': smtpHost?.stringValue ?? '',
+            },
+            {
+              'name': 'smtp_port',
+              'type': 'number',
+              'value': smtpPort?.stringValue ?? '',
+            },
+            {
+              'name': 'smtp_from',
+              'type': 'string',
+              'value': smtpFrom?.stringValue ?? '',
+            },
           ],
         }),
         headers: {'content-type': 'application/json'},

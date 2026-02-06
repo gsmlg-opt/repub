@@ -1,6 +1,7 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 import 'package:jaspr_router/jaspr_router.dart';
+import 'package:web/web.dart' as web;
 
 import '../../src/components/layout.dart';
 import '../../src/services/auth_api_client.dart';
@@ -21,6 +22,18 @@ class _RegisterPageState extends State<RegisterPage> {
   String _name = '';
   bool _loading = false;
   String? _error;
+  bool _isSecureContext = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if we're in a secure context (HTTPS or localhost)
+    _isSecureContext = web.window.isSecureContext;
+    if (!_isSecureContext) {
+      _error =
+          'Registration requires a secure context (HTTPS or localhost). This page must be accessed over HTTPS for password encryption to work.';
+    }
+  }
 
   Future<void> _handleRegister() async {
     if (_email.isEmpty || _password.isEmpty) {
@@ -228,7 +241,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   type: ButtonType.button,
                   classes:
                       'w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed',
-                  attributes: _loading ? {'disabled': 'true'} : {},
+                  attributes: (_loading || !_isSecureContext)
+                      ? {'disabled': 'true'}
+                      : {},
                   events: {'click': (_) => _handleRegister()},
                   [
                     Component.text(
