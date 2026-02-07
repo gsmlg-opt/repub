@@ -1631,7 +1631,7 @@ class PostgresMetadataStore extends MetadataStore {
       // Clear pending flag
       await session.execute(
         Sql.named('''
-          UPDATE site_config SET value = 'false' WHERE name = 'storage_pending_initialized'
+          UPDATE site_config SET value = 'false' WHERE name = 'storage_pending_config_initialized'
         '''),
       );
     });
@@ -3597,7 +3597,7 @@ class SqliteMetadataStore extends MetadataStore {
     // Clear pending flag
     _db.execute(
       'UPDATE site_config SET value = ? WHERE name = ?',
-      ['false', 'storage_pending_initialized'],
+      ['false', 'storage_pending_config_initialized'],
     );
   }
 
@@ -4587,7 +4587,7 @@ const _postgresMigrations = <String, String>{
       ('storage_s3_access_key', 'string', '', 'S3 access key (encrypted)'),
       ('storage_s3_secret_key', 'string', '', 'S3 secret key (encrypted)'),
       ('storage_s3_bucket', 'string', '', 'S3 bucket name'),
-      ('storage_pending_initialized', 'boolean', 'false', 'Whether pending storage config exists'),
+      ('storage_pending_config_initialized', 'boolean', 'false', 'Whether pending storage config exists'),
       ('storage_pending_type', 'string', 'local', 'Pending storage backend: local or s3'),
       ('storage_pending_local_path', 'string', './data/storage', 'Pending local filesystem storage path'),
       ('storage_pending_cache_path', 'string', './data/cache', 'Pending cache path for upstream packages'),
@@ -4597,6 +4597,15 @@ const _postgresMigrations = <String, String>{
       ('storage_pending_s3_secret_key', 'string', '', 'Pending S3 secret key (encrypted)'),
       ('storage_pending_s3_bucket', 'string', '', 'Pending S3 bucket name')
     ON CONFLICT (name) DO NOTHING;
+  ''',
+  '015_fix_pending_storage_key': '''
+    -- Fix naming: storage_pending_initialized -> storage_pending_config_initialized
+    UPDATE site_config SET name = 'storage_pending_config_initialized'
+      WHERE name = 'storage_pending_initialized';
+    -- Insert correct name if it doesn't exist (fresh installs that already ran fixed 014)
+    INSERT INTO site_config (name, value_type, value, description)
+      VALUES ('storage_pending_config_initialized', 'boolean', 'false', 'Whether pending storage config exists')
+      ON CONFLICT (name) DO NOTHING;
   ''',
 };
 
@@ -4847,7 +4856,7 @@ const _sqliteMigrations = <String, String>{
     INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
       ('storage_s3_bucket', 'string', '', 'S3 bucket name');
     INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
-      ('storage_pending_initialized', 'boolean', 'false', 'Whether pending storage config exists');
+      ('storage_pending_config_initialized', 'boolean', 'false', 'Whether pending storage config exists');
     INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
       ('storage_pending_type', 'string', 'local', 'Pending storage backend: local or s3');
     INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
@@ -4864,6 +4873,13 @@ const _sqliteMigrations = <String, String>{
       ('storage_pending_s3_secret_key', 'string', '', 'Pending S3 secret key (encrypted)');
     INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
       ('storage_pending_s3_bucket', 'string', '', 'Pending S3 bucket name');
+  ''',
+  '015_fix_pending_storage_key': '''
+    -- Fix naming: storage_pending_initialized -> storage_pending_config_initialized
+    UPDATE site_config SET name = 'storage_pending_config_initialized'
+      WHERE name = 'storage_pending_initialized';
+    INSERT OR IGNORE INTO site_config (name, value_type, value, description) VALUES
+      ('storage_pending_config_initialized', 'boolean', 'false', 'Whether pending storage config exists');
   ''',
 };
 
