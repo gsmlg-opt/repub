@@ -85,56 +85,47 @@ jobs:
           DOCS=$(echo "$COMMITS" | grep -i "^- docs" || true)
           CHORES=$(echo "$COMMITS" | grep -i "^- chore\|^- ci\|^- style" || true)
 
-          # Build release notes
-          cat > release_notes.md << 'EOFNOTES'
-          ## Changes in $NEW_TAG
+          # Build release notes using unquoted heredocs for variable expansion
+          cat > release_notes.md <<EOFNOTES
+          ## Changes in ${NEW_TAG}
 
           EOFNOTES
 
           if [ -n "$FEATURES" ]; then
-            cat >> release_notes.md << 'EOFNOTES'
+            cat >> release_notes.md <<EOFNOTES
           ### Features
-          $FEATURES
+          ${FEATURES}
 
           EOFNOTES
           fi
 
           if [ -n "$FIXES" ]; then
-            cat >> release_notes.md << 'EOFNOTES'
+            cat >> release_notes.md <<EOFNOTES
           ### Bug Fixes
-          $FIXES
+          ${FIXES}
 
           EOFNOTES
           fi
 
           if [ -n "$DOCS" ]; then
-            cat >> release_notes.md << 'EOFNOTES'
+            cat >> release_notes.md <<EOFNOTES
           ### Documentation
-          $DOCS
+          ${DOCS}
 
           EOFNOTES
           fi
 
           if [ -n "$CHORES" ]; then
-            cat >> release_notes.md << 'EOFNOTES'
+            cat >> release_notes.md <<EOFNOTES
           ### Maintenance
-          $CHORES
+          ${CHORES}
 
           EOFNOTES
           fi
 
-          cat >> release_notes.md << 'EOFNOTES'
+          cat >> release_notes.md <<EOFNOTES
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${NEW_TAG}
           EOFNOTES
-
-          # Replace variables in notes
-          sed -i "s|\$NEW_TAG|$NEW_TAG|g" release_notes.md
-          sed -i "s|\$FEATURES|$FEATURES|g" release_notes.md
-          sed -i "s|\$FIXES|$FIXES|g" release_notes.md
-          sed -i "s|\$DOCS|$DOCS|g" release_notes.md
-          sed -i "s|\$CHORES|$CHORES|g" release_notes.md
-          sed -i "s|\${PREVIOUS_TAG}|$PREVIOUS_TAG|g" release_notes.md
-          sed -i "s|\${NEW_TAG}|$NEW_TAG|g" release_notes.md
 
           cat release_notes.md
 
