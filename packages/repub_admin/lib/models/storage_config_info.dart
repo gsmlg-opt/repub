@@ -86,8 +86,7 @@ class StorageConfigInfo extends Equatable {
   factory StorageConfigInfo.fromJson(Map<String, dynamic> json) {
     return StorageConfigInfo(
       active: json['active'] != null
-          ? StorageConfigDetail.fromJson(
-              json['active'] as Map<String, dynamic>)
+          ? StorageConfigDetail.fromJson(json['active'] as Map<String, dynamic>)
           : null,
       pending: json['pending'] != null
           ? StorageConfigDetail.fromJson(

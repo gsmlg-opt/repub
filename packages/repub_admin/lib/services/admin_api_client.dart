@@ -630,7 +630,8 @@ class AdminApiClient {
       final error = json['error'] as Map<String, dynamic>?;
       throw AdminApiException(
         statusCode: response.statusCode,
-        message: error?['message'] as String? ?? 'Failed to save storage config',
+        message:
+            error?['message'] as String? ?? 'Failed to save storage config',
       );
     }
   }
