@@ -32,7 +32,11 @@ jobs:
           for pkg in packages/*; do
             if [ -d "$pkg/test" ] && [ "$(ls -A "$pkg/test" 2>/dev/null)" ]; then
               echo "Testing $pkg..."
-              (cd "$pkg" && dart test --reporter=expanded)
+              if grep -q "sdk: flutter" "$pkg/pubspec.yaml" 2>/dev/null; then
+                (cd "$pkg" && flutter test --reporter=expanded)
+              else
+                (cd "$pkg" && dart test --reporter=expanded)
+              fi
             else
               echo "Skipping $pkg (no tests)"
             fi
