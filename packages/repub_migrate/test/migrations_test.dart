@@ -40,13 +40,13 @@ void main() {
     });
 
     test('upstream cache migration adds column', () {
-      final migration = postgresMigrations['002_upstream_cache']!;
+      final migration = postgresMigrations['002_add_upstream_cache']!;
       expect(migration, contains('ALTER TABLE packages'));
       expect(migration, contains('is_upstream_cache'));
     });
 
     test('admin authentication migration creates admin_users', () {
-      final migration = postgresMigrations['003_admin_authentication']!;
+      final migration = postgresMigrations['004_admin_authentication']!;
       expect(migration, contains('CREATE TABLE'));
       expect(migration, contains('admin_users'));
       expect(migration, contains('username'));
@@ -91,16 +91,16 @@ void main() {
     });
 
     test('returns only unapplied postgresMigrations', () {
-      final applied = {'001_initial', '002_upstream_cache'};
+      final applied = {'001_initial', '002_add_upstream_cache'};
       final pending = getPendingMigrations(applied, postgresMigrations);
 
       expect(pending.any((m) => m.key == '001_initial'), isFalse);
-      expect(pending.any((m) => m.key == '002_upstream_cache'), isFalse);
-      expect(pending.any((m) => m.key == '003_admin_authentication'), isTrue);
+      expect(pending.any((m) => m.key == '002_add_upstream_cache'), isFalse);
+      expect(pending.any((m) => m.key == '004_admin_authentication'), isTrue);
     });
 
     test('returns postgresMigrations in sorted order', () {
-      final applied = {'002_upstream_cache'}; // Skip the middle one
+      final applied = {'002_add_upstream_cache'}; // Skip the middle one
       final pending = getPendingMigrations(applied, postgresMigrations);
 
       // Should include 001 and all after 002

@@ -164,8 +164,7 @@ void main() {
       expect(find.text('Invalid credentials'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
-          (widget) =>
-              widget is Icon && widget.icon == Icons.error_outline,
+          (widget) => widget is Icon && widget.icon == Icons.error_outline,
         ),
         findsOneWidget,
       );
