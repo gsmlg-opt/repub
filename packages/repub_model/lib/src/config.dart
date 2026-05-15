@@ -335,6 +335,10 @@ class Config {
   /// and special values like 'localhost' (expands to 127.0.0.1).
   final List<String> adminIpWhitelist;
 
+  /// List of trusted proxy IPs/CIDRs that are allowed to forward client IPs.
+  /// Used for extracting X-Forwarded-For correctly.
+  final List<String> trustedProxies;
+
   /// Number of database connection retry attempts before failing.
   /// Default is 30 (with 1 second delay between retries).
   final int databaseRetryAttempts;
@@ -370,6 +374,7 @@ class Config {
     required this.rateLimitRequests,
     required this.rateLimitWindowSeconds,
     this.adminIpWhitelist = const [],
+    this.trustedProxies = const [],
     this.databaseRetryAttempts = 30,
     this.databaseRetryDelaySeconds = 1,
     this.maxUploadSizeBytes = 100 * 1024 * 1024, // 100MB default
@@ -443,16 +448,44 @@ class Config {
       rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
       adminIpWhitelist:
           _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
+      trustedProxies:
+          _parseIpWhitelist(_envOptional('REPUB_TRUSTED_PROXIES')),
       databaseRetryAttempts: _envInt('REPUB_DATABASE_RETRY_ATTEMPTS', 30),
       databaseRetryDelaySeconds:
           _envInt('REPUB_DATABASE_RETRY_DELAY_SECONDS', 1),
       maxUploadSizeBytes:
           _envInt('REPUB_MAX_UPLOAD_SIZE_BYTES', 100 * 1024 * 1024),
-      encryptionKey: _env(
-        'REPUB_ENCRYPTION_KEY',
-        ConfigEncryption.generateKey(),
-      ),
+      encryptionKey: _resolveEncryptionKey(),
     );
+  }
+
+  /// Resolves the encryption key. Uses environment variable if present.
+  /// Otherwise, attempts to load from or save to a file in REPUB_KEY_PATH to ensure persistence.
+  static String _resolveEncryptionKey() {
+    final envKey = Platform.environment['REPUB_ENCRYPTION_KEY'];
+    if (envKey != null && envKey.isNotEmpty) {
+      return envKey;
+    }
+
+    final keyPath = Platform.environment['REPUB_KEY_PATH'] ?? './data/metadata/keys';
+    final keyFile = File('$keyPath/.encryption_key');
+
+    if (keyFile.existsSync()) {
+      try {
+        return keyFile.readAsStringSync().trim();
+      } catch (e) {
+        // Fallback to generating a new key if read fails
+      }
+    }
+
+    final newKey = ConfigEncryption.generateKey();
+    try {
+      keyFile.parent.createSync(recursive: true);
+      keyFile.writeAsStringSync(newKey);
+    } catch (e) {
+      // If we can't write the key, just use the generated one
+    }
+    return newKey;
   }
 
   /// Create a config with storage settings from database.

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart';
 import 'package:pointycastle/export.dart';
@@ -19,6 +21,53 @@ class PasswordCrypto {
       encoding: RSAEncoding.OAEP,
       digest: RSADigest.SHA256,
     ));
+  }
+
+  PasswordCrypto._internal(this.publicKey, this.privateKey) {
+    _encrypter = Encrypter(RSA(
+      publicKey: publicKey,
+      privateKey: privateKey,
+      encoding: RSAEncoding.OAEP,
+      digest: RSADigest.SHA256,
+    ));
+  }
+
+  /// Load existing RSA key pair or generate and save a new one.
+  static Future<PasswordCrypto> loadOrGenerate(String keyPath) async {
+    final file = File(keyPath);
+    if (file.existsSync()) {
+      try {
+        final jsonStr = await file.readAsString();
+        final json = jsonDecode(jsonStr);
+        final n = BigInt.parse(json['n'], radix: 16);
+        final e = BigInt.parse(json['e'], radix: 16);
+        final d = BigInt.parse(json['d'], radix: 16);
+        final p = BigInt.parse(json['p'], radix: 16);
+        final q = BigInt.parse(json['q'], radix: 16);
+
+        final pubKey = RSAPublicKey(n, e);
+        final privKey = RSAPrivateKey(n, d, p, q);
+        return PasswordCrypto._internal(pubKey, privKey);
+      } catch (e) {
+        // Fallback to generating new
+      }
+    }
+
+    final crypto = PasswordCrypto();
+    try {
+      final json = {
+        'n': crypto.publicKey.modulus!.toRadixString(16),
+        'e': crypto.publicKey.exponent!.toRadixString(16),
+        'd': crypto.privateKey.privateExponent!.toRadixString(16),
+        'p': crypto.privateKey.p!.toRadixString(16),
+        'q': crypto.privateKey.q!.toRadixString(16),
+      };
+      file.parent.createSync(recursive: true);
+      await file.writeAsString(jsonEncode(json));
+    } catch (e) {
+      // Ignore write errors
+    }
+    return crypto;
   }
 
   /// Generate RSA key pair

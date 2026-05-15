@@ -15,6 +15,7 @@ void main() {
     late BlobStore cacheBlobs;
     late Config config;
     late ApiHandlers handlers;
+    late PasswordCrypto crypto;
 
     setUp(() async {
       metadata = SqliteMetadataStore.inMemory();
@@ -44,12 +45,14 @@ void main() {
         encryptionKey: testEncryptionKey,
       );
 
+      crypto = PasswordCrypto();
+
       handlers = ApiHandlers(
         config: config,
         metadata: metadata,
         blobs: blobs,
         cacheBlobs: cacheBlobs,
-        passwordCrypto: PasswordCrypto(),
+        passwordCrypto: crypto,
       );
     });
 
@@ -64,7 +67,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': '',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -81,7 +84,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'invalid-email.com',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -98,7 +101,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test@',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -115,7 +118,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test@example.c',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -132,7 +135,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'valid.user+test@example.com',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -153,7 +156,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test1@example.com',
-            'password': 'Short1',
+            'password': crypto.encryptPassword('Short1'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -171,7 +174,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test2@example.com',
-            'password': 'lowercase123',
+            'password': crypto.encryptPassword('lowercase123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -189,7 +192,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test3@example.com',
-            'password': 'UPPERCASE123',
+            'password': crypto.encryptPassword('UPPERCASE123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -207,7 +210,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test4@example.com',
-            'password': 'NoNumbersHere',
+            'password': crypto.encryptPassword('NoNumbersHere'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -225,7 +228,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'test5@example.com',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -459,7 +462,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'duplicate@example.com',
-            'password': 'ValidPass123',
+            'password': crypto.encryptPassword('ValidPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -473,7 +476,7 @@ void main() {
           Uri.parse('http://localhost/api/auth/register'),
           body: jsonEncode({
             'email': 'duplicate@example.com',
-            'password': 'AnotherPass123',
+            'password': crypto.encryptPassword('AnotherPass123'),
           }),
           headers: {'content-type': 'application/json'},
         );
