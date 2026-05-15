@@ -72,6 +72,7 @@ jobs:
       REPUB_S3_ACCESS_KEY: "minioadmin"
       REPUB_S3_SECRET_KEY: "minioadmin"
       REPUB_S3_BUCKET: "repub"
+      REPUB_REQUIRE_PUBLISH_AUTH: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -130,14 +131,6 @@ jobs:
 
           curl -sf http://localhost:4920/health || exit 1
 
-      - name: Create auth token
-        id: token
-        run: |
-          cd packages/repub_cli
-          TOKEN=$(dart run repub_cli token create ci-test publish:all 2>&1 | grep "^Created token:" | cut -d: -f2 | tr -d ' ')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "Token created successfully"
-
       - name: Create test package
         run: |
           mkdir -p /tmp/test_pkg/lib
@@ -176,9 +169,6 @@ jobs:
 
       - name: Publish test package
         run: |
-          # Add token to dart pub
-          echo "${{ steps.token.outputs.token }}" | dart pub token add http://localhost:4920
-
           cd /tmp/test_pkg
           dart pub publish --force
 
@@ -260,9 +250,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Remove token
-          dart pub token remove http://localhost:4920 || true
-
           # Stop server
           if [ -f /tmp/server.pid ]; then
             kill $(cat /tmp/server.pid) 2>/dev/null || true
