@@ -1,0 +1,70 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Docker Compose Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Start services via Docker Compose
+        run: |
+          docker compose up -d --build
+
+      - name: Wait for Repub server to be ready
+        run: |
+          echo "Waiting for repub to be healthy..."
+          attempt=1
+          max_attempts=30
+          
+          while [ $attempt -le $max_attempts ]; do
+            # docker compose ps outputs JSON, we can check health status
+            status=$(docker inspect --format='{{json .State.Health.Status}}' $(docker compose ps -q repub) 2>/dev/null || echo '"unknown"')
+            
+            if [ "$status" = '"healthy"' ]; then
+              echo "Repub server is healthy!"
+              exit 0
+            fi
+            
+            if [ "$status" = '"unhealthy"' ]; then
+              echo "Repub server became unhealthy!"
+              docker compose logs repub
+              exit 1
+            fi
+            
+            echo "Status is $status... Waiting (attempt $attempt/$max_attempts)"
+            sleep 2
+            attempt=$((attempt + 1))
+          done
+          
+          echo "Timed out waiting for repub to be healthy."
+          docker compose logs repub
+          exit 1
+
+      - name: Run Smoke Test Script
+        run: |
+          ./scripts/smoke_test.sh
+
+      - name: Dump Docker logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

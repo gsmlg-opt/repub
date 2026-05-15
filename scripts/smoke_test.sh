@@ -40,11 +40,6 @@ log_error() {
 cleanup() {
     log_info "Cleaning up..."
     rm -rf "$TEST_DIR"
-
-    # Remove the token from dart pub
-    if [ -n "$TOKEN" ]; then
-        dart pub token remove "$REPUB_URL" 2>/dev/null || true
-    fi
 }
 
 trap cleanup EXIT
@@ -259,10 +254,6 @@ main() {
 
     # Wait for service
     wait_for_service "$REPUB_URL"
-
-    # Create and configure token
-    create_token
-    add_token_to_dart
 
     # Create and publish test package
     local pkg_dir
