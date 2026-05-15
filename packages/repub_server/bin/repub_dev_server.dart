@@ -44,8 +44,10 @@ Future<void> main(List<String> args) async {
 
   // Initialize password encryption
   print('Initializing password encryption...');
-  final keyPath = Platform.environment['REPUB_KEY_PATH'] ?? './data/metadata/keys';
-  final passwordCrypto = await PasswordCrypto.loadOrGenerate('$keyPath/.rsa_key');
+  final keyPath =
+      Platform.environment['REPUB_KEY_PATH'] ?? './data/metadata/keys';
+  final passwordCrypto =
+      await PasswordCrypto.loadOrGenerate('$keyPath/.rsa_key');
 
   // Create API router (disable static files - use webdev proxy instead)
   final apiRouter = createRouter(

@@ -45,7 +45,8 @@ abstract class MetadataStore {
       password: userInfo.length > 1 ? userInfo[1] : 'repub',
     );
 
-    final insecure = Platform.environment['REPUB_DATABASE_SSL_INSECURE'] == 'true';
+    final insecure =
+        Platform.environment['REPUB_DATABASE_SSL_INSECURE'] == 'true';
     final sslMode = insecure ? SslMode.disable : SslMode.require;
 
     for (var i = 0; i < retryAttempts; i++) {
@@ -4334,4 +4335,3 @@ class SqliteMetadataStore extends MetadataStore {
 }
 
 // PostgreSQL migrations
-

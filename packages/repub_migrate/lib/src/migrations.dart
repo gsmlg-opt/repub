@@ -250,7 +250,8 @@ const postgresMigrations = <String, String>{
 };
 
 /// Get all migrations that haven't been applied yet.
-List<MapEntry<String, String>> getPendingMigrations(Set<String> applied, Map<String, String> allMigrations) {
+List<MapEntry<String, String>> getPendingMigrations(
+    Set<String> applied, Map<String, String> allMigrations) {
   return allMigrations.entries.where((e) => !applied.contains(e.key)).toList()
     ..sort((a, b) => a.key.compareTo(b.key));
 }
@@ -527,4 +528,3 @@ const sqliteMigrations = <String, String>{
       ('storage_pending_config_initialized', 'boolean', 'false', 'Whether pending storage config exists');
   ''',
 };
-

@@ -448,8 +448,7 @@ class Config {
       rateLimitWindowSeconds: _envInt('REPUB_RATE_LIMIT_WINDOW_SECONDS', 60),
       adminIpWhitelist:
           _parseIpWhitelist(_envOptional('REPUB_ADMIN_IP_WHITELIST')),
-      trustedProxies:
-          _parseIpWhitelist(_envOptional('REPUB_TRUSTED_PROXIES')),
+      trustedProxies: _parseIpWhitelist(_envOptional('REPUB_TRUSTED_PROXIES')),
       databaseRetryAttempts: _envInt('REPUB_DATABASE_RETRY_ATTEMPTS', 30),
       databaseRetryDelaySeconds:
           _envInt('REPUB_DATABASE_RETRY_DELAY_SECONDS', 1),
@@ -467,7 +466,8 @@ class Config {
       return envKey;
     }
 
-    final keyPath = Platform.environment['REPUB_KEY_PATH'] ?? './data/metadata/keys';
+    final keyPath =
+        Platform.environment['REPUB_KEY_PATH'] ?? './data/metadata/keys';
     final keyFile = File('$keyPath/.encryption_key');
 
     if (keyFile.existsSync()) {

@@ -62,12 +62,12 @@ class WebhookService {
 
       final host = uri.host.toLowerCase();
       late InternetAddress resolvedAddress;
-      
+
       // If host is already an IP, lookup just parses it.
       final addresses = await InternetAddress.lookup(host);
       if (addresses.isEmpty) return null;
       resolvedAddress = addresses.first;
-      
+
       final ip = resolvedAddress.address;
 
       // Check blocked patterns against the resolved IP
@@ -201,7 +201,7 @@ class WebhookService {
         final signature = _computeSignature(body, webhook.secret!);
         headers['X-Webhook-Signature'] = 'sha256=$signature';
       }
-      
+
       final deliveryUri = originalUri.replace(host: resolvedIp);
 
       final response = await _httpClient
