@@ -1,31 +1,65 @@
 name: E2E Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to test (optional, builds from source if empty)'
+        required: false
+        type: string
+      git_ref:
+        description: 'Git reference to run tests on'
+        required: true
+        default: 'main'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   smoke-test:
     name: Docker Compose Smoke Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref || github.ref }}
+
+      - name: Setup environment variables
+        id: setup_env
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+            echo "build_image=false" >> $GITHUB_OUTPUT
+          else
+            echo "IMAGE_TAG=repub:e2e-test" >> $GITHUB_ENV
+            echo "build_image=true" >> $GITHUB_OUTPUT
+          fi
 
       - uses: subosito/flutter-action@v2
+        if: steps.setup_env.outputs.build_image == 'true'
         with:
           channel: stable
 
-      - name: Start services via Docker Compose
+      - name: Build Docker image
+        if: steps.setup_env.outputs.build_image == 'true'
         run: |
-          docker compose up -d --build
+          docker build -t ${{ env.IMAGE_TAG }} .
+
+      - name: Start services via Docker Compose
+        env:
+          REPUB_IMAGE: ${{ env.IMAGE_TAG }}
+        run: |
+          # Use REPUB_IMAGE env var to override the image in docker-compose.yml
+          # We need to make sure docker-compose.yml uses this variable
+          docker compose up -d
 
       - name: Wait for Repub server to be ready
         run: |

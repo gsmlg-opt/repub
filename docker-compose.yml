@@ -47,6 +47,7 @@ services:
       "
 
   repub:
+    image: ${REPUB_IMAGE:-repub:latest}
     build: .
     depends_on:
       postgres:
