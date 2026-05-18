@@ -26,7 +26,7 @@ Middleware ipWhitelistMiddleware({
   required String pathPrefix,
 }) {
   // Expand special values and parse CIDRs
-  final parsedRules = _parseWhitelist(whitelist);
+  final parsedRules = parseIpList(whitelist);
 
   return (Handler handler) {
     return (Request request) {
@@ -45,7 +45,7 @@ Middleware ipWhitelistMiddleware({
       final clientIp = extractClientIp(request);
 
       // Check if IP is whitelisted
-      if (_isIpWhitelisted(clientIp, parsedRules)) {
+      if (isIpInList(clientIp, parsedRules)) {
         return handler(request);
       }
 
@@ -59,13 +59,13 @@ Middleware ipWhitelistMiddleware({
 }
 
 /// Parsed whitelist rule that can match IPs.
-abstract class _WhitelistRule {
+abstract class WhitelistRule {
   bool matches(String ip);
   bool get allowsAll => false;
 }
 
 /// Rule that matches a single exact IP address.
-class _ExactIpRule extends _WhitelistRule {
+class _ExactIpRule extends WhitelistRule {
   final String ip;
   _ExactIpRule(this.ip);
 
@@ -74,7 +74,7 @@ class _ExactIpRule extends _WhitelistRule {
 }
 
 /// Rule that matches IPs within a CIDR range.
-class _CidrRule extends _WhitelistRule {
+class _CidrRule extends WhitelistRule {
   final int networkAddress;
   final int subnetMask;
 
@@ -89,7 +89,7 @@ class _CidrRule extends _WhitelistRule {
 }
 
 /// Rule that allows all IPs (wildcard).
-class _WildcardRule extends _WhitelistRule {
+class _WildcardRule extends WhitelistRule {
   @override
   bool matches(String ip) => true;
 
@@ -98,8 +98,8 @@ class _WildcardRule extends _WhitelistRule {
 }
 
 /// Parse whitelist strings into rules.
-List<_WhitelistRule> _parseWhitelist(List<String> whitelist) {
-  final rules = <_WhitelistRule>[];
+List<WhitelistRule> parseIpList(List<String> whitelist) {
+  final rules = <WhitelistRule>[];
 
   for (final entry in whitelist) {
     final trimmed = entry.trim().toLowerCase();
@@ -218,7 +218,7 @@ bool _isValidIpv6(String ip) {
 }
 
 /// Check if IP matches any rule in the whitelist.
-bool _isIpWhitelisted(String ip, List<_WhitelistRule> rules) {
+bool isIpInList(String ip, List<WhitelistRule> rules) {
   // Handle 'unknown' IP - never whitelisted unless wildcard
   if (ip == 'unknown') {
     return rules.any((r) => r.allowsAll);

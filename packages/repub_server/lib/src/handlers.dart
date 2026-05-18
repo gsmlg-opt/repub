@@ -15,6 +15,7 @@ import 'package:shelf_static/shelf_static.dart';
 import 'csv_export.dart';
 import 'email_service.dart';
 import 'feed.dart';
+import 'ip_whitelist.dart';
 import 'password_crypto.dart';
 import 'publish.dart';
 import 'upstream.dart';
@@ -479,22 +480,47 @@ class ApiHandlers {
   /// Checks X-Forwarded-For and X-Real-IP headers in order of precedence.
   /// Returns null if no IP can be determined.
   String? _extractClientIp(Request request) {
-    // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
-    final forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor != null && forwardedFor.isNotEmpty) {
-      final firstIp = forwardedFor.split(',').first.trim();
-      if (firstIp.isNotEmpty) {
-        return firstIp;
+    String? socketIp;
+    final connInfo = request.context['shelf.io.connection_info'];
+    if (connInfo != null) {
+      try {
+        socketIp = (connInfo as dynamic).remoteAddress.address;
+      } catch (_) {}
+    }
+
+    // Only trust proxy headers if socket IP is in the trusted proxies list
+    // If the list is empty, we fall back to the old behavior of always trusting it (or you can choose to be strict).
+    // Let's implement strict: if trusted proxies is configured, MUST match.
+    // If not configured, we allow it for backwards compatibility.
+    bool isTrusted = config.trustedProxies.isEmpty;
+    if (!isTrusted && socketIp != null) {
+      isTrusted = _isIpTrusted(socketIp, config.trustedProxies);
+    }
+
+    if (isTrusted) {
+      // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+      final forwardedFor = request.headers['x-forwarded-for'];
+      if (forwardedFor != null && forwardedFor.isNotEmpty) {
+        final firstIp = forwardedFor.split(',').first.trim();
+        if (firstIp.isNotEmpty) {
+          return firstIp;
+        }
+      }
+
+      // Fall back to X-Real-IP
+      final realIp = request.headers['x-real-ip'];
+      if (realIp != null && realIp.isNotEmpty) {
+        return realIp;
       }
     }
 
-    // Fall back to X-Real-IP
-    final realIp = request.headers['x-real-ip'];
-    if (realIp != null && realIp.isNotEmpty) {
-      return realIp;
-    }
+    return socketIp;
+  }
 
-    return null;
+  bool _isIpTrusted(String ip, List<String> trustedProxies) {
+    if (trustedProxies.isEmpty) return false;
+    final parsedRules = parseIpList(trustedProxies);
+    return isIpInList(ip, parsedRules);
   }
 
   /// Trigger webhook with error logging (fire-and-forget but logged).

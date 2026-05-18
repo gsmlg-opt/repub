@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
@@ -50,41 +51,50 @@ class WebhookService {
         _onWebhookDisabled = onWebhookDisabled;
 
   /// Check if a URL is safe to call (SSRF protection).
-  /// Returns true if safe, false if blocked.
-  bool _isUrlSafe(String url) {
+  /// Resolves the hostname to an IP address and checks against blocked patterns.
+  /// Returns the resolved IP address if safe, null if blocked.
+  Future<String?> _resolveAndValidate(String url) async {
     try {
       final uri = Uri.parse(url);
       if (!uri.hasScheme || (!uri.isScheme('http') && !uri.isScheme('https'))) {
-        return false;
+        return null;
       }
 
       final host = uri.host.toLowerCase();
+      late InternetAddress resolvedAddress;
 
-      // Check blocked patterns
-      if (_blockedPatterns.any((pattern) => host.startsWith(pattern))) {
-        return false;
+      // If host is already an IP, lookup just parses it.
+      final addresses = await InternetAddress.lookup(host);
+      if (addresses.isEmpty) return null;
+      resolvedAddress = addresses.first;
+
+      final ip = resolvedAddress.address;
+
+      // Check blocked patterns against the resolved IP
+      if (_blockedPatterns.any((pattern) => ip.startsWith(pattern))) {
+        return null;
       }
 
       // Check for private class B (172.16.0.0 - 172.31.255.255)
-      if (host.startsWith('172.')) {
-        final parts = host.split('.');
+      if (ip.startsWith('172.')) {
+        final parts = ip.split('.');
         if (parts.length >= 2) {
           final second = int.tryParse(parts[1]);
           if (second != null && second >= 16 && second <= 31) {
-            return false;
+            return null;
           }
         }
       }
 
-      return true;
+      return ip;
     } catch (e) {
-      // Log URL parsing errors for debugging
+      // Log URL parsing/resolution errors for debugging
       Logger.debug(
-        'Failed to parse webhook URL for safety check',
+        'Failed to parse or resolve webhook URL for safety check',
         component: 'webhook',
         metadata: {'url': url, 'error': e.toString()},
       );
-      return false;
+      return null;
     }
   }
 
@@ -134,7 +144,8 @@ class WebhookService {
 
     // SSRF protection: Validate URL at delivery time
     // This protects against webhooks created before SSRF protection was added
-    if (!_isUrlSafe(webhook.url)) {
+    final resolvedIp = await _resolveAndValidate(webhook.url);
+    if (resolvedIp == null) {
       error = 'Blocked: URL targets internal or private network';
       Logger.warn(
         'SSRF protection blocked webhook delivery',
@@ -177,10 +188,12 @@ class WebhookService {
 
     try {
       final body = jsonEncode(payload.toJson());
+      final originalUri = Uri.parse(webhook.url);
       final headers = <String, String>{
         'Content-Type': 'application/json',
         'X-Webhook-Event': payload.eventType,
         'X-Webhook-Delivery': _uuid.v4(),
+        'Host': originalUri.host,
       };
 
       // Add HMAC signature if secret is configured
@@ -189,9 +202,11 @@ class WebhookService {
         headers['X-Webhook-Signature'] = 'sha256=$signature';
       }
 
+      final deliveryUri = originalUri.replace(host: resolvedIp);
+
       final response = await _httpClient
           .post(
-            Uri.parse(webhook.url),
+            deliveryUri,
             headers: headers,
             body: body,
           )

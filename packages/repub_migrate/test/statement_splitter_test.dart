@@ -189,7 +189,7 @@ ALTER TABLE packages ADD COLUMN IF NOT EXISTS replaced_by VARCHAR(255) NULL;
     group('real migration content', () {
       test('splits actual migration SQL correctly', () {
         // Test with actual migration content from the project
-        final initialMigration = migrations['001_initial']!;
+        final initialMigration = postgresMigrations['001_initial']!;
         final statements = splitStatements(initialMigration);
 
         // Should have multiple CREATE TABLE/INDEX statements
@@ -203,8 +203,8 @@ ALTER TABLE packages ADD COLUMN IF NOT EXISTS replaced_by VARCHAR(255) NULL;
         }
       });
 
-      test('all migrations can be split without error', () {
-        for (final entry in migrations.entries) {
+      test('all postgresMigrations can be split without error', () {
+        for (final entry in postgresMigrations.entries) {
           final statements = splitStatements(entry.value);
           expect(statements, isNotNull,
               reason: 'Migration ${entry.key} should split without error');

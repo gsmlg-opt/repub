@@ -115,11 +115,16 @@ Future<void> startServer({Config? config}) async {
 
   // Initialize password encryption
   Logger.info('Initializing password encryption...', component: 'security');
-  final passwordCrypto = PasswordCrypto();
-  Logger.info('RSA key pair generated', component: 'security', metadata: {
-    'keySize': 2048,
-    'algorithm': 'RSA-OAEP',
-  });
+  final keyPath =
+      Platform.environment['REPUB_KEY_PATH'] ?? './data/metadata/keys';
+  final passwordCrypto =
+      await PasswordCrypto.loadOrGenerate('$keyPath/.rsa_key');
+  Logger.info('RSA key pair generated/loaded',
+      component: 'security',
+      metadata: {
+        'keySize': 2048,
+        'algorithm': 'RSA-OAEP',
+      });
 
   // Create router
   final router = createRouter(

@@ -2,16 +2,16 @@ import 'package:repub_migrate/repub_migrate.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('migrations', () {
+  group('postgresMigrations', () {
     test('has ordered migration keys', () {
-      final keys = migrations.keys.toList();
+      final keys = postgresMigrations.keys.toList();
       final sortedKeys = List<String>.from(keys)..sort();
       expect(keys, equals(sortedKeys),
           reason: 'Migrations should be defined in sorted order');
     });
 
     test('migration keys follow naming convention', () {
-      for (final key in migrations.keys) {
+      for (final key in postgresMigrations.keys) {
         expect(
           key,
           matches(RegExp(r'^\d{3}_[a-z_]+$')),
@@ -20,8 +20,8 @@ void main() {
       }
     });
 
-    test('all migrations have non-empty SQL', () {
-      for (final entry in migrations.entries) {
+    test('all postgresMigrations have non-empty SQL', () {
+      for (final entry in postgresMigrations.entries) {
         expect(
           entry.value.trim(),
           isNotEmpty,
@@ -31,7 +31,7 @@ void main() {
     });
 
     test('initial migration creates required tables', () {
-      final initialMigration = migrations['001_initial']!;
+      final initialMigration = postgresMigrations['001_initial']!;
       expect(initialMigration, contains('CREATE TABLE'));
       expect(initialMigration, contains('packages'));
       expect(initialMigration, contains('package_versions'));
@@ -40,13 +40,13 @@ void main() {
     });
 
     test('upstream cache migration adds column', () {
-      final migration = migrations['002_upstream_cache']!;
+      final migration = postgresMigrations['002_add_upstream_cache']!;
       expect(migration, contains('ALTER TABLE packages'));
       expect(migration, contains('is_upstream_cache'));
     });
 
     test('admin authentication migration creates admin_users', () {
-      final migration = migrations['003_admin_authentication']!;
+      final migration = postgresMigrations['004_admin_authentication']!;
       expect(migration, contains('CREATE TABLE'));
       expect(migration, contains('admin_users'));
       expect(migration, contains('username'));
@@ -54,7 +54,7 @@ void main() {
     });
 
     test('activity log migration creates required tables', () {
-      final migration = migrations['009_activity_log']!;
+      final migration = postgresMigrations['009_activity_log']!;
       expect(migration, contains('CREATE TABLE'));
       expect(migration, contains('activity_log'));
       expect(migration, contains('activity_type'));
@@ -62,7 +62,7 @@ void main() {
     });
 
     test('webhooks migration creates webhooks and deliveries tables', () {
-      final migration = migrations['010_webhooks']!;
+      final migration = postgresMigrations['010_webhooks']!;
       expect(migration, contains('CREATE TABLE'));
       expect(migration, contains('webhooks'));
       expect(migration, contains('webhook_deliveries'));
@@ -70,7 +70,7 @@ void main() {
     });
 
     test('version retraction migration adds columns', () {
-      final migration = migrations['011_version_retraction']!;
+      final migration = postgresMigrations['011_version_retraction']!;
       expect(migration, contains('ALTER TABLE package_versions'));
       expect(migration, contains('is_retracted'));
       expect(migration, contains('retracted_at'));
@@ -79,29 +79,29 @@ void main() {
   });
 
   group('getPendingMigrations', () {
-    test('returns all migrations when none applied', () {
-      final pending = getPendingMigrations({});
-      expect(pending.length, equals(migrations.length));
+    test('returns all postgresMigrations when none applied', () {
+      final pending = getPendingMigrations({}, postgresMigrations);
+      expect(pending.length, equals(postgresMigrations.length));
     });
 
     test('returns empty list when all applied', () {
-      final applied = migrations.keys.toSet();
-      final pending = getPendingMigrations(applied);
+      final applied = postgresMigrations.keys.toSet();
+      final pending = getPendingMigrations(applied, postgresMigrations);
       expect(pending, isEmpty);
     });
 
-    test('returns only unapplied migrations', () {
-      final applied = {'001_initial', '002_upstream_cache'};
-      final pending = getPendingMigrations(applied);
+    test('returns only unapplied postgresMigrations', () {
+      final applied = {'001_initial', '002_add_upstream_cache'};
+      final pending = getPendingMigrations(applied, postgresMigrations);
 
       expect(pending.any((m) => m.key == '001_initial'), isFalse);
-      expect(pending.any((m) => m.key == '002_upstream_cache'), isFalse);
-      expect(pending.any((m) => m.key == '003_admin_authentication'), isTrue);
+      expect(pending.any((m) => m.key == '002_add_upstream_cache'), isFalse);
+      expect(pending.any((m) => m.key == '004_admin_authentication'), isTrue);
     });
 
-    test('returns migrations in sorted order', () {
-      final applied = {'002_upstream_cache'}; // Skip the middle one
-      final pending = getPendingMigrations(applied);
+    test('returns postgresMigrations in sorted order', () {
+      final applied = {'002_add_upstream_cache'}; // Skip the middle one
+      final pending = getPendingMigrations(applied, postgresMigrations);
 
       // Should include 001 and all after 002
       final keys = pending.map((m) => m.key).toList();
@@ -109,19 +109,19 @@ void main() {
       expect(keys, equals(sortedKeys));
     });
 
-    test('ignores unknown applied migrations', () {
+    test('ignores unknown applied postgresMigrations', () {
       final applied = {'001_initial', 'unknown_migration'};
-      final pending = getPendingMigrations(applied);
+      final pending = getPendingMigrations(applied, postgresMigrations);
 
       // Should still return all except 001_initial
       expect(pending.any((m) => m.key == '001_initial'), isFalse);
-      expect(pending.length, equals(migrations.length - 1));
+      expect(pending.length, equals(postgresMigrations.length - 1));
     });
   });
 
   group('migration content validation', () {
     test('no migration contains DROP TABLE without IF EXISTS', () {
-      for (final entry in migrations.entries) {
+      for (final entry in postgresMigrations.entries) {
         final sql = entry.value.toUpperCase();
         if (sql.contains('DROP TABLE')) {
           expect(
@@ -135,7 +135,7 @@ void main() {
     });
 
     test('CREATE TABLE uses IF NOT EXISTS', () {
-      for (final entry in migrations.entries) {
+      for (final entry in postgresMigrations.entries) {
         final sql = entry.value.toUpperCase();
         // Count CREATE TABLE occurrences that don't have IF NOT EXISTS
         final createTableCount =
@@ -151,17 +151,17 @@ void main() {
 
     test('ALTER TABLE uses IF EXISTS/IF NOT EXISTS for columns', () {
       // This is a best-practice check - PostgreSQL supports ADD COLUMN IF NOT EXISTS
-      for (final entry in migrations.entries) {
+      for (final entry in postgresMigrations.entries) {
         final sql = entry.value.toUpperCase();
         if (sql.contains('ADD COLUMN') && !sql.contains('IF NOT EXISTS')) {
-          // Allow migrations that might be running on older PostgreSQL
+          // Allow postgresMigrations that might be running on older PostgreSQL
           // Just log a warning rather than failing
         }
       }
     });
 
     test('indexes use IF NOT EXISTS', () {
-      for (final entry in migrations.entries) {
+      for (final entry in postgresMigrations.entries) {
         final sql = entry.value.toUpperCase();
         final createIndexCount =
             RegExp(r'CREATE INDEX(?! IF NOT EXISTS)').allMatches(sql).length;

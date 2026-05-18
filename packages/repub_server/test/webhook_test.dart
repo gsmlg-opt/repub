@@ -48,8 +48,9 @@ void main() {
         await Future.delayed(Duration(milliseconds: 100));
 
         expect(capturedRequests, hasLength(1));
-        expect(capturedRequests.first.url.toString(),
-            equals('https://example.com/webhook'));
+        final request = capturedRequests.first;
+        expect(request.url.path, equals('/webhook'));
+        expect(request.headers['host'], equals('example.com'));
       });
 
       test('does not trigger webhooks for non-matching events', () async {

@@ -148,7 +148,7 @@ void main() {
       }
     });
 
-    testWidgets('shows error snackbar on authentication failure',
+    testWidgets('shows error message on authentication failure',
         (tester) async {
       final controller = StreamController<AuthState>.broadcast();
       when(() => mockAuthBloc.state).thenReturn(const AuthUnauthenticated());
@@ -160,14 +160,11 @@ void main() {
       controller.add(const AuthError('Invalid credentials'));
       await tester.pump();
 
-      // Check for snackbar with error message
+      // Check for inline error message
       expect(find.text('Invalid credentials'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
-          (widget) =>
-              widget is SnackBar &&
-              (widget.backgroundColor == Colors.red ||
-                  widget.backgroundColor?.value == Colors.red.value),
+          (widget) => widget is Icon && widget.icon == Icons.error_outline,
         ),
         findsOneWidget,
       );

@@ -26,25 +26,20 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}[INFO]${NC} $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1" >&2
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1" >&2
 }
 
 cleanup() {
     log_info "Cleaning up..."
     rm -rf "$TEST_DIR"
-
-    # Remove the token from dart pub
-    if [ -n "$TOKEN" ]; then
-        dart pub token remove "$REPUB_URL" 2>/dev/null || true
-    fi
 }
 
 trap cleanup EXIT
@@ -259,10 +254,6 @@ main() {
 
     # Wait for service
     wait_for_service "$REPUB_URL"
-
-    # Create and configure token
-    create_token
-    add_token_to_dart
 
     # Create and publish test package
     local pkg_dir

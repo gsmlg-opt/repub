@@ -17,9 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          channel: stable
 
       - name: Install Melos
         run: dart pub global activate melos
@@ -32,7 +32,11 @@ jobs:
           for pkg in packages/*; do
             if [ -d "$pkg/test" ] && [ "$(ls -A "$pkg/test" 2>/dev/null)" ]; then
               echo "Testing $pkg..."
-              (cd "$pkg" && dart test --reporter=expanded)
+              if grep -q "sdk: flutter" "$pkg/pubspec.yaml" 2>/dev/null; then
+                (cd "$pkg" && flutter test --reporter=expanded)
+              else
+                (cd "$pkg" && dart test --reporter=expanded)
+              fi
             else
               echo "Skipping $pkg (no tests)"
             fi
@@ -62,18 +66,20 @@ jobs:
       REPUB_LISTEN_ADDR: "0.0.0.0:4920"
       REPUB_BASE_URL: "http://localhost:4920"
       REPUB_DATABASE_URL: postgres://repub:repub@localhost:5432/repub
+      REPUB_DATABASE_SSL_INSECURE: "true"
       REPUB_S3_ENDPOINT: "http://localhost:9000"
       REPUB_S3_REGION: "us-east-1"
       REPUB_S3_ACCESS_KEY: "minioadmin"
       REPUB_S3_SECRET_KEY: "minioadmin"
       REPUB_S3_BUCKET: "repub"
+      REPUB_REQUIRE_PUBLISH_AUTH: "false"
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          channel: stable
 
       - name: Install Melos
         run: dart pub global activate melos
@@ -125,14 +131,6 @@ jobs:
 
           curl -sf http://localhost:4920/health || exit 1
 
-      - name: Create auth token
-        id: token
-        run: |
-          cd packages/repub_cli
-          TOKEN=$(dart run repub_cli token create ci-test publish:all 2>&1 | grep "^Created token:" | cut -d: -f2 | tr -d ' ')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "Token created successfully"
-
       - name: Create test package
         run: |
           mkdir -p /tmp/test_pkg/lib
@@ -171,9 +169,6 @@ jobs:
 
       - name: Publish test package
         run: |
-          # Add token to dart pub
-          echo "${{ steps.token.outputs.token }}" | dart pub token add http://localhost:4920
-
           cd /tmp/test_pkg
           dart pub publish --force
 
@@ -255,9 +250,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Remove token
-          dart pub token remove http://localhost:4920 || true
-
           # Stop server
           if [ -f /tmp/server.pid ]; then
             kill $(cat /tmp/server.pid) 2>/dev/null || true

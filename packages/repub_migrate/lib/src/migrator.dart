@@ -17,7 +17,7 @@ Future<int> runMigrations(Connection conn) async {
   final applied = result.map((row) => row[0] as String).toSet();
 
   // Run pending migrations
-  final pending = getPendingMigrations(applied);
+  final pending = getPendingMigrations(applied, postgresMigrations);
   var count = 0;
 
   for (final migration in pending) {
